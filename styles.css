@@ -547,6 +547,12 @@ input[type="date"], input[type="number"] {
   user-select: none;
 }
 
+.goal-header,
+.tasks-header {
+  cursor: pointer;
+  user-select: none;
+}
+
 .capital-title-wrapper {
   display: flex;
   align-items: center;
@@ -555,16 +561,6 @@ input[type="date"], input[type="number"] {
 
 .capital-header .title {
   margin-bottom: 0;
-}
-
-.toggle-arrow {
-  font-size: 10px;
-  color: #a186f1;
-  transition: transform 0.3s ease;
-}
-
-.toggle-arrow.collapsed {
-  transform: rotate(180deg);
 }
 
 .capital-content {

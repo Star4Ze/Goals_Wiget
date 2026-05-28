@@ -277,24 +277,20 @@ function autoResizeWindow() {
 function setupCapitalToggle() {
   const toggle = document.getElementById('capital-toggle');
   const content = document.getElementById('capital-content');
-  const arrow = document.getElementById('capital-arrow');
-  if (!toggle || !content || !arrow) return;
+  if (!toggle || !content) return;
   
   const isCollapsed = localStorage.getItem('capital_collapsed') === 'true';
   if (isCollapsed) {
     content.classList.add('collapsed');
-    arrow.classList.add('collapsed');
   }
   
   toggle.addEventListener('click', () => {
     const willCollapse = !content.classList.contains('collapsed');
     if (willCollapse) {
       content.classList.add('collapsed');
-      arrow.classList.add('collapsed');
       localStorage.setItem('capital_collapsed', 'true');
     } else {
       content.classList.remove('collapsed');
-      arrow.classList.remove('collapsed');
       localStorage.setItem('capital_collapsed', 'false');
       showAllTasks = false;
       localStorage.setItem('show_all_tasks', 'false');
@@ -322,14 +318,16 @@ function openTaskModal(task, event) {
 
 function setupSimpleCollapse({ toggleId, buttonId, contentIds, storageKey, onChange }) {
   const toggle = document.getElementById(toggleId);
-  const button = document.getElementById(buttonId);
+  const button = buttonId ? document.getElementById(buttonId) : null;
   const contents = contentIds.map(id => document.getElementById(id)).filter(Boolean);
-  if (!toggle || !button || contents.length === 0) return;
+  if (!toggle || contents.length === 0) return;
 
   const apply = (collapsed) => {
     contents.forEach(content => content.classList.toggle('collapsed', collapsed));
-    button.textContent = collapsed ? '▼' : '▲';
-    button.title = collapsed ? 'Развернуть' : 'Свернуть';
+    if (button) {
+      button.textContent = collapsed ? '▼' : '▲';
+      button.title = collapsed ? 'Развернуть' : 'Свернуть';
+    }
     localStorage.setItem(storageKey, collapsed ? 'true' : 'false');
     if (onChange) onChange(collapsed);
     autoResizeWindow();
@@ -339,22 +337,23 @@ function setupSimpleCollapse({ toggleId, buttonId, contentIds, storageKey, onCha
   apply(localStorage.getItem(storageKey) === 'true');
 
   toggle.addEventListener('click', (e) => {
-    if (e.target.closest('button') && e.target.id !== buttonId) return;
+    if (e.target.closest('button') && (!buttonId || e.target.id !== buttonId)) return;
     const collapsed = !contents[0].classList.contains('collapsed');
     apply(collapsed);
   });
 
-  button.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const collapsed = !contents[0].classList.contains('collapsed');
-    apply(collapsed);
-  });
+  if (button) {
+    button.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const collapsed = !contents[0].classList.contains('collapsed');
+      apply(collapsed);
+    });
+  }
 }
 
 function setupSectionCollapses() {
   setupSimpleCollapse({
     toggleId: 'goal-toggle',
-    buttonId: 'toggle-goal-btn',
     contentIds: ['goal-content', 'goal-stats'],
     storageKey: 'goal_collapsed',
     onChange: (collapsed) => {
@@ -365,12 +364,11 @@ function setupSectionCollapses() {
   document.querySelector('#goal-card .progress')?.addEventListener('click', () => {
     const goalCard = document.getElementById('goal-card');
     if (!goalCard?.classList.contains('goal-collapsed')) return;
-    document.getElementById('toggle-goal-btn')?.click();
+    document.getElementById('goal-toggle')?.click();
   });
 
   setupSimpleCollapse({
     toggleId: 'tasks-toggle',
-    buttonId: 'toggle-tasks-card-btn',
     contentIds: ['tasks-content'],
     storageKey: 'tasks_card_collapsed',
     onChange: (collapsed) => {
@@ -381,7 +379,6 @@ function setupSectionCollapses() {
 
   setupSimpleCollapse({
     toggleId: 'daily-toggle',
-    buttonId: 'toggle-daily-card-btn',
     contentIds: ['daily-content'],
     storageKey: 'daily_card_collapsed',
     onChange: (collapsed) => {
@@ -523,6 +520,63 @@ function renderCreateFileInput(listContainer) {
   row.appendChild(input);
   row.appendChild(submitBtn);
   listContainer.appendChild(row);
+  setTimeout(() => input.focus(), 50);
+}
+
+function renderRenameFileInput(fileName) {
+  const body = document.querySelector('#file-action-modal .modal-body');
+  if (!body) return;
+
+  const oldRow = body.querySelector('.rename-file-row');
+  if (oldRow) {
+    oldRow.querySelector('input')?.focus();
+    return;
+  }
+
+  const row = document.createElement('div');
+  row.className = 'create-file-row rename-file-row';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'create-file-input';
+  input.value = fileName;
+  input.placeholder = 'Новое имя файла';
+
+  const submitBtn = document.createElement('button');
+  submitBtn.className = 'create-file-submit';
+  submitBtn.textContent = '✓';
+  submitBtn.title = 'Переименовать файл';
+
+  const submit = async () => {
+    const newName = input.value.trim();
+    if (!newName || !window.electronAPI?.renameObsidianFile) return;
+    const result = await window.electronAPI.renameObsidianFile(fileName, newName);
+    const success = typeof result === 'object' ? result.success : result;
+    const actualName = typeof result === 'object' && result.fileName ? result.fileName : newName;
+
+    if (success) {
+      if (activeFileName === fileName) {
+        await selectActiveFile(actualName);
+      }
+      closeFileActionModal();
+      closeFileSelectorModal();
+    } else {
+      input.classList.add('error');
+      input.value = '';
+      input.placeholder = 'Не удалось переименовать';
+      input.focus();
+    }
+  };
+
+  submitBtn.onclick = submit;
+  input.onkeydown = async (e) => {
+    if (e.key === 'Enter') await submit();
+    if (e.key === 'Escape') row.remove();
+  };
+
+  row.appendChild(input);
+  row.appendChild(submitBtn);
+  body.appendChild(row);
   setTimeout(() => input.focus(), 50);
 }
 
@@ -695,7 +749,6 @@ function renderTaskNode(task, options, depth = 0, indexLabel = '') {
     cb.type = 'checkbox';
     cb.className = 'task-check';
     cb.checked = task.done;
-    cb.disabled = task.done && fileName === 'Ежедневные задачи';
     cb.onchange = async () => {
       await markTaskDone(task, fileName);
     };
@@ -1007,20 +1060,9 @@ async function init() {
   const fileDeleteBtn = document.getElementById('file-delete-btn');
 
   if (fileRenameBtn) {
-    fileRenameBtn.addEventListener('click', async () => {
-      if (!selectedFileName || !window.electronAPI?.renameObsidianFile) return;
-      const oldName = selectedFileName;
-      const newName = prompt('Новое имя файла задач:', oldName)?.trim();
-      if (!newName || newName === oldName) return;
-
-      const success = await window.electronAPI.renameObsidianFile(oldName, newName);
-      if (success) {
-        if (activeFileName === oldName) {
-          await selectActiveFile(newName);
-        }
-        closeFileActionModal();
-        await renderFileList();
-      }
+    fileRenameBtn.addEventListener('click', () => {
+      if (!selectedFileName) return;
+      renderRenameFileInput(selectedFileName);
     });
   }
 

@@ -330,16 +330,21 @@ function setupHandlers() {
 
   ipcMain.handle('rename-obsidian-file', async (event, oldName, newName) => {
     try {
-      if (oldName === DAILY_TASKS_FILE_NAME || newName === DAILY_TASKS_FILE_NAME) return false;
+      if (oldName === DAILY_TASKS_FILE_NAME || newName === DAILY_TASKS_FILE_NAME) {
+        return { success: false, error: 'reserved' };
+      }
+      const safeNewName = newName.replace(/[\/\\:\*\?"<>\|]/g, '').trim();
+      if (!safeNewName) return { success: false, error: 'empty' };
       const oldPath = getFilePath(oldName);
-      const newPath = getFilePath(newName);
-      if (!fs.existsSync(oldPath) || fs.existsSync(newPath)) return false;
+      const newPath = getFilePath(safeNewName);
+      if (!fs.existsSync(oldPath)) return { success: false, error: 'missing' };
+      if (fs.existsSync(newPath)) return { success: false, error: 'exists' };
       fs.renameSync(oldPath, newPath);
-      logAction(`📂 Файл задач переименован: ${oldName}.md → ${newName}.md`);
-      return true;
+      logAction(`📂 Файл задач переименован: ${oldName}.md → ${safeNewName}.md`);
+      return { success: true, fileName: safeNewName };
     } catch (e) {
       logAction(`Ошибка переименования файла задач: ${e.message}`);
-      return false;
+      return { success: false, error: e.message };
     }
   });
 
