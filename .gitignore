@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Electron/package outputs
+dist/
+build/
+out/
+release/
+*.asar
+
+# Local runtime files
+config.json
+log.txt
+*.log
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Environment files
+.env
+.env.*

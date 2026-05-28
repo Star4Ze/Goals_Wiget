@@ -1,0 +1,1106 @@
+const STORAGE_KEY = 'widget_data';
+
+function loadSavedData() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+      document.getElementById('personal').value = formatInput(data.personal || 800000);
+      document.getElementById('managed').value = formatInput(data.managed || 200000);
+      document.getElementById('personal-rate').value = data.personalRate || 14;
+      document.getElementById('managed-rate').value = data.managedRate || 18;
+      document.getElementById('target').value = formatInput(data.target || 5000000);
+      if (data.deadline) document.getElementById('deadline').value = data.deadline;
+      return data;
+    } catch(e) {}
+  }
+  return null;
+}
+
+function saveAllData() {
+  const data = {
+    personal: parseMoney(document.getElementById('personal').value),
+    managed: parseMoney(document.getElementById('managed').value),
+    personalRate: parseFloat(document.getElementById('personal-rate').value),
+    managedRate: parseFloat(document.getElementById('managed-rate').value),
+    target: parseMoney(document.getElementById('target').value),
+    deadline: document.getElementById('deadline').value,
+    lastUpdated: new Date().toISOString()
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function formatMoney(n) {
+  return Math.round(n).toLocaleString('ru-RU') + ' ₽';
+}
+
+function parseMoney(str) {
+  if (!str) return 0;
+  return parseFloat(str.toString().replace(/\s/g, '').replace(/₽/g, '')) || 0;
+}
+
+function formatInput(n) {
+  return Math.round(n).toLocaleString('ru-RU');
+}
+
+function setupMoneyFields() {
+  document.querySelectorAll('.money').forEach(input => {
+    const val = parseMoney(input.value);
+    input.value = formatInput(val);
+    
+    input.addEventListener('blur', function() {
+      this.value = formatInput(parseMoney(this.value));
+      calculate();
+      saveAllData();
+    });
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); });
+  });
+}
+
+function setupDateField() {
+  const deadline = document.getElementById('deadline');
+  if (!deadline) return;
+
+  const openPicker = () => {
+    if (typeof deadline.showPicker === 'function') {
+      try {
+        deadline.showPicker();
+      } catch (e) {
+        deadline.focus();
+      }
+    } else {
+      deadline.focus();
+    }
+  };
+
+  deadline.addEventListener('click', openPicker);
+  deadline.addEventListener('focus', openPicker);
+}
+
+let obsidianTasks = [];
+let activeFileName = localStorage.getItem('active_task_file') || 'Дела';
+let showAllTasks = localStorage.getItem('show_all_tasks') === 'true';
+let dailyTasks = [];
+
+let selectedTask = null;
+let selectedTaskFileName = null;
+let selectedFileName = null;
+let activeSubtaskInputTaskId = null;
+let activeEditTaskId = null;
+let activeTriggerBtnRect = null;
+
+function getTaskKey(task, fileName) {
+  return `${fileName}:${task.lineIndex}`;
+}
+
+function clamp(value, min, max) {
+  if (max < min) return min;
+  return Math.min(Math.max(value, min), max);
+}
+
+function positionFloatingModal(modalContent, anchorRect) {
+  const gap = 8;
+  const margin = 12;
+  modalContent.style.position = 'absolute';
+  modalContent.style.left = '0px';
+  modalContent.style.right = 'auto';
+  modalContent.style.top = '0px';
+  modalContent.style.bottom = 'auto';
+
+  const modalRect = modalContent.getBoundingClientRect();
+  const width = modalRect.width || 220;
+  const height = modalRect.height || 180;
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const anchor = anchorRect || {
+    left: (viewportWidth - width) / 2,
+    right: (viewportWidth + width) / 2,
+    top: (viewportHeight - height) / 2,
+    bottom: (viewportHeight + height) / 2
+  };
+
+  const preferAbove = anchor.top > height + gap + margin;
+  const top = preferAbove ? anchor.top - height - gap : anchor.bottom + gap;
+  const left = anchor.right - width;
+
+  modalContent.style.left = `${clamp(left, margin, viewportWidth - width - margin)}px`;
+  modalContent.style.top = `${clamp(top, margin, viewportHeight - height - margin)}px`;
+}
+
+function positionDropdownBelow(modalContent, anchorRect) {
+  const gap = 8;
+  const margin = 12;
+  modalContent.style.position = 'absolute';
+  modalContent.style.left = '0px';
+  modalContent.style.right = 'auto';
+  modalContent.style.top = '0px';
+  modalContent.style.bottom = 'auto';
+
+  const modalRect = modalContent.getBoundingClientRect();
+  const width = modalRect.width || 220;
+  const height = modalRect.height || 180;
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const left = anchorRect.left + (anchorRect.width - width) / 2;
+  const top = anchorRect.bottom + gap;
+  const availableHeight = Math.max(120, viewportHeight - top - margin);
+
+  modalContent.style.left = `${clamp(left, margin, viewportWidth - width - margin)}px`;
+  modalContent.style.top = `${Math.max(margin, top)}px`;
+  modalContent.style.maxHeight = `${availableHeight}px`;
+  modalContent.style.overflow = 'hidden';
+}
+
+// Global click listener for click outside cancels
+document.addEventListener('click', (e) => {
+  if (activeSubtaskInputTaskId !== null) {
+    const row = document.querySelector('.add-subtask-row');
+    if (row && !row.contains(e.target) && !e.target.classList.contains('task-options-btn') && !e.target.classList.contains('modal-action-btn')) {
+      activeSubtaskInputTaskId = null;
+      renderTasks();
+      renderDailyTasks();
+    }
+  }
+  
+  if (activeEditTaskId !== null) {
+    const isEditClick = e.target.classList.contains('task-edit-input') || 
+                        e.target.classList.contains('task-edit-save-btn') || 
+                        e.target.classList.contains('task-edit-cancel-btn');
+    if (!isEditClick && !e.target.classList.contains('task-options-btn') && !e.target.classList.contains('modal-action-btn')) {
+      activeEditTaskId = null;
+      renderTasks();
+      renderDailyTasks();
+    }
+  }
+
+  const inlineAddRow = document.getElementById('inline-add-task-row');
+  const triggerBtn = document.getElementById('add-task-trigger-btn');
+  if (inlineAddRow && !inlineAddRow.classList.contains('hidden') && triggerBtn) {
+    const isClickInside = inlineAddRow.contains(e.target) || triggerBtn.contains(e.target);
+    if (!isClickInside) {
+      inlineAddRow.classList.add('hidden');
+      document.getElementById('inline-new-task-input').value = '';
+    }
+  }
+
+  const inlineDailyAddRow = document.getElementById('inline-add-daily-task-row');
+  const dailyTriggerBtn = document.getElementById('add-daily-task-trigger-btn');
+  if (inlineDailyAddRow && !inlineDailyAddRow.classList.contains('hidden') && dailyTriggerBtn) {
+    const isClickInside = inlineDailyAddRow.contains(e.target) || dailyTriggerBtn.contains(e.target);
+    if (!isClickInside) {
+      inlineDailyAddRow.classList.add('hidden');
+      document.getElementById('inline-new-daily-task-input').value = '';
+    }
+  }
+});
+
+async function selectActiveFile(fileName) {
+  activeFileName = fileName;
+  localStorage.setItem('active_task_file', fileName);
+  const fileBtn = document.getElementById('active-file-btn');
+  if (fileBtn) fileBtn.textContent = fileName;
+  await loadObsidianTasks();
+}
+
+async function loadObsidianTasks() {
+  if (window.electronAPI) {
+    obsidianTasks = await window.electronAPI.readObsidianTasks(activeFileName);
+    renderTasks();
+  } else {
+    obsidianTasks = [];
+    renderTasks();
+  }
+}
+
+async function loadDailyTasks() {
+  if (window.electronAPI?.readDailyTasks) {
+    dailyTasks = await window.electronAPI.readDailyTasks();
+  } else {
+    dailyTasks = [];
+  }
+  renderDailyTasks();
+}
+
+async function addNewTaskInline() {
+  const input = document.getElementById('inline-new-task-input');
+  const taskText = input.value.trim();
+  if (!taskText) return;
+  
+  if (window.electronAPI) {
+    const result = await window.electronAPI.addNewTask(taskText, activeFileName);
+    if (result) {
+      input.value = '';
+      document.getElementById('inline-add-task-row')?.classList.add('hidden');
+      await loadObsidianTasks();
+    }
+  }
+}
+
+async function addDailyTaskInline() {
+  const input = document.getElementById('inline-new-daily-task-input');
+  const taskText = input.value.trim();
+  if (!taskText) return;
+  
+  if (window.electronAPI) {
+    const result = await window.electronAPI.addNewTask(taskText, 'Ежедневные задачи');
+    if (result) {
+      input.value = '';
+      document.getElementById('inline-add-daily-task-row')?.classList.add('hidden');
+      await loadDailyTasks();
+    }
+  }
+}
+
+async function markTaskDone(task, fileName = activeFileName) {
+  if (task.source === 'obsidian' && window.electronAPI) {
+    await window.electronAPI.markTaskDone(task.lineIndex, fileName);
+    if (fileName === 'Ежедневные задачи') {
+      await loadDailyTasks();
+    } else {
+      await loadObsidianTasks();
+    }
+  }
+  calculate();
+}
+
+function autoResizeWindow() {
+  if (window.electronAPI && window.electronAPI.resizeWindow) {
+    const container = document.querySelector('.container');
+    if (container) {
+      const width = 520;
+      const height = Math.min(1024, Math.ceil(container.getBoundingClientRect().height) + 38);
+      window.electronAPI.resizeWindow(width, height);
+    }
+  }
+}
+
+function setupCapitalToggle() {
+  const toggle = document.getElementById('capital-toggle');
+  const content = document.getElementById('capital-content');
+  const arrow = document.getElementById('capital-arrow');
+  if (!toggle || !content || !arrow) return;
+  
+  const isCollapsed = localStorage.getItem('capital_collapsed') === 'true';
+  if (isCollapsed) {
+    content.classList.add('collapsed');
+    arrow.classList.add('collapsed');
+  }
+  
+  toggle.addEventListener('click', () => {
+    const willCollapse = !content.classList.contains('collapsed');
+    if (willCollapse) {
+      content.classList.add('collapsed');
+      arrow.classList.add('collapsed');
+      localStorage.setItem('capital_collapsed', 'true');
+    } else {
+      content.classList.remove('collapsed');
+      arrow.classList.remove('collapsed');
+      localStorage.setItem('capital_collapsed', 'false');
+      showAllTasks = false;
+      localStorage.setItem('show_all_tasks', 'false');
+      renderTasks();
+    }
+    autoResizeWindow();
+    setTimeout(autoResizeWindow, 310);
+  });
+}
+
+function openTaskModal(task, event) {
+  selectedTask = task;
+  selectedTaskFileName = event?.currentTarget?.dataset?.fileName || activeFileName;
+  const modal = document.getElementById('task-modal');
+  const modalContent = modal.querySelector('.modal-content');
+  if (modal && modalContent && event) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    activeTriggerBtnRect = rect;
+    const moveBtn = document.getElementById('modal-move-btn');
+    if (moveBtn) moveBtn.classList.toggle('hidden', selectedTaskFileName === 'Ежедневные задачи');
+    modal.classList.remove('hidden');
+    positionFloatingModal(modalContent, rect);
+  }
+}
+
+function setupSimpleCollapse({ toggleId, buttonId, contentIds, storageKey, onChange }) {
+  const toggle = document.getElementById(toggleId);
+  const button = document.getElementById(buttonId);
+  const contents = contentIds.map(id => document.getElementById(id)).filter(Boolean);
+  if (!toggle || !button || contents.length === 0) return;
+
+  const apply = (collapsed) => {
+    contents.forEach(content => content.classList.toggle('collapsed', collapsed));
+    button.textContent = collapsed ? '▼' : '▲';
+    button.title = collapsed ? 'Развернуть' : 'Свернуть';
+    localStorage.setItem(storageKey, collapsed ? 'true' : 'false');
+    if (onChange) onChange(collapsed);
+    autoResizeWindow();
+    setTimeout(autoResizeWindow, 250);
+  };
+
+  apply(localStorage.getItem(storageKey) === 'true');
+
+  toggle.addEventListener('click', (e) => {
+    if (e.target.closest('button') && e.target.id !== buttonId) return;
+    const collapsed = !contents[0].classList.contains('collapsed');
+    apply(collapsed);
+  });
+
+  button.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const collapsed = !contents[0].classList.contains('collapsed');
+    apply(collapsed);
+  });
+}
+
+function setupSectionCollapses() {
+  setupSimpleCollapse({
+    toggleId: 'goal-toggle',
+    buttonId: 'toggle-goal-btn',
+    contentIds: ['goal-content', 'goal-stats'],
+    storageKey: 'goal_collapsed',
+    onChange: (collapsed) => {
+      document.getElementById('goal-card')?.classList.toggle('goal-collapsed', collapsed);
+    }
+  });
+
+  document.querySelector('#goal-card .progress')?.addEventListener('click', () => {
+    const goalCard = document.getElementById('goal-card');
+    if (!goalCard?.classList.contains('goal-collapsed')) return;
+    document.getElementById('toggle-goal-btn')?.click();
+  });
+
+  setupSimpleCollapse({
+    toggleId: 'tasks-toggle',
+    buttonId: 'toggle-tasks-card-btn',
+    contentIds: ['tasks-content'],
+    storageKey: 'tasks_card_collapsed',
+    onChange: (collapsed) => {
+      document.getElementById('add-task-trigger-btn')?.classList.toggle('hidden', collapsed);
+      document.getElementById('toggle-expand-tasks-btn')?.classList.toggle('hidden', collapsed);
+    }
+  });
+
+  setupSimpleCollapse({
+    toggleId: 'daily-toggle',
+    buttonId: 'toggle-daily-card-btn',
+    contentIds: ['daily-content'],
+    storageKey: 'daily_card_collapsed',
+    onChange: (collapsed) => {
+      document.getElementById('add-daily-task-trigger-btn')?.classList.toggle('hidden', collapsed);
+    }
+  });
+}
+
+function closeTaskModal() {
+  selectedTask = null;
+  selectedTaskFileName = null;
+  const modal = document.getElementById('task-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+}
+
+function openFileSelectorModal(event) {
+  const modal = document.getElementById('file-selector-modal');
+  const modalContent = modal.querySelector('.modal-content');
+  if (modal && modalContent && event) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    modal.classList.remove('hidden');
+    positionDropdownBelow(modalContent, rect);
+    renderFileList();
+  }
+}
+
+function closeFileSelectorModal() {
+  const modal = document.getElementById('file-selector-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function openFileActionModal(fileName, event) {
+  selectedFileName = fileName;
+  const modal = document.getElementById('file-action-modal');
+  const modalContent = modal?.querySelector('.modal-content');
+  if (modal && modalContent && event) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    modal.classList.remove('hidden');
+    positionFloatingModal(modalContent, rect);
+  }
+}
+
+function closeFileActionModal() {
+  selectedFileName = null;
+  const modal = document.getElementById('file-action-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function renderFileList() {
+  const listContainer = document.getElementById('file-selector-list');
+  if (!listContainer || !window.electronAPI) return;
+  
+  const files = await window.electronAPI.getObsidianFiles();
+  listContainer.innerHTML = '';
+  
+  files.forEach(file => {
+    const row = document.createElement('div');
+    row.className = 'file-list-row';
+
+    const btn = document.createElement('button');
+    btn.className = 'file-select-btn';
+    btn.textContent = `📁 ${file}`;
+    btn.onclick = async () => {
+      await selectActiveFile(file);
+      closeFileSelectorModal();
+    };
+
+    const optionsBtn = document.createElement('button');
+    optionsBtn.className = 'file-options-btn';
+    optionsBtn.textContent = '•••';
+    optionsBtn.title = 'Действия с файлом';
+    optionsBtn.onclick = (e) => {
+      e.stopPropagation();
+      openFileActionModal(file, e);
+    };
+
+    row.appendChild(btn);
+    row.appendChild(optionsBtn);
+    listContainer.appendChild(row);
+  });
+  
+  const sep = document.createElement('div');
+  sep.style.borderTop = '1px solid #333';
+  sep.style.margin = '6px 0';
+  listContainer.appendChild(sep);
+  
+  const createBtn = document.createElement('button');
+  createBtn.className = 'modal-action-btn';
+  createBtn.style.color = '#a186f1';
+  createBtn.textContent = '➕ Создать файл...';
+  createBtn.onclick = () => renderCreateFileInput(listContainer);
+  listContainer.appendChild(createBtn);
+}
+
+function renderCreateFileInput(listContainer) {
+  const oldRow = listContainer.querySelector('.create-file-row');
+  if (oldRow) {
+    oldRow.querySelector('input')?.focus();
+    return;
+  }
+
+  const row = document.createElement('div');
+  row.className = 'create-file-row';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'create-file-input';
+  input.placeholder = 'Название файла';
+
+  const submitBtn = document.createElement('button');
+  submitBtn.className = 'create-file-submit';
+  submitBtn.textContent = '+';
+  submitBtn.title = 'Создать файл';
+
+  const submit = async () => {
+    const trimmed = input.value.trim();
+    if (!trimmed || !window.electronAPI) return;
+
+    const success = await window.electronAPI.createObsidianFile(trimmed);
+    if (success) {
+      await selectActiveFile(trimmed);
+      closeFileSelectorModal();
+    } else {
+      input.classList.add('error');
+      input.value = '';
+      input.placeholder = 'Такой файл уже есть';
+      input.focus();
+    }
+  };
+
+  submitBtn.onclick = submit;
+  input.onkeydown = async (e) => {
+    if (e.key === 'Enter') await submit();
+    if (e.key === 'Escape') row.remove();
+  };
+
+  row.appendChild(input);
+  row.appendChild(submitBtn);
+  listContainer.appendChild(row);
+  setTimeout(() => input.focus(), 50);
+}
+
+function openMoveTaskModal(task, targetRect) {
+  const modal = document.getElementById('move-task-modal');
+  const modalContent = modal.querySelector('.modal-content');
+  if (modal && modalContent && targetRect) {
+    modal.classList.remove('hidden');
+    positionFloatingModal(modalContent, targetRect);
+    renderMoveTargets(task);
+  }
+}
+
+function closeMoveTaskModal() {
+  const modal = document.getElementById('move-task-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function renderMoveTargets(task) {
+  const listContainer = document.getElementById('move-task-list');
+  if (!listContainer || !window.electronAPI) return;
+  
+  const files = await window.electronAPI.getObsidianFiles();
+  listContainer.innerHTML = '';
+  
+  const otherFiles = files.filter(f => f !== activeFileName);
+  if (otherFiles.length === 0) {
+    const info = document.createElement('div');
+    info.style.color = '#888';
+    info.style.fontSize = '11px';
+    info.style.padding = '8px';
+    info.style.textAlign = 'center';
+    info.textContent = 'Нет других файлов. Создайте файл!';
+    listContainer.appendChild(info);
+    return;
+  }
+  
+  otherFiles.forEach(file => {
+    const btn = document.createElement('button');
+    btn.className = 'modal-action-btn';
+    btn.textContent = `📂 ${file}`;
+    btn.onclick = async () => {
+      const success = await window.electronAPI.moveTaskToFile(activeFileName, task.lineIndex, file);
+      if (success) {
+        closeMoveTaskModal();
+        await loadObsidianTasks();
+      }
+    };
+    listContainer.appendChild(btn);
+  });
+}
+
+function createInlineSubtaskInput(parentTask, parentElement, fileName) {
+  const row = document.createElement('div');
+  row.className = 'add-subtask-row';
+  
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'subtask-input';
+  input.placeholder = 'Добавить подзадачу...';
+  
+  const btn = document.createElement('button');
+  btn.className = 'add-subtask-btn-submit';
+  btn.textContent = '+';
+  
+  const submit = async () => {
+    const val = input.value.trim();
+    if (val && window.electronAPI) {
+      await window.electronAPI.addSubtask(parentTask.lineIndex, val, fileName);
+      activeSubtaskInputTaskId = null;
+      if (fileName === 'Ежедневные задачи') {
+        await loadDailyTasks();
+      } else {
+        await loadObsidianTasks();
+      }
+    }
+  };
+  
+  btn.onclick = submit;
+  input.onkeydown = async (e) => {
+    if (e.key === 'Enter') {
+      await submit();
+    } else if (e.key === 'Escape') {
+      activeSubtaskInputTaskId = null;
+      renderTasks();
+    }
+  };
+  
+  row.appendChild(input);
+  row.appendChild(btn);
+  parentElement.appendChild(row);
+  
+  setTimeout(() => input.focus(), 50);
+}
+
+function getVisibleChildren(task, showDone) {
+  return (task.subtasks || []).filter(child => showDone || !child.done);
+}
+
+function countTasks(tasks, showDone = true) {
+  return tasks.reduce((sum, task) => {
+    if (!showDone && task.done) return sum;
+    return sum + 1 + countTasks(getVisibleChildren(task, showDone), showDone);
+  }, 0);
+}
+
+function renderTaskNode(task, options, depth = 0, indexLabel = '') {
+  const fileName = options.fileName;
+  const key = getTaskKey(task, fileName);
+  const group = document.createElement('div');
+  group.className = `task-group depth-${Math.min(depth, 4)}`;
+
+  const div = document.createElement('div');
+  div.className = depth > 0 ? 'task subtask' : 'task';
+  div.style.setProperty('--task-depth', depth);
+
+  if (task.done) {
+    div.classList.add('done');
+  }
+
+  if (activeEditTaskId === key) {
+    const editInput = document.createElement('input');
+    editInput.type = 'text';
+    editInput.className = depth > 0 ? 'task-edit-input subtask-edit-input' : 'task-edit-input';
+    editInput.value = task.text;
+
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'task-edit-save-btn';
+    saveBtn.textContent = '✓';
+    saveBtn.title = 'Сохранить';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'task-edit-cancel-btn';
+    cancelBtn.textContent = '✕';
+    cancelBtn.title = 'Отмена';
+
+    const reload = fileName === 'Ежедневные задачи' ? loadDailyTasks : loadObsidianTasks;
+    const submitEdit = async () => {
+      const val = editInput.value.trim();
+      if (val && window.electronAPI) {
+        await window.electronAPI.editTask(task.lineIndex, val, fileName);
+        activeEditTaskId = null;
+        await reload();
+      }
+    };
+
+    saveBtn.onclick = submitEdit;
+    cancelBtn.onclick = () => {
+      activeEditTaskId = null;
+      renderTasks();
+      renderDailyTasks();
+    };
+
+    editInput.onkeydown = async (e) => {
+      if (e.key === 'Enter') {
+        await submitEdit();
+      } else if (e.key === 'Escape') {
+        activeEditTaskId = null;
+        renderTasks();
+        renderDailyTasks();
+      }
+    };
+
+    div.appendChild(editInput);
+    div.appendChild(saveBtn);
+    div.appendChild(cancelBtn);
+    setTimeout(() => editInput.focus(), 50);
+  } else {
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'task-check';
+    cb.checked = task.done;
+    cb.disabled = task.done && fileName === 'Ежедневные задачи';
+    cb.onchange = async () => {
+      await markTaskDone(task, fileName);
+    };
+
+    const span = document.createElement('span');
+    span.className = 'task-text';
+    span.textContent = `${indexLabel}${task.text}`;
+
+    div.appendChild(cb);
+    div.appendChild(span);
+
+    const optBtn = document.createElement('button');
+    optBtn.className = 'task-options-btn';
+    optBtn.textContent = '•••';
+    optBtn.title = 'Опции';
+    optBtn.dataset.fileName = fileName;
+    optBtn.onclick = (e) => {
+      e.stopPropagation();
+      openTaskModal(task, e);
+    };
+    div.appendChild(optBtn);
+  }
+
+  group.appendChild(div);
+
+  if (activeSubtaskInputTaskId === key) {
+    createInlineSubtaskInput(task, group, fileName);
+  }
+
+  const children = getVisibleChildren(task, options.showDone);
+  if (children.length > 0) {
+    const childContainer = document.createElement('div');
+    childContainer.className = 'subtasks-container';
+    children.forEach((child, childIdx) => {
+      childContainer.appendChild(renderTaskNode(child, options, depth + 1, `${childIdx + 1}. `));
+    });
+    group.appendChild(childContainer);
+  }
+
+  return group;
+}
+
+function renderTasks() {
+  const container = document.getElementById('tasks');
+  const counter = document.getElementById('task-counter');
+  if (!container) return;
+
+  const activeRoot = obsidianTasks.filter(t => !t.done);
+  const active = showAllTasks ? activeRoot : activeRoot.slice(0, 5);
+  const visibleCount = countTasks(active, false);
+  const totalActiveCount = countTasks(activeRoot, false);
+  counter.textContent = `${totalActiveCount} осталось`;
+
+  container.classList.toggle('expanded', showAllTasks);
+
+  const toggleBtn = document.getElementById('toggle-expand-tasks-btn');
+  if (toggleBtn) {
+    toggleBtn.textContent = showAllTasks ? '▲' : '▼';
+  }
+
+  container.innerHTML = '';
+  active.forEach((task, idx) => {
+    container.appendChild(renderTaskNode(task, { fileName: activeFileName, showDone: false }, 0, `${idx + 1}. `));
+  });
+
+  autoResizeWindow();
+}
+
+function renderDailyTasks() {
+  const container = document.getElementById('daily-tasks');
+  const counter = document.getElementById('daily-task-counter');
+  if (!container) return;
+
+  const openCount = countTasks(dailyTasks, false);
+  const totalCount = countTasks(dailyTasks, true);
+  if (counter) counter.textContent = `${openCount} осталось`;
+
+  container.innerHTML = '';
+  dailyTasks.forEach((task, idx) => {
+    container.appendChild(renderTaskNode(task, { fileName: 'Ежедневные задачи', showDone: true }, 0, `${idx + 1}. `));
+  });
+
+  autoResizeWindow();
+}
+
+async function addIncome() {
+  const amountInput = document.getElementById('income-amount');
+  const amount = parseMoney(amountInput.value);
+  
+  if (amount <= 0) return;
+  
+  const personalInput = document.getElementById('personal');
+  const currentPersonal = parseMoney(personalInput.value);
+  const newPersonal = currentPersonal + amount;
+  
+  personalInput.value = formatInput(newPersonal);
+  
+  if (window.electronAPI) {
+    await window.electronAPI.addIncome(amount, newPersonal);
+  }
+  
+  amountInput.value = formatInput(0);
+  calculate();
+  saveAllData();
+}
+
+function setupCloseButton() {
+  const closeBtn = document.getElementById('close-btn');
+  if (closeBtn && window.electronAPI) {
+    closeBtn.addEventListener('click', () => {
+      window.electronAPI.closeWindow();
+    });
+  }
+}
+
+function calculate() {
+  const target = parseMoney(document.getElementById('target').value);
+  const deadline = document.getElementById('deadline').value;
+  const personal = parseMoney(document.getElementById('personal').value);
+  const personalRate = parseFloat(document.getElementById('personal-rate').value) / 100 || 0;
+  const managed = parseMoney(document.getElementById('managed').value);
+  const managedRate = parseFloat(document.getElementById('managed-rate').value) / 100 || 0;
+  
+  const totalCap = personal + managed;
+  
+  let days = 0;
+  if (deadline) {
+    const now = new Date(); now.setHours(0,0,0,0);
+    const dl = new Date(deadline);
+    days = Math.max(0, Math.ceil((dl - now) / 86400000));
+  }
+  const years = days / 365;
+  
+  const avgRate = totalCap > 0 
+    ? (personal * personalRate + managed * managedRate) / totalCap
+    : (personalRate + managedRate) / 2;
+  
+  const futureValue = totalCap * Math.pow(1 + avgRate, years);
+  const pct = target > 0 ? Math.min(100, (futureValue / target) * 100) : 0;
+  
+  document.getElementById('bar').style.width = pct + '%';
+  document.getElementById('percent').textContent = pct.toFixed(1) + '%';
+  
+  const remain = Math.max(0, target - futureValue);
+  const capitalBadge = document.getElementById('capital-total-badge');
+  if (capitalBadge) {
+    capitalBadge.textContent = formatMoney(totalCap);
+  }
+  document.getElementById('remain').innerHTML = formatMoney(remain);
+  document.getElementById('days').textContent = days ? days + ' дн.' : '—';
+  
+  let monthly = 0;
+  let daily = 0;
+  if (days > 0 && remain > 0 && avgRate > 0) {
+    const rDaily = Math.pow(1 + avgRate, 1/365) - 1;
+    daily = remain * rDaily / (Math.pow(1 + rDaily, days) - 1);
+
+    const rMonthly = Math.pow(1 + avgRate, 1/12) - 1;
+    const months = days * 12 / 365;
+    if (months > 0) {
+      monthly = remain * rMonthly / (Math.pow(1 + rMonthly, months) - 1);
+    }
+  } else if (days > 0 && remain > 0) {
+    daily = remain / days;
+    const months = days * 12 / 365;
+    if (months > 0) {
+      monthly = remain / months;
+    }
+  }
+  
+  const monthlyEl = document.getElementById('monthly');
+  if (monthlyEl) {
+    monthlyEl.innerHTML = monthly > 0 ? formatMoney(monthly) : '—';
+  }
+
+  const dailyEl = document.getElementById('daily');
+  if (dailyEl) {
+    dailyEl.innerHTML = daily > 0 ? formatMoney(daily) : '—';
+  }
+}
+
+async function init() {
+  setupMoneyFields();
+  setupDateField();
+  loadSavedData();
+  setupCloseButton();
+  setupCapitalToggle();
+  setupSectionCollapses();
+  
+  const fileBtn = document.getElementById('active-file-btn');
+  if (fileBtn) fileBtn.textContent = activeFileName;
+  
+  const ids = ['target', 'deadline', 'personal', 'personal-rate', 'managed', 'managed-rate'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', () => { calculate(); saveAllData(); autoResizeWindow(); });
+    if (el && id === 'deadline') el.addEventListener('change', () => { calculate(); saveAllData(); autoResizeWindow(); });
+  });
+  
+  document.getElementById('add-income-btn')?.addEventListener('click', async () => {
+    await addIncome();
+    autoResizeWindow();
+  });
+  document.getElementById('income-amount')?.addEventListener('keydown', async e => {
+    if (e.key === 'Enter') {
+      await addIncome();
+      autoResizeWindow();
+    }
+  });
+
+  document.getElementById('toggle-expand-tasks-btn')?.addEventListener('click', () => {
+    showAllTasks = !showAllTasks;
+    localStorage.setItem('show_all_tasks', showAllTasks ? 'true' : 'false');
+    renderTasks();
+  });
+
+  document.getElementById('active-file-btn')?.addEventListener('click', (e) => {
+    openFileSelectorModal(e);
+  });
+
+  document.getElementById('add-task-trigger-btn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const row = document.getElementById('inline-add-task-row');
+    if (row) {
+      const isHidden = row.classList.contains('hidden');
+      if (isHidden) {
+        row.classList.remove('hidden');
+        const input = document.getElementById('inline-new-task-input');
+        setTimeout(() => input.focus(), 50);
+      } else {
+        row.classList.add('hidden');
+        document.getElementById('inline-new-task-input').value = '';
+      }
+      autoResizeWindow();
+    }
+  });
+
+  document.getElementById('inline-add-task-submit')?.addEventListener('click', async () => {
+    await addNewTaskInline();
+    autoResizeWindow();
+  });
+  document.getElementById('inline-new-task-input')?.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter') {
+      await addNewTaskInline();
+      autoResizeWindow();
+    }
+  });
+
+  document.getElementById('add-daily-task-trigger-btn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const row = document.getElementById('inline-add-daily-task-row');
+    if (row) {
+      const isHidden = row.classList.contains('hidden');
+      if (isHidden) {
+        row.classList.remove('hidden');
+        const input = document.getElementById('inline-new-daily-task-input');
+        setTimeout(() => input.focus(), 50);
+      } else {
+        row.classList.add('hidden');
+        document.getElementById('inline-new-daily-task-input').value = '';
+      }
+      autoResizeWindow();
+    }
+  });
+
+  document.getElementById('inline-add-daily-task-submit')?.addEventListener('click', async () => {
+    await addDailyTaskInline();
+    autoResizeWindow();
+  });
+  document.getElementById('inline-new-daily-task-input')?.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter') {
+      await addDailyTaskInline();
+      autoResizeWindow();
+    }
+  });
+
+  const modalOverlay = document.getElementById('task-modal');
+  const fileSelectorOverlay = document.getElementById('file-selector-modal');
+  const fileActionOverlay = document.getElementById('file-action-modal');
+  const moveTaskOverlay = document.getElementById('move-task-modal');
+
+  if (modalOverlay) {
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay) closeTaskModal();
+    });
+  }
+  if (fileSelectorOverlay) {
+    fileSelectorOverlay.addEventListener('click', (e) => {
+      if (e.target === fileSelectorOverlay) closeFileSelectorModal();
+    });
+  }
+  if (fileActionOverlay) {
+    fileActionOverlay.addEventListener('click', (e) => {
+      if (e.target === fileActionOverlay) closeFileActionModal();
+    });
+  }
+  if (moveTaskOverlay) {
+    moveTaskOverlay.addEventListener('click', (e) => {
+      if (e.target === moveTaskOverlay) closeMoveTaskModal();
+    });
+  }
+
+  const modalPinBtn = document.getElementById('modal-pin-btn');
+  const modalEditBtn = document.getElementById('modal-edit-btn');
+  const modalAddSubtaskBtn = document.getElementById('modal-add-subtask-btn');
+  const modalMoveBtn = document.getElementById('modal-move-btn');
+  const modalDeleteBtn = document.getElementById('modal-delete-btn');
+  const fileRenameBtn = document.getElementById('file-rename-btn');
+  const fileDeleteBtn = document.getElementById('file-delete-btn');
+
+  if (fileRenameBtn) {
+    fileRenameBtn.addEventListener('click', async () => {
+      if (!selectedFileName || !window.electronAPI?.renameObsidianFile) return;
+      const oldName = selectedFileName;
+      const newName = prompt('Новое имя файла задач:', oldName)?.trim();
+      if (!newName || newName === oldName) return;
+
+      const success = await window.electronAPI.renameObsidianFile(oldName, newName);
+      if (success) {
+        if (activeFileName === oldName) {
+          await selectActiveFile(newName);
+        }
+        closeFileActionModal();
+        await renderFileList();
+      }
+    });
+  }
+
+  if (fileDeleteBtn) {
+    fileDeleteBtn.addEventListener('click', async () => {
+      if (!selectedFileName || !window.electronAPI?.deleteObsidianFile) return;
+      const deletedName = selectedFileName;
+      const success = await window.electronAPI.deleteObsidianFile(deletedName);
+      if (success) {
+        const files = await window.electronAPI.getObsidianFiles();
+        if (activeFileName === deletedName) {
+          await selectActiveFile(files[0] || 'Дела');
+        }
+        closeFileActionModal();
+        await renderFileList();
+      }
+    });
+  }
+
+  if (modalPinBtn) {
+    modalPinBtn.addEventListener('click', async () => {
+      if (selectedTask && window.electronAPI) {
+        const fileName = selectedTaskFileName || activeFileName;
+        await window.electronAPI.pinTask(selectedTask.lineIndex, selectedTask.parentLineIndex, fileName);
+        closeTaskModal();
+        if (fileName === 'Ежедневные задачи') await loadDailyTasks();
+        else await loadObsidianTasks();
+      }
+    });
+  }
+
+  if (modalEditBtn) {
+    modalEditBtn.addEventListener('click', () => {
+      if (selectedTask) {
+        activeEditTaskId = getTaskKey(selectedTask, selectedTaskFileName || activeFileName);
+        closeTaskModal();
+        renderTasks();
+        renderDailyTasks();
+      }
+    });
+  }
+
+  if (modalAddSubtaskBtn) {
+    modalAddSubtaskBtn.addEventListener('click', () => {
+      if (selectedTask) {
+        activeSubtaskInputTaskId = getTaskKey(selectedTask, selectedTaskFileName || activeFileName);
+        closeTaskModal();
+        renderTasks();
+        renderDailyTasks();
+      }
+    });
+  }
+
+  if (modalMoveBtn) {
+    modalMoveBtn.addEventListener('click', (e) => {
+      if (selectedTask && activeTriggerBtnRect && selectedTaskFileName !== 'Ежедневные задачи') {
+        const taskToMove = selectedTask;
+        const rect = activeTriggerBtnRect;
+        closeTaskModal();
+        openMoveTaskModal(taskToMove, rect);
+      }
+    });
+  }
+
+  if (modalDeleteBtn) {
+    modalDeleteBtn.addEventListener('click', async () => {
+      if (selectedTask && window.electronAPI) {
+        const fileName = selectedTaskFileName || activeFileName;
+        await window.electronAPI.deleteTask(selectedTask.lineIndex, fileName);
+        closeTaskModal();
+        if (fileName === 'Ежедневные задачи') await loadDailyTasks();
+        else await loadObsidianTasks();
+      }
+    });
+  }
+  
+  await loadObsidianTasks();
+  await loadDailyTasks();
+  calculate();
+  autoResizeWindow();
+}
+
+init();

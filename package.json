@@ -1,0 +1,12 @@
+{
+  "name": "goal-tracker-widget",
+  "version": "1.0.0",
+  "description": "Финансовый трекер с Obsidian интеграцией",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^28.0.0"
+  }
+}

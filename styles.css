@@ -1,0 +1,1045 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: transparent;  /* ← полностью прозрачный фон */
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  padding: 20px 18px 18px 22px;
+  color: #e0e0e0;
+  overflow: hidden; /* Скрываем все полосы прокрутки */
+}
+
+/* Скрываем скроллбары для Chrome/Electron */
+::-webkit-scrollbar {
+  display: none;
+}
+
+.container {
+  max-width: 100%;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  filter:
+    drop-shadow(-6px -6px 12px rgba(0, 0, 0, 0.34))
+    drop-shadow(6px 10px 18px rgba(0, 0, 0, 0.26));
+}
+
+/* Карточка для перетаскивания — делаем прозрачной только область перетаскивания */
+.card-header {
+  -webkit-app-region: drag;
+}
+
+.card-header button,
+.card-header input,
+.card-header .progress {
+  -webkit-app-region: no-drag;
+}
+
+.title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  gap: 8px;
+}
+
+.title-row .title {
+  margin-bottom: 0;
+  flex: 1;
+}
+
+.goal-collapsed {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.goal-collapsed .goal-header {
+  display: none;
+}
+
+.goal-collapsed .progress {
+  margin: 0;
+  cursor: pointer;
+}
+
+.close-btn {
+  -webkit-app-region: no-drag;
+  background: none;
+  border: none;
+  color: #888888;
+  font-size: 16px;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: #3a3a3a;
+  color: #f07178;
+}
+
+/* Карточки — НЕПРОЗРАЧНЫЕ, с тенью для красоты */
+.card {
+  background: #252525;  /* ← непрозрачный фон карточек */
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 1px solid #333333;
+  box-shadow:
+    -3px -3px 8px rgba(0, 0, 0, 0.22),
+    0 5px 12px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(0); /* отключаем блюр */
+}
+
+/* Остальные стили без изменений */
+.title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #a186f1;
+  margin-bottom: 14px;
+  letter-spacing: 0.3px;
+}
+
+.input-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.field {
+  flex: 1;
+  min-width: 120px;
+  -webkit-app-region: no-drag;
+}
+
+.field label {
+  font-size: 11px;
+  color: #888888;
+  display: block;
+  margin-bottom: 5px;
+}
+
+.field input {
+  width: 100%;
+  padding: 8px 10px;
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 10px;
+  color: #e0e0e0;
+  font-size: 13px;
+  font-family: inherit;
+  -webkit-app-region: no-drag;
+}
+
+.field input:focus {
+  outline: none;
+  border-color: #a186f1;
+  background: #2a2a2a;
+}
+
+.floating-field {
+  position: relative;
+}
+
+.floating-field label {
+  position: absolute;
+  top: 5px;
+  left: 11px;
+  z-index: 1;
+  margin: 0;
+  font-size: 9px;
+  line-height: 1;
+  color: #777777;
+  pointer-events: none;
+}
+
+.floating-field input {
+  padding-top: 17px;
+  padding-bottom: 6px;
+  min-height: 42px;
+}
+
+#deadline {
+  cursor: pointer;
+}
+
+#deadline::-webkit-calendar-picker-indicator {
+  display: none;
+  opacity: 0;
+}
+
+.progress {
+  margin: 12px 0 8px;
+}
+
+.goal-content,
+.tasks-content {
+  transition: max-height 0.25s ease, opacity 0.2s ease, margin 0.2s ease;
+  max-height: 900px;
+  opacity: 1;
+  overflow: hidden;
+}
+
+.goal-content.collapsed,
+.tasks-content.collapsed {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  pointer-events: none;
+}
+
+.bar {
+  position: relative;
+  height: 18px;
+  background: #3a3a3a;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  width: 0%;
+  background: #a186f1;
+  border-radius: 10px;
+  transition: width 0.3s;
+}
+
+.percent {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: #f2efff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.stat {
+  background: #1e1e1e;
+  padding: 8px 6px;
+  border-radius: 12px;
+  text-align: center;
+  border: 1px solid #333333;
+}
+
+.stat .label {
+  font-size: 10px;
+  color: #888888;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.stat .value {
+  font-size: 13px;
+  font-weight: 600;
+  color: #a186f1;
+  word-break: break-word;
+}
+
+.capital-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.half {
+  flex: 1;
+  min-width: 120px;
+}
+
+/* Доход */
+.income-section {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #333333;
+}
+
+.income-title {
+  font-size: 12px;
+  color: #a186f1;
+  margin-bottom: 8px;
+}
+
+.income-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.income-row input {
+  flex: 2;
+  min-width: 120px;
+  padding: 8px 10px;
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 10px;
+  color: #e0e0e0;
+}
+
+.income-row button {
+  background: #a186f1;
+  border: none;
+  padding: 0 16px;
+  border-radius: 10px;
+  color: #1e1e1e;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Задачи */
+.tasks-list {
+  max-height: none;
+  overflow-y: visible;
+}
+
+.daily-tasks-list {
+  max-height: 210px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.daily-tasks-list::-webkit-scrollbar {
+  display: block !important;
+  width: 4px !important;
+}
+
+.daily-tasks-list::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.daily-tasks-list::-webkit-scrollbar-thumb {
+  background: #333333 !important;
+  border-radius: 10px !important;
+}
+
+/* Добавление новой задачи */
+.add-task-section {
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #333333;
+}
+
+.add-task-row {
+  display: flex;
+  gap: 8px;
+}
+
+.task-input {
+  flex: 1;
+  padding: 8px 10px;
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 10px;
+  color: #e0e0e0;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.task-input:focus {
+  outline: none;
+  border-color: #a186f1;
+  background: #2a2a2a;
+}
+
+.add-task-btn {
+  background: #a186f1;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 10px;
+  color: #1e1e1e;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.add-task-btn:hover {
+  background: #b399ff;
+}
+
+.add-task-btn:active {
+  transform: scale(0.95);
+}
+
+/* Календарь */
+.tasks-calendar {
+  margin-bottom: 14px;
+  padding: 12px;
+  background: #1e1e1e;
+  border-radius: 10px;
+  border: 1px solid #333333;
+}
+
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.calendar-month {
+  font-size: 12px;
+  font-weight: 600;
+  color: #a186f1;
+  flex: 1;
+  text-align: center;
+}
+
+.calendar-nav {
+  display: flex;
+  gap: 4px;
+}
+
+.calendar-nav button {
+  background: #333333;
+  border: none;
+  color: #a186f1;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.calendar-nav button:hover {
+  background: #444444;
+}
+
+.calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.calendar-weekday {
+  text-align: center;
+  font-size: 10px;
+  color: #888888;
+  font-weight: 600;
+}
+
+.calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  background: #252525;
+  border: 1px solid #333333;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: #999999;
+  position: relative;
+  overflow: hidden;
+}
+
+.calendar-day:hover {
+  border-color: #a186f1;
+  background: #2a2a2a;
+}
+
+.calendar-day.other-month {
+  color: #555555;
+}
+
+.calendar-day.today {
+  background: #a186f1;
+  color: #1e1e1e;
+  font-weight: 600;
+  border-color: #a186f1;
+}
+
+.calendar-day.has-tasks::after {
+  content: '●';
+  position: absolute;
+  bottom: 2px;
+  font-size: 8px;
+  color: #4db8ff;
+}
+
+.task {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0 8px calc(var(--task-depth, 0) * 10px);
+  border-bottom: 1px solid #333333;
+}
+
+.task:last-child {
+  border-bottom: none;
+}
+
+.task-check {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  cursor: pointer;
+  accent-color: #a186f1;
+  flex-shrink: 0;
+}
+
+.task-text {
+  flex: 1;
+  font-size: 13px;
+  color: #e0e0e0;
+  word-break: break-word;
+  white-space: normal;
+  line-height: 1.4;
+  overflow-wrap: break-word;
+}
+
+.task.done .task-text {
+  color: #777777;
+  text-decoration: line-through;
+}
+
+.counter {
+  background: #2a2a2a;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  margin-left: 8px;
+  font-weight: normal;
+  color: #a186f1;
+}
+
+input[type="date"], input[type="number"] {
+  color-scheme: dark;
+}
+
+/* Капитал сворачивание */
+.capital-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.capital-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.capital-header .title {
+  margin-bottom: 0;
+}
+
+.toggle-arrow {
+  font-size: 10px;
+  color: #a186f1;
+  transition: transform 0.3s ease;
+}
+
+.toggle-arrow.collapsed {
+  transform: rotate(180deg);
+}
+
+.capital-content {
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease, margin-top 0.3s ease;
+  max-height: 500px;
+  opacity: 1;
+  overflow: hidden;
+  margin-top: 14px;
+}
+
+.capital-content.collapsed {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+  pointer-events: none;
+}
+
+/* Вкладки задач */
+.tasks-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  gap: 8px;
+}
+
+.tasks-header .title {
+  margin-bottom: 0;
+}
+
+.task-tabs {
+  display: flex;
+  gap: 4px;
+  background: #1e1e1e;
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid #333333;
+}
+
+.task-tab {
+  background: none;
+  border: none;
+  color: #888888;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.task-tab:hover {
+  color: #e0e0e0;
+}
+
+.task-tab.active {
+  background: #333333;
+  color: #a186f1;
+}
+
+/* Подзадачи (иерархия подцелей) */
+.subtasks-container {
+  padding-left: 14px;
+  border-left: 1px dashed #3a3a3a;
+  margin-left: 8px;
+  margin-top: -2px;
+  margin-bottom: 8px;
+}
+
+.task.subtask {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  border-bottom: none;
+}
+
+.task.subtask .task-text {
+  font-size: 12px;
+  color: #b0b0b0;
+}
+
+/* Опции задачи при наведении */
+.task {
+  position: relative;
+}
+.task-options-btn {
+  opacity: 0;
+  pointer-events: none;
+  background: none;
+  border: none;
+  color: #888888;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  padding: 2px 6px;
+  margin-left: 6px;
+  transition: all 0.2s ease;
+  border-radius: 4px;
+  flex-shrink: 0;
+  align-self: center;
+  -webkit-app-region: no-drag;
+}
+.task:hover .task-options-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
+.task-options-btn:hover {
+  color: #a186f1;
+  background: #2a2a2a;
+}
+
+/* Модальное окно действий */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+  transition: opacity 0.15s ease;
+  opacity: 1;
+}
+.modal-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+  display: none !important;
+}
+.modal-content {
+  background: #252525;
+  border: 1px solid #444444;
+  border-radius: 12px;
+  width: 220px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+  padding: 10px;
+  transform: scale(1);
+  transition: transform 0.15s ease;
+  pointer-events: auto;
+}
+.modal-overlay.hidden .modal-content {
+  transform: scale(0.95);
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #333333;
+  padding-bottom: 6px;
+}
+.modal-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #a186f1;
+  letter-spacing: 0.3px;
+}
+.modal-close {
+  background: none;
+  border: none;
+  color: #888888;
+  font-size: 14px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.modal-close:hover {
+  color: #f07178;
+}
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: inherit;
+  overflow-y: auto;
+}
+.modal-action-btn {
+  background: #1e1e1e;
+  border: 1px solid #333333;
+  color: #e0e0e0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.modal-action-btn.hidden {
+  display: none;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.file-list-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.file-select-btn {
+  flex: 1;
+  min-width: 0;
+  background: #1e1e1e;
+  border: 1px solid #333333;
+  color: #e0e0e0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.file-select-btn:hover {
+  background: #2a2a2a;
+  border-color: #a186f1;
+  color: #a186f1;
+}
+
+.file-options-btn {
+  width: 34px;
+  flex-shrink: 0;
+  background: #1e1e1e;
+  border: 1px solid #333333;
+  color: #888888;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.file-options-btn:hover {
+  color: #a186f1;
+  border-color: #a186f1;
+  background: #2a2a2a;
+}
+.modal-action-btn:hover {
+  background: #2a2a2a;
+  border-color: #a186f1;
+  color: #a186f1;
+}
+.modal-action-btn.delete {
+  color: #ff5370;
+  border-color: rgba(255, 83, 112, 0.2);
+}
+.modal-action-btn.delete:hover {
+  background: rgba(255, 83, 112, 0.1);
+  border-color: #ff5370;
+  color: #ff5370;
+}
+
+.create-file-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.create-file-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  color: #e0e0e0;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.create-file-input:focus {
+  outline: none;
+  border-color: #a186f1;
+  background: #2a2a2a;
+}
+
+.create-file-input.error {
+  border-color: #ff5370;
+}
+
+.create-file-submit {
+  width: 34px;
+  border: none;
+  border-radius: 8px;
+  background: #a186f1;
+  color: #1e1e1e;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.create-file-submit:hover {
+  background: #b399ff;
+}
+
+/* Поле добавления подзадачи */
+.add-subtask-row {
+  display: flex;
+  gap: 8px;
+  padding: 4px 0 8px 24px;
+  width: 100%;
+  animation: slideDown 0.15s ease-out;
+}
+.subtask-input {
+  flex: 1;
+  padding: 6px 10px;
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  color: #e0e0e0;
+  font-size: 12px;
+  font-family: inherit;
+}
+.subtask-input:focus {
+  outline: none;
+  border-color: #a186f1;
+  background: #2a2a2a;
+}
+.add-subtask-btn-submit {
+  background: #a186f1;
+  border: none;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: #1e1e1e;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+.add-subtask-btn-submit:hover {
+  background: #b399ff;
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Поле редактирования задачи */
+.task-edit-input {
+  flex: 1;
+  padding: 4px 8px;
+  background: #1e1e1e;
+  border: 1px solid #a186f1;
+  border-radius: 6px;
+  color: #e0e0e0;
+  font-size: 13px;
+  font-family: inherit;
+}
+.task-edit-input.subtask-edit-input {
+  font-size: 12px;
+}
+.task-edit-save-btn, .task-edit-cancel-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  font-size: 14px;
+  transition: color 0.2s;
+  -webkit-app-region: no-drag;
+}
+.task-edit-save-btn {
+  color: #a186f1;
+}
+.task-edit-save-btn:hover {
+  color: #b399ff;
+}
+.task-edit-cancel-btn {
+  color: #ff5370;
+}
+.task-edit-cancel-btn:hover {
+  color: #ff758f;
+}
+
+/* Стилизация новой шапки задач */
+.tasks-header {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  min-height: 28px;
+}
+.title-with-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.toggle-expand-btn {
+  background: none;
+  border: none;
+  color: #888888;
+  cursor: pointer;
+  font-size: 10px;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
+  -webkit-app-region: no-drag;
+}
+.toggle-expand-btn:hover {
+  color: #a186f1;
+  background: #2a2a2a;
+}
+.active-file-btn {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  color: #a186f1;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  -webkit-app-region: no-drag;
+  z-index: 5;
+}
+.active-file-btn:hover {
+  background: #2a2a2a;
+  border-color: #a186f1;
+}
+.add-task-trigger-btn {
+  background: #a186f1;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 8px;
+  color: #1e1e1e;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  transition: all 0.2s;
+  -webkit-app-region: no-drag;
+}
+.add-task-trigger-btn:hover {
+  background: #b399ff;
+}
+
+/* Инлайновое добавление новой задачи */
+.add-task-inline-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  animation: slideDown 0.15s ease-out;
+}
+.add-task-inline-row.hidden {
+  display: none !important;
+}
+
+/* Расширенный скролл списка задач */
+.tasks-list.expanded {
+  max-height: 290px;
+  overflow-y: auto !important;
+  padding-right: 6px;
+}
+.tasks-list.expanded::-webkit-scrollbar {
+  display: block !important;
+  width: 4px !important;
+}
+.tasks-list.expanded::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+.tasks-list.expanded::-webkit-scrollbar-thumb {
+  background: #333333 !important;
+  border-radius: 10px !important;
+}
+.tasks-list.expanded::-webkit-scrollbar-thumb:hover {
+  background: #a186f1 !important;
+}

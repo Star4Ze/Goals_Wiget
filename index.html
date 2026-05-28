@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Финансовый трекер</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="container">
+  
+  <div class="card card-header" id="goal-card">
+    <div class="title-row goal-header" id="goal-toggle">
+      <div class="title">🎯 Финансовая цель</div>
+      <button id="toggle-goal-btn" class="toggle-expand-btn" title="Свернуть цель">▲</button>
+      <button id="close-btn" class="close-btn" title="Закрыть">✕</button>
+    </div>
+    <div class="goal-content" id="goal-content">
+      <div class="input-row">
+        <div class="field floating-field"><label for="target">Цель</label><input type="text" id="target" value="5 000 000" class="money"></div>
+        <div class="field floating-field"><label for="deadline">Дедлайн</label><input type="date" id="deadline" value="2030-01-01"></div>
+      </div>
+    </div>
+    <div class="progress"><div class="bar"><div class="fill" id="bar"></div><span class="percent" id="percent">0%</span></div></div>
+    <div class="stats goal-content" id="goal-stats">
+      <div class="stat"><span class="label">Осталось</span><span class="value" id="remain">—</span></div>
+      <div class="stat"><span class="label">Дней</span><span class="value" id="days">—</span></div>
+      <div class="stat"><span class="label">В месяц</span><span class="value" id="monthly">—</span></div>
+      <div class="stat"><span class="label">В день</span><span class="value" id="daily">—</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="capital-header" id="capital-toggle">
+      <div class="capital-title-wrapper">
+        <div class="title">💰 Капитал</div>
+        <span id="capital-total-badge" class="counter">0 ₽</span>
+      </div>
+      <span class="toggle-arrow" id="capital-arrow">▲</span>
+    </div>
+    <div class="capital-content" id="capital-content">
+      <div class="capital-row">
+        <div class="field half"><label>Личный капитал</label><input type="text" id="personal" class="money"></div>
+        <div class="field half"><label>% годовых</label><input type="number" id="personal-rate" value="14" step="0.5"></div>
+      </div>
+      <div class="capital-row">
+        <div class="field half"><label>В управлении</label><input type="text" id="managed" class="money"></div>
+        <div class="field half"><label>% годовых</label><input type="number" id="managed-rate" value="18" step="0.5"></div>
+      </div>
+      
+      <div class="income-section">
+        <div class="income-title">💵 Добавить доход</div>
+        <div class="income-row">
+          <input type="text" id="income-amount" class="money" placeholder="Сумма" value="0">
+          <button id="add-income-btn">+ Добавить</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="tasks-header" id="tasks-toggle">
+      <div class="title-with-toggle">
+        <span class="title">📋 Задачи <span id="task-counter" class="counter">0/0</span></span>
+        <button id="toggle-tasks-card-btn" class="toggle-expand-btn" title="Свернуть задачи">▲</button>
+        <button id="toggle-expand-tasks-btn" class="toggle-expand-btn" title="Развернуть бэклог">▼</button>
+      </div>
+      <button id="active-file-btn" class="active-file-btn">Дела</button>
+      <button id="add-task-trigger-btn" class="add-task-trigger-btn" title="Добавить задачу">+ Добавить задачу</button>
+    </div>
+    
+    <!-- Инлайновое добавление новой задачи (скрыто по умолчанию) -->
+    <div class="tasks-content" id="tasks-content">
+    <div class="add-task-inline-row hidden" id="inline-add-task-row">
+      <input type="text" id="inline-new-task-input" class="task-input" placeholder="Добавить новую задачу...">
+      <button id="inline-add-task-submit" class="add-task-btn">+</button>
+    </div>
+
+    <div id="tasks" class="tasks-list"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="tasks-header daily-header" id="daily-toggle">
+      <div class="title-with-toggle">
+        <span class="title">☀️ Ежедневно <span id="daily-task-counter" class="counter">0/0</span></span>
+        <button id="toggle-daily-card-btn" class="toggle-expand-btn" title="Свернуть ежедневные">▲</button>
+      </div>
+      <button id="add-daily-task-trigger-btn" class="add-task-trigger-btn" title="Добавить ежедневную задачу">+ Добавить</button>
+    </div>
+    
+    <div class="tasks-content" id="daily-content">
+    <div class="add-task-inline-row hidden" id="inline-add-daily-task-row">
+      <input type="text" id="inline-new-daily-task-input" class="task-input" placeholder="Добавить ежедневную задачу...">
+      <button id="inline-add-daily-task-submit" class="add-task-btn">+</button>
+    </div>
+
+    <div id="daily-tasks" class="tasks-list daily-tasks-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно действий с задачей -->
+<div id="task-modal" class="modal-overlay hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">Управление задачей</div>
+      <button class="modal-close" onclick="closeTaskModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <button class="modal-action-btn" id="modal-pin-btn">📌 Сделать приоритетной</button>
+      <button class="modal-action-btn" id="modal-edit-btn">✏️ Редактировать</button>
+      <button class="modal-action-btn" id="modal-add-subtask-btn">↳ Добавить подзадачу</button>
+      <button class="modal-action-btn" id="modal-move-btn">📂 Переместить задачу...</button>
+      <button class="modal-action-btn delete" id="modal-delete-btn">🗑️ Удалить задачу</button>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно выбора активного файла -->
+<div id="file-selector-modal" class="modal-overlay hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">Выберите файл задач</div>
+      <button class="modal-close" onclick="closeFileSelectorModal()">✕</button>
+    </div>
+    <div class="modal-body" id="file-selector-list" style="max-height: 200px; overflow-y: auto;">
+      <!-- Динамический список файлов -->
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно действий с файлом -->
+<div id="file-action-modal" class="modal-overlay hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">Файл задач</div>
+      <button class="modal-close" onclick="closeFileActionModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <button class="modal-action-btn" id="file-rename-btn">✏️ Переименовать</button>
+      <button class="modal-action-btn delete" id="file-delete-btn">🗑️ Удалить файл</button>
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно переноса задачи -->
+<div id="move-task-modal" class="modal-overlay hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">Переместить задачу в...</div>
+      <button class="modal-close" onclick="closeMoveTaskModal()">✕</button>
+    </div>
+    <div class="modal-body" id="move-task-list" style="max-height: 200px; overflow-y: auto;">
+      <!-- Динамический список целевых файлов -->
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
