@@ -1,1 +1,0 @@
-CreateObject("WScript.Shell").Run "powershell -Command ""cd 'd:\Documents\Programming\Goals_Wiget'; npm start""", 0, False

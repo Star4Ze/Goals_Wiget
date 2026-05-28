@@ -34,6 +34,8 @@ body {
 
 .card-header button,
 .card-header input,
+.card-header .goal-header,
+.card-header .title,
 .card-header .progress {
   -webkit-app-region: no-drag;
 }
@@ -63,6 +65,10 @@ body {
 .goal-collapsed .progress {
   margin: 0;
   cursor: pointer;
+}
+
+.hidden-by-goal {
+  display: none !important;
 }
 
 .close-btn {

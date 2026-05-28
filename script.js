@@ -358,6 +358,7 @@ function setupSectionCollapses() {
     storageKey: 'goal_collapsed',
     onChange: (collapsed) => {
       document.getElementById('goal-card')?.classList.toggle('goal-collapsed', collapsed);
+      document.getElementById('capital-card')?.classList.toggle('hidden-by-goal', collapsed);
     }
   });
 

@@ -6,12 +6,17 @@ dist/
 build/
 out/
 release/
+*.exe
 *.asar
 
 # Local runtime files
 config.json
 log.txt
 *.log
+
+# Local notes and personal workflow docs
+GIT_GUIDE.md
+TargetWiget.vbs
 
 # OS/editor noise
 .DS_Store
