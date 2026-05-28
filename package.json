@@ -4,9 +4,24 @@
   "description": "Финансовый трекер с Obsidian интеграцией",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder"
   },
   "devDependencies": {
     "electron": "^28.0.0"
+  },
+  "build": {
+    "appId": "com.goalswidget.app",
+    "productName": "Goals Widget",
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }
