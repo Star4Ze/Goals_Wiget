@@ -1,8 +1,10 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
 let mainWindow;
+let breakWindow = null;
+let analyticsWindow = null;
 
 const TARGET_DIR = "C:\\Users\\HomePC\\Documents\\Obsidian\\Progects\\MyLife";
 const DAILY_TASKS_FILE_NAME = "Ежедневные задачи";
@@ -68,8 +70,8 @@ function createWindow() {
     height: savedBounds.height || 650,
     resizable: true,
     frame: false,
-    transparent: true,        // ← включаем прозрачность
-    backgroundColor: '#00000000',  // ← полностью прозрачный фон (#00000000 = rgba(0,0,0,0))
+    transparent: true,
+    backgroundColor: '#00000000',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -81,6 +83,10 @@ function createWindow() {
 
   mainWindow.loadFile('index.html');
   mainWindow.setTitle('Финансовый трекер');
+  
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    console.log(`[RENDERER CONSOLE] ${message} (at ${sourceId}:${line})`);
+  });
   
   mainWindow.on('resize', () => {
     const bounds = mainWindow.getBounds();
@@ -185,10 +191,111 @@ function resetDoneTasks(lines) {
   return lines.map(line => line.replace(/^(\s*-\s*)\[[xX]\](\s*)/, '$1[ ]$2'));
 }
 
+function saveDailyTasksHistory() {
+  try {
+    const today = getTodayKey();
+    const filePath = getFilePath(DAILY_TASKS_FILE_NAME);
+    if (!fs.existsSync(filePath)) return;
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const lines = content.split(/\r?\n/);
+    
+    const tasks = [];
+    lines.forEach(line => {
+      const match = line.match(/^\s*-\s*\[([ xX])\]\s*(.*)$/);
+      if (match) {
+        const done = match[1].toLowerCase() === 'x';
+        const text = match[2].trim();
+        if (text) {
+          tasks.push({ text, done });
+        }
+      }
+    });
+    
+    const historyPath = path.join(TARGET_DIR, 'daily-history.json');
+    let history = {};
+    if (fs.existsSync(historyPath)) {
+      try {
+        history = JSON.parse(fs.readFileSync(historyPath, 'utf-8'));
+      } catch (e) {}
+    }
+    
+    let dayEntry = history[today];
+    if (!dayEntry) {
+      dayEntry = {
+        dailyTasks: tasks,
+        completedStandardTasks: []
+      };
+    } else if (Array.isArray(dayEntry)) {
+      dayEntry = {
+        dailyTasks: tasks,
+        completedStandardTasks: []
+      };
+    } else if (typeof dayEntry === 'object') {
+      dayEntry.dailyTasks = tasks;
+    }
+    
+    history[today] = dayEntry;
+    fs.writeFileSync(historyPath, JSON.stringify(history, null, 2), 'utf-8');
+    logAction(`📈 История за ${today} сохранена. Ежедневных задач: ${tasks.length}`);
+  } catch (e) {
+    logAction(`Ошибка сохранения истории: ${e.message}`);
+  }
+}
+
+function addCompletedStandardTaskToHistory(taskText, fileName) {
+  try {
+    const today = getTodayKey();
+    const historyPath = path.join(TARGET_DIR, 'daily-history.json');
+    let history = {};
+    if (fs.existsSync(historyPath)) {
+      try {
+        history = JSON.parse(fs.readFileSync(historyPath, 'utf-8'));
+      } catch (e) {}
+    }
+    
+    let dayEntry = history[today];
+    if (!dayEntry) {
+      dayEntry = {
+        dailyTasks: [],
+        completedStandardTasks: []
+      };
+    } else if (Array.isArray(dayEntry)) {
+      dayEntry = {
+        dailyTasks: dayEntry,
+        completedStandardTasks: []
+      };
+    } else if (typeof dayEntry === 'object') {
+      if (!dayEntry.dailyTasks) dayEntry.dailyTasks = [];
+      if (!dayEntry.completedStandardTasks) dayEntry.completedStandardTasks = [];
+    }
+    
+    const alreadyExists = dayEntry.completedStandardTasks.some(t => t.text === taskText && t.file === fileName);
+    if (!alreadyExists) {
+      dayEntry.completedStandardTasks.push({
+        text: taskText,
+        file: fileName,
+        timestamp: new Date().toISOString()
+      });
+      history[today] = dayEntry;
+      fs.writeFileSync(historyPath, JSON.stringify(history, null, 2), 'utf-8');
+      logAction(`📈 Разовая задача "${taskText}" добавлена в историю выполненных задач за ${today}.`);
+    }
+  } catch (e) {
+    logAction(`Ошибка добавления выполненной разовой задачи в историю: ${e.message}`);
+  }
+}
+
+function saveDailyTasksHistoryIfNeeded(fileName) {
+  if (fileName === DAILY_TASKS_FILE_NAME) {
+    saveDailyTasksHistory();
+  }
+}
+
 function ensureDailyTasksReady() {
   const filePath = getFilePath(DAILY_TASKS_FILE_NAME);
   if (!fs.existsSync(filePath)) {
     fs.writeFileSync(filePath, "- [ ] Утренняя проверка целей\n", "utf-8");
+    saveDailyTasksHistory();
     return;
   }
 
@@ -197,17 +304,12 @@ function ensureDailyTasksReady() {
   const today = getTodayKey();
   const config = loadConfig();
 
-  if (!hasOpenTasks(lines) && hasDoneTasks(lines) && config.dailyCompletionDate !== today) {
-    fs.writeFileSync(filePath, resetDoneTasks(lines).join('\n'), 'utf-8');
-    saveConfigValue({ dailyCompletionDate: null });
-    logAction(`🔄 Ежедневные задачи обновлены на ${today}`);
-  }
-}
-
-function maybeSaveDailyCompletion(fileName, lines) {
-  if (fileName !== DAILY_TASKS_FILE_NAME) return;
-  if (!hasOpenTasks(lines) && hasDoneTasks(lines)) {
-    saveConfigValue({ dailyCompletionDate: getTodayKey() });
+  if (config.lastDailyResetDate !== today) {
+    const resetLines = resetDoneTasks(lines);
+    fs.writeFileSync(filePath, resetLines.join('\n'), 'utf-8');
+    saveConfigValue({ lastDailyResetDate: today });
+    saveDailyTasksHistory(); // Save the initial unchecked state of daily tasks for this date
+    logAction(`🔄 Ежедневные задачи автоматически обновлены на новый день: ${today}`);
   }
 }
 
@@ -279,6 +381,19 @@ function readTasksFromFile(fileName) {
     return [];
   }
 }
+
+// Midnight checking routine (live updates)
+let lastCheckedDate = getTodayKey();
+setInterval(() => {
+  const today = getTodayKey();
+  if (today !== lastCheckedDate) {
+    lastCheckedDate = today;
+    ensureDailyTasksReady();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('day-changed', today);
+    }
+  }
+}, 10000);
 
 function setupHandlers() {
   ipcMain.handle('close-window', () => {
@@ -384,6 +499,7 @@ function setupHandlers() {
         : newTask + '\n';
         
       fs.writeFileSync(filePath, newContent, 'utf-8');
+      saveDailyTasksHistoryIfNeeded(fileName);
       logAction(`📝 Добавлена новая задача в начало ${path.basename(filePath)}: ${taskText}`);
       return true;
     } catch (err) {
@@ -401,6 +517,15 @@ function setupHandlers() {
       if (lineIndex >= 0 && lineIndex < lines.length) {
         const line = lines[lineIndex];
         const shouldMarkDone = fileName === DAILY_TASKS_FILE_NAME ? !isTaskDoneLine(line) : true;
+        
+        // Track completed standard tasks
+        if (fileName !== DAILY_TASKS_FILE_NAME && shouldMarkDone) {
+          const cleanText = line.replace(/^\s*-\s*(?:\[[ xX]\])?\s*/, '').trim();
+          if (cleanText) {
+            addCompletedStandardTaskToHistory(cleanText, fileName);
+          }
+        }
+        
         lines[lineIndex] = setTaskDoneState(line, shouldMarkDone);
         updateParentCompletion(lines, lineIndex);
         if (fileName === DAILY_TASKS_FILE_NAME) {
@@ -410,9 +535,9 @@ function setupHandlers() {
             lines.pop();
           }
           lines.push(...taskBlock);
-          maybeSaveDailyCompletion(fileName, lines);
         }
         fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
+        saveDailyTasksHistoryIfNeeded(fileName);
         logAction(`✅ Выполнена задача на строке ${lineIndex + 1} в ${path.basename(filePath)}`);
         return true;
       }
@@ -434,6 +559,7 @@ function setupHandlers() {
         lines.splice(lineIndex, size);
         
         fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
+        saveDailyTasksHistoryIfNeeded(fileName);
         logAction(`🗑️ Удалена задача (и её подзадачи, всего строк: ${size}) с индекса ${lineIndex + 1} в ${path.basename(filePath)}`);
         return true;
       }
@@ -460,6 +586,7 @@ function setupHandlers() {
           lines[lineIndex] = newLine;
           
           fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
+          saveDailyTasksHistoryIfNeeded(fileName);
           logAction(`✏️ Отредактирована задача на строке ${lineIndex + 1}: "${newText}"`);
           return true;
         }
@@ -495,6 +622,7 @@ function setupHandlers() {
         lines[parentLineIndex] = setTaskDoneState(lines[parentLineIndex], false);
         updateParentCompletion(lines, parentLineIndex);
         fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
+        saveDailyTasksHistoryIfNeeded(fileName);
         logAction(`↳ Добавлена подзадача к строке ${parentLineIndex + 1}: "${subtaskText}"`);
         return true;
       }
@@ -528,6 +656,7 @@ function setupHandlers() {
         }
         
         fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
+        saveDailyTasksHistoryIfNeeded(fileName);
         return true;
       }
       return false;
@@ -548,6 +677,17 @@ function setupHandlers() {
       if (lineIndex >= 0 && lineIndex < sourceLines.length) {
         const size = getTaskBlockSize(sourceLines, lineIndex);
         const taskBlock = sourceLines.splice(lineIndex, size);
+        
+        // Strip base indentation from the moved block so it becomes a root task
+        const baseWhitespaceMatch = taskBlock[0].match(/^(\s*)/);
+        const baseWhitespace = baseWhitespaceMatch ? baseWhitespaceMatch[1] : '';
+        if (baseWhitespace) {
+          for (let i = 0; i < taskBlock.length; i++) {
+            if (taskBlock[i].startsWith(baseWhitespace)) {
+              taskBlock[i] = taskBlock[i].slice(baseWhitespace.length);
+            }
+          }
+        }
         
         fs.writeFileSync(sourcePath, sourceLines.join('\n'), 'utf-8');
         
@@ -574,6 +714,98 @@ function setupHandlers() {
 
   ipcMain.handle('add-income', (event, amount, newTotal) => {
     logAction(`💰 Добавлен доход: ${amount.toLocaleString('ru-RU')} ₽ → личный капитал: ${newTotal.toLocaleString('ru-RU')} ₽`);
+  });
+
+  // Settings & Break Window Handlers
+  ipcMain.handle('select-media-file', async () => {
+    if (!mainWindow) return null;
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Выберите картинку или видео для перерыва',
+      filters: [
+        { name: 'Медиа файлы', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'mp4', 'webm', 'mov'] }
+      ],
+      properties: ['openFile']
+    });
+    
+    if (!result.canceled && result.filePaths.length > 0) {
+      return result.filePaths[0];
+    }
+    return null;
+  });
+
+  ipcMain.handle('show-break-window', (event, mediaPath, accentColor, accentHover) => {
+    if (breakWindow) {
+      breakWindow.focus();
+      return;
+    }
+    
+    const query = new URLSearchParams();
+    if (mediaPath) query.set('media', mediaPath);
+    if (accentColor) query.set('accent', accentColor);
+    if (accentHover) query.set('hover', accentHover);
+    
+    breakWindow = new BrowserWindow({
+      width: 800,
+      height: 600,
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      fullscreen: true,
+      backgroundColor: '#00000000',
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false
+      }
+    });
+    
+    breakWindow.loadURL(`file://${path.join(__dirname, 'break.html')}?${query.toString()}`);
+    
+    breakWindow.on('closed', () => {
+      breakWindow = null;
+    });
+  });
+
+  // Analytics Window Handlers
+  ipcMain.handle('get-daily-history', async () => {
+    const historyPath = path.join(TARGET_DIR, 'daily-history.json');
+    try {
+      if (fs.existsSync(historyPath)) {
+        return JSON.parse(fs.readFileSync(historyPath, 'utf-8'));
+      }
+    } catch (e) {
+      logAction(`Ошибка чтения истории: ${e.message}`);
+    }
+    return {};
+  });
+
+  ipcMain.handle('show-analytics-window', (event, accentColor, accentHover) => {
+    if (analyticsWindow) {
+      analyticsWindow.focus();
+      return;
+    }
+    
+    const query = new URLSearchParams();
+    if (accentColor) query.set('accent', accentColor);
+    if (accentHover) query.set('hover', accentHover);
+    
+    analyticsWindow = new BrowserWindow({
+      width: 720,
+      height: 520,
+      frame: false,
+      transparent: true,
+      backgroundColor: '#00000000',
+      resizable: true,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false
+      }
+    });
+    
+    analyticsWindow.loadURL(`file://${path.join(__dirname, 'analytics.html')}?${query.toString()}`);
+    
+    analyticsWindow.on('closed', () => {
+      analyticsWindow = null;
+    });
   });
 }
 

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Перерыв!</title>
+  <style>
+    :root {
+      --accent-color: #a186f1;
+      --accent-hover: #b399ff;
+    }
+    
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(15, 15, 15, 0.95);
+      color: #e0e0e0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      overflow: hidden;
+      -webkit-app-region: drag; /* make whole window draggable */
+      user-select: none;
+    }
+    
+    .content-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      text-align: center;
+      max-width: 80%;
+      -webkit-app-region: no-drag;
+      animation: fadeIn 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    
+    h1 {
+      font-size: 32px;
+      margin: 0;
+      color: var(--accent-color, #a186f1);
+      letter-spacing: 1px;
+      text-shadow: 0 4px 12px rgba(161, 134, 241, 0.3);
+    }
+    
+    p {
+      font-size: 18px;
+      color: #b0b0b0;
+      margin: 0 0 10px 0;
+    }
+    
+    .media-container {
+      width: 480px;
+      height: 270px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 2px solid var(--accent-color, #a186f1);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .media-element {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    
+    .close-btn {
+      background: var(--accent-color, #a186f1);
+      color: #1e1e1e;
+      border: none;
+      padding: 12px 30px;
+      font-size: 16px;
+      font-weight: 600;
+      border-radius: 30px;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(161, 134, 241, 0.4);
+      transition: all 0.2s ease;
+      outline: none;
+    }
+    
+    .close-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(161, 134, 241, 0.6);
+      background: var(--accent-hover, #b399ff);
+    }
+    
+    .close-btn:active {
+      transform: translateY(0);
+    }
+    
+    /* Default animated break illustration when no media is chosen */
+    .default-illustration {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-color, #a186f1), var(--accent-hover, #b399ff));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 64px;
+      animation: pulse 2s infinite ease-in-out;
+      box-shadow: 0 0 30px rgba(161, 134, 241, 0.4);
+    }
+    
+    @keyframes pulse {
+      0% { transform: scale(1); box-shadow: 0 0 30px rgba(161, 134, 241, 0.4); }
+      50% { transform: scale(1.08); box-shadow: 0 0 50px rgba(161, 134, 241, 0.6); }
+      100% { transform: scale(1); box-shadow: 0 0 30px rgba(161, 134, 241, 0.4); }
+    }
+  </style>
+</head>
+<body>
+  <div class="content-container">
+    <div class="default-illustration" id="illustration">☕</div>
+    <div class="media-container" id="media-container" style="display: none;">
+      <!-- Dynamic media element (img or video) -->
+    </div>
+    
+    <div>
+      <h1>Время сделать перерыв!</h1>
+      <p>Оторвитесь от экрана, разомнитесь, выпейте воды.</p>
+    </div>
+    
+    <button class="close-btn" id="close-btn">Вернуться к работе</button>
+  </div>
+
+  <script>
+    // Play the synthesizer sound immediately
+    function playChime() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const now = ctx.currentTime;
+        
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(523.25, now); // C5
+        osc1.frequency.exponentialRampToValueAtTime(783.99, now + 0.3); // G5
+        
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(659.25, now); // E5
+        osc2.frequency.exponentialRampToValueAtTime(1046.50, now + 0.3); // C6
+        
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+        
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(ctx.destination);
+        
+        osc1.start(now);
+        osc1.stop(now + 1.5);
+        osc2.start(now);
+        osc2.stop(now + 1.5);
+      } catch (e) {
+        console.error("Audio error:", e);
+      }
+    }
+
+    playChime();
+
+    // Get parameters
+    const params = new URLSearchParams(window.location.search);
+    const mediaPath = params.get('media');
+    const accentColor = params.get('accent') || '#a186f1';
+    const accentHover = params.get('hover') || '#b399ff';
+    
+    // Apply colors to variables
+    document.documentElement.style.setProperty('--accent-color', accentColor);
+    document.documentElement.style.setProperty('--accent-hover', accentHover);
+    
+    if (mediaPath) {
+      const container = document.getElementById('media-container');
+      const ill = document.getElementById('illustration');
+      
+      const isVideo = /\.(mp4|webm|ogg|mov)$/i.test(mediaPath);
+      let el;
+      if (isVideo) {
+        el = document.createElement('video');
+        el.src = mediaPath;
+        el.className = 'media-element';
+        el.autoplay = true;
+        el.loop = true;
+        el.muted = false; // play sound if it has video sound!
+        el.controls = true;
+      } else {
+        el = document.createElement('img');
+        el.src = mediaPath;
+        el.className = 'media-element';
+      }
+      
+      container.innerHTML = '';
+      container.appendChild(el);
+      container.style.display = 'flex';
+      ill.style.display = 'none';
+    }
+    
+    document.getElementById('close-btn').addEventListener('click', () => {
+      window.close();
+    });
+  </script>
+</body>
+</html>

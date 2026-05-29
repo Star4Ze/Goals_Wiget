@@ -88,6 +88,7 @@ let selectedFileName = null;
 let activeSubtaskInputTaskId = null;
 let activeEditTaskId = null;
 let activeTriggerBtnRect = null;
+var breakAlarmTimer = null;
 
 function getTaskKey(task, fileName) {
   return `${fileName}:${task.lineIndex}`;
@@ -932,6 +933,10 @@ function calculate() {
 }
 
 async function init() {
+  try {
+    initThemeAndAccent();
+  initBreakTimer();
+  initSettingsListeners();
   setupMoneyFields();
   setupDateField();
   loadSavedData();
@@ -1139,11 +1144,218 @@ async function init() {
       }
     });
   }
+
+  // Click & IPC Listeners
+  document.getElementById('settings-btn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openSettingsModal();
+  });
+
+  document.getElementById('daily-analytics-btn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openAnalyticsWindow();
+  });
+
+  if (window.electronAPI && window.electronAPI.onDayChanged) {
+    window.electronAPI.onDayChanged(() => {
+      loadDailyTasks();
+    });
+  }
   
   await loadObsidianTasks();
   await loadDailyTasks();
   calculate();
   autoResizeWindow();
+  } catch (error) {
+    if (window.electronAPI && window.electronAPI.logAction) {
+      window.electronAPI.logAction("CRITICAL INIT ERROR: " + error.message + " | stack: " + error.stack);
+    }
+  }
 }
 
 init();
+
+// ==========================================================================
+// Settings, Theme & Break Timer Additions
+// ==========================================================================
+
+const premiumColors = [
+  { name: 'Purple', primary: '#a186f1', hover: '#b399ff', dark: '#1e1e1e' },
+  { name: 'Mint', primary: '#3ddc84', hover: '#5beb9b', dark: '#1e1e1e' },
+  { name: 'Sky Blue', primary: '#4db8ff', hover: '#70c7ff', dark: '#1e1e1e' },
+  { name: 'Pink', primary: '#ff75b5', hover: '#ff94c7', dark: '#1e1e1e' },
+  { name: 'Sunset Orange', primary: '#ff8f59', hover: '#ffa57a', dark: '#1e1e1e' },
+  { name: 'Golden Yellow', primary: '#ffcc00', hover: '#ffe066', dark: '#1e1e1e' },
+  { name: 'Teal', primary: '#00f5d4', hover: '#33ffd6', dark: '#1e1e1e' }
+];
+
+function initThemeAndAccent() {
+  // Apply saved theme
+  const savedTheme = localStorage.getItem('widget_theme') || 'dark';
+  if (savedTheme === 'light') {
+    document.body.classList.add('light-theme');
+    document.getElementById('theme-light-btn')?.classList.add('active');
+    document.getElementById('theme-dark-btn')?.classList.remove('active');
+  } else {
+    document.body.classList.remove('light-theme');
+    document.getElementById('theme-dark-btn')?.classList.add('active');
+    document.getElementById('theme-light-btn')?.classList.remove('active');
+  }
+  
+  // Apply saved accent color
+  const primaryColor = localStorage.getItem('accent_primary') || '#a186f1';
+  const hoverColor = localStorage.getItem('accent_hover') || '#b399ff';
+  const darkColor = localStorage.getItem('accent_dark') || '#1e1e1e';
+  
+  document.documentElement.style.setProperty('--accent-color', primaryColor);
+  document.documentElement.style.setProperty('--accent-hover', hoverColor);
+  document.documentElement.style.setProperty('--accent-dark', darkColor);
+}
+
+function openSettingsModal() {
+  const modal = document.getElementById('settings-modal');
+  const modalContent = modal?.querySelector('.modal-content');
+  if (modal && modalContent) {
+    // Generate color palette dots
+    const palette = document.getElementById('color-palette');
+    if (palette) {
+      palette.innerHTML = '';
+      const currentAccent = localStorage.getItem('accent_primary') || '#a186f1';
+      
+      premiumColors.forEach(color => {
+        const dot = document.createElement('div');
+        dot.className = 'color-circle';
+        dot.style.backgroundColor = color.primary;
+        dot.title = color.name;
+        if (color.primary === currentAccent) {
+          dot.classList.add('active');
+        }
+        
+        dot.onclick = () => {
+          document.querySelectorAll('.color-circle').forEach(d => d.classList.remove('active'));
+          dot.classList.add('active');
+          
+          // Apply variables live
+          document.documentElement.style.setProperty('--accent-color', color.primary);
+          document.documentElement.style.setProperty('--accent-hover', color.hover);
+          document.documentElement.style.setProperty('--accent-dark', color.dark);
+          
+          // Save
+          localStorage.setItem('accent_primary', color.primary);
+          localStorage.setItem('accent_hover', color.hover);
+          localStorage.setItem('accent_dark', color.dark);
+        };
+        palette.appendChild(dot);
+      });
+    }
+    
+    // Set break timer selector values
+    const select = document.getElementById('break-interval-select');
+    if (select) {
+      select.value = localStorage.getItem('break_interval') || '0';
+    }
+    
+    const mediaInput = document.getElementById('break-media-path');
+    if (mediaInput) {
+      const savedPath = localStorage.getItem('break_media_path') || '';
+      mediaInput.value = savedPath ? savedPath.split(/[\\\/]/).pop() : '';
+      mediaInput.title = savedPath;
+    }
+    
+    modal.classList.remove('hidden');
+    
+    // Position modal centered since it's a primary system setting
+    modalContent.style.position = 'absolute';
+    modalContent.style.left = `${(window.innerWidth - 330) / 2}px`;
+    modalContent.style.top = `${Math.max(20, (window.innerHeight - 380) / 2)}px`;
+  }
+}
+
+function closeSettingsModal() {
+  const modal = document.getElementById('settings-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function initBreakTimer() {
+  if (breakAlarmTimer) {
+    clearInterval(breakAlarmTimer);
+    breakAlarmTimer = null;
+  }
+  
+  const interval = parseInt(localStorage.getItem('break_interval') || '0');
+  if (interval > 0) {
+    const ms = interval * 60 * 1000;
+    breakAlarmTimer = setInterval(() => {
+      triggerBreakWindow();
+    }, ms);
+  }
+}
+
+function triggerBreakWindow() {
+  if (window.electronAPI && window.electronAPI.showBreakWindow) {
+    const mediaPath = localStorage.getItem('break_media_path') || '';
+    const accent = localStorage.getItem('accent_primary') || '#a186f1';
+    const hover = localStorage.getItem('accent_hover') || '#b399ff';
+    window.electronAPI.showBreakWindow(mediaPath, accent, hover);
+  }
+}
+
+function initSettingsListeners() {
+  // Theme Dark
+  document.getElementById('theme-dark-btn')?.addEventListener('click', () => {
+    document.body.classList.remove('light-theme');
+    document.getElementById('theme-dark-btn')?.classList.add('active');
+    document.getElementById('theme-light-btn')?.classList.remove('active');
+    localStorage.setItem('widget_theme', 'dark');
+  });
+  
+  // Theme Light
+  document.getElementById('theme-light-btn')?.addEventListener('click', () => {
+    document.body.classList.add('light-theme');
+    document.getElementById('theme-light-btn')?.classList.add('active');
+    document.getElementById('theme-dark-btn')?.classList.remove('active');
+    localStorage.setItem('widget_theme', 'light');
+  });
+  
+  // Break Interval change
+  document.getElementById('break-interval-select')?.addEventListener('change', (e) => {
+    localStorage.setItem('break_interval', e.target.value);
+    initBreakTimer(); // restart timer
+  });
+  
+  // Choose media
+  document.getElementById('select-media-btn')?.addEventListener('click', async () => {
+    if (window.electronAPI && window.electronAPI.selectMediaFile) {
+      const filePath = await window.electronAPI.selectMediaFile();
+      if (filePath) {
+        localStorage.setItem('break_media_path', filePath);
+        const mediaInput = document.getElementById('break-media-path');
+        if (mediaInput) {
+          mediaInput.value = filePath.split(/[\\\/]/).pop();
+          mediaInput.title = filePath;
+        }
+      }
+    }
+  });
+  
+  // Test alarm
+  document.getElementById('test-break-btn')?.addEventListener('click', () => {
+    triggerBreakWindow();
+  });
+
+  // Settings Modal Overlay Click cancels
+  const settingsOverlay = document.getElementById('settings-modal');
+  if (settingsOverlay) {
+    settingsOverlay.addEventListener('click', (e) => {
+      if (e.target === settingsOverlay) closeSettingsModal();
+    });
+  }
+}
+
+function openAnalyticsWindow() {
+  if (window.electronAPI && window.electronAPI.showAnalyticsWindow) {
+    const accent = localStorage.getItem('accent_primary') || '#a186f1';
+    const hover = localStorage.getItem('accent_hover') || '#b399ff';
+    window.electronAPI.showAnalyticsWindow(accent, hover);
+  }
+}

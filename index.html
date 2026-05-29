@@ -12,7 +12,10 @@
   <div class="card card-header" id="goal-card">
     <div class="title-row goal-header" id="goal-toggle">
       <div class="title">🎯 Финансовая цель</div>
-      <button id="close-btn" class="close-btn" title="Закрыть">✕</button>
+      <div class="header-controls">
+        <button id="settings-btn" class="close-btn" title="Настройки">⚙️</button>
+        <button id="close-btn" class="close-btn" title="Закрыть">✕</button>
+      </div>
     </div>
     <div class="goal-content" id="goal-content">
       <div class="input-row">
@@ -82,7 +85,10 @@
       <div class="title-with-toggle">
         <span class="title">☀️ Ежедневно <span id="daily-task-counter" class="counter">0/0</span></span>
       </div>
-      <button id="add-daily-task-trigger-btn" class="add-task-trigger-btn" title="Добавить ежедневную задачу">+ Добавить</button>
+      <div style="display: flex; gap: 6px; align-items: center; -webkit-app-region: no-drag;">
+        <button id="daily-analytics-btn" class="add-task-trigger-btn" style="background: var(--bg-button); border: 1px solid var(--border-color); color: var(--accent-color);" title="Аналитика">📊 Аналитика</button>
+        <button id="add-daily-task-trigger-btn" class="add-task-trigger-btn" title="Добавить ежедневную задачу">+ Добавить</button>
+      </div>
     </div>
     
     <div class="tasks-content" id="daily-content">
@@ -149,6 +155,65 @@
     </div>
     <div class="modal-body" id="move-task-list" style="max-height: 200px; overflow-y: auto;">
       <!-- Динамический список целевых файлов -->
+    </div>
+  </div>
+</div>
+
+<!-- Модальное окно настроек -->
+<div id="settings-modal" class="modal-overlay hidden">
+  <div class="modal-content settings-modal-content">
+    <div class="modal-header">
+      <div class="modal-title">⚙️ Настройки виджета</div>
+      <button class="modal-close" onclick="closeSettingsModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- Раздел: Оформление -->
+      <div class="settings-section">
+        <div class="settings-section-title">🎨 Цветовые оттенки</div>
+        
+        <div class="setting-row">
+          <label>Фоновая тема:</label>
+          <div class="theme-toggle-group">
+            <button id="theme-dark-btn" class="theme-btn active">Темная</button>
+            <button id="theme-light-btn" class="theme-btn">Светлая</button>
+          </div>
+        </div>
+        
+        <div class="setting-row">
+          <label>Основной цвет:</label>
+          <div class="color-palette" id="color-palette">
+            <!-- Динамические кружочки -->
+          </div>
+        </div>
+      </div>
+      
+      <!-- Раздел: Перерывы -->
+      <div class="settings-section">
+        <div class="settings-section-title">⏳ Напоминание о перерыве</div>
+        
+        <div class="setting-row">
+          <label for="break-interval-select">Период уведомлений:</label>
+          <select id="break-interval-select" class="settings-select">
+            <option value="0">Выключено</option>
+            <option value="15">Каждые 15 минут</option>
+            <option value="30">Каждые 30 минут</option>
+            <option value="45">Каждые 45 минут</option>
+            <option value="60">Каждый час</option>
+            <option value="90">Каждые 1.5 часа</option>
+          </select>
+        </div>
+        
+        <div class="setting-row">
+          <label>Визуальный сигнал (видео/картинка):</label>
+          <div style="display: flex; flex-direction: column; gap: 6px; width: 100%;">
+            <div style="display: flex; gap: 6px; width: 100%;">
+              <input type="text" id="break-media-path" class="settings-input" placeholder="По умолчанию (кофе)" readonly style="font-size: 11px;">
+              <button id="select-media-btn" class="settings-action-btn" style="flex-shrink: 0; padding: 6px 10px;">Выбрать...</button>
+            </div>
+            <button id="test-break-btn" class="settings-action-btn" style="align-self: flex-start; color: var(--accent-color); padding: 6px 12px; margin-top: 4px;">⚡ Тест сигнала</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>

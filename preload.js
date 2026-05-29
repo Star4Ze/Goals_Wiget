@@ -18,5 +18,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   renameObsidianFile: (oldName, newName) => ipcRenderer.invoke('rename-obsidian-file', oldName, newName),
   deleteObsidianFile: (fileName) => ipcRenderer.invoke('delete-obsidian-file', fileName),
   readDailyTasks: () => ipcRenderer.invoke('read-daily-tasks'),
-  moveTaskToFile: (sourceFile, lineIndex, targetFile) => ipcRenderer.invoke('move-task-to-file', sourceFile, lineIndex, targetFile)
+  moveTaskToFile: (sourceFile, lineIndex, targetFile) => ipcRenderer.invoke('move-task-to-file', sourceFile, lineIndex, targetFile),
+  
+  // Settings, Breaks & Analytics additions
+  selectMediaFile: () => ipcRenderer.invoke('select-media-file'),
+  showBreakWindow: (mediaPath, accent, hover) => ipcRenderer.invoke('show-break-window', mediaPath, accent, hover),
+  showAnalyticsWindow: (accent, hover) => ipcRenderer.invoke('show-analytics-window', accent, hover),
+  onDayChanged: (callback) => ipcRenderer.on('day-changed', (event, today) => callback(today))
 });

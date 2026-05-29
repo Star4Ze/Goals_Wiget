@@ -1,3 +1,44 @@
+:root {
+  --accent-color: #a186f1;
+  --accent-hover: #b399ff;
+  --accent-dark: #1e1e1e;
+  
+  --bg-body: transparent;
+  --bg-card: #252525;
+  --bg-input: #1e1e1e;
+  --bg-input-focus: #2a2a2a;
+  --bg-button: #1e1e1e;
+  --bg-button-hover: #2a2a2a;
+  
+  --border-color: #333333;
+  --border-color-input: #3a3a3a;
+  --border-color-modal: #444444;
+  
+  --text-main: #e0e0e0;
+  --text-muted: #888888;
+  --text-subtask: #b0b0b0;
+  --text-done: #777777;
+  --text-shadow-percent: rgba(0, 0, 0, 0.45);
+}
+
+.light-theme {
+  --bg-card: #ffffff;
+  --bg-input: #f3f3f3;
+  --bg-input-focus: #eaeaea;
+  --bg-button: #f3f3f3;
+  --bg-button-hover: #eaeaea;
+  
+  --border-color: #e2e8f0;
+  --border-color-input: #cbd5e1;
+  --border-color-modal: #cbd5e1;
+  
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-subtask: #334155;
+  --text-done: #94a3b8;
+  --text-shadow-percent: rgba(255, 255, 255, 0.45);
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -5,11 +46,12 @@
 }
 
 body {
-  background: transparent;  /* ← полностью прозрачный фон */
+  background: var(--bg-body);
   font-family: 'Segoe UI', system-ui, sans-serif;
   padding: 20px 18px 18px 22px;
-  color: #e0e0e0;
+  color: var(--text-main);
   overflow: hidden; /* Скрываем все полосы прокрутки */
+  transition: color 0.3s ease;
 }
 
 /* Скрываем скроллбары для Chrome/Electron */
@@ -36,7 +78,8 @@ body {
 .card-header input,
 .card-header .goal-header,
 .card-header .title,
-.card-header .progress {
+.card-header .progress,
+.card-header .header-controls {
   -webkit-app-region: no-drag;
 }
 
@@ -71,11 +114,18 @@ body {
   display: none !important;
 }
 
+.header-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  -webkit-app-region: no-drag;
+}
+
 .close-btn {
   -webkit-app-region: no-drag;
   background: none;
   border: none;
-  color: #888888;
+  color: var(--text-muted);
   font-size: 16px;
   cursor: pointer;
   width: 28px;
@@ -88,30 +138,35 @@ body {
 }
 
 .close-btn:hover {
-  background: #3a3a3a;
+  background: var(--bg-button-hover);
   color: #f07178;
+}
+
+#settings-btn:hover {
+  color: var(--accent-color);
 }
 
 /* Карточки — НЕПРОЗРАЧНЫЕ, с тенью для красоты */
 .card {
-  background: #252525;  /* ← непрозрачный фон карточек */
+  background: var(--bg-card);  /* ← непрозрачный фон карточек */
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 12px;
-  border: 1px solid #333333;
+  border: 1px solid var(--border-color);
   box-shadow:
     -3px -3px 8px rgba(0, 0, 0, 0.22),
     0 5px 12px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(0); /* отключаем блюр */
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
-/* Остальные стили без изменений */
 .title {
   font-size: 13px;
   font-weight: 600;
-  color: #a186f1;
+  color: var(--accent-color);
   margin-bottom: 14px;
   letter-spacing: 0.3px;
+  transition: color 0.3s ease;
 }
 
 .input-row {
@@ -129,7 +184,7 @@ body {
 
 .field label {
   font-size: 11px;
-  color: #888888;
+  color: var(--text-muted);
   display: block;
   margin-bottom: 5px;
 }
@@ -137,19 +192,20 @@ body {
 .field input {
   width: 100%;
   padding: 8px 10px;
-  background: #1e1e1e;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color-input);
   border-radius: 10px;
-  color: #e0e0e0;
+  color: var(--text-main);
   font-size: 13px;
   font-family: inherit;
   -webkit-app-region: no-drag;
+  transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
 .field input:focus {
   outline: none;
-  border-color: #a186f1;
-  background: #2a2a2a;
+  border-color: var(--accent-color);
+  background: var(--bg-input-focus);
 }
 
 .floating-field {
@@ -164,7 +220,7 @@ body {
   margin: 0;
   font-size: 9px;
   line-height: 1;
-  color: #777777;
+  color: var(--text-muted);
   pointer-events: none;
 }
 
@@ -207,7 +263,7 @@ body {
 .bar {
   position: relative;
   height: 18px;
-  background: #3a3a3a;
+  background: var(--border-color-input);
   border-radius: 10px;
   overflow: hidden;
 }
@@ -215,9 +271,9 @@ body {
 .fill {
   height: 100%;
   width: 0%;
-  background: #a186f1;
+  background: var(--accent-color);
   border-radius: 10px;
-  transition: width 0.3s;
+  transition: width 0.3s, background-color 0.3s ease;
 }
 
 .percent {
@@ -241,16 +297,17 @@ body {
 }
 
 .stat {
-  background: #1e1e1e;
+  background: var(--bg-input);
   padding: 8px 6px;
   border-radius: 12px;
   text-align: center;
-  border: 1px solid #333333;
+  border: 1px solid var(--border-color);
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 .stat .label {
   font-size: 10px;
-  color: #888888;
+  color: var(--text-muted);
   display: block;
   margin-bottom: 4px;
 }
@@ -258,8 +315,9 @@ body {
 .stat .value {
   font-size: 13px;
   font-weight: 600;
-  color: #a186f1;
+  color: var(--accent-color);
   word-break: break-word;
+  transition: color 0.3s ease;
 }
 
 .capital-row {
@@ -278,13 +336,14 @@ body {
 .income-section {
   margin-top: 16px;
   padding-top: 12px;
-  border-top: 1px solid #333333;
+  border-top: 1px solid var(--border-color);
 }
 
 .income-title {
   font-size: 12px;
-  color: #a186f1;
+  color: var(--accent-color);
   margin-bottom: 8px;
+  transition: color 0.3s ease;
 }
 
 .income-row {
@@ -297,20 +356,22 @@ body {
   flex: 2;
   min-width: 120px;
   padding: 8px 10px;
-  background: #1e1e1e;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color-input);
   border-radius: 10px;
-  color: #e0e0e0;
+  color: var(--text-main);
+  transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
 .income-row button {
-  background: #a186f1;
+  background: var(--accent-color);
   border: none;
   padding: 0 16px;
   border-radius: 10px;
-  color: #1e1e1e;
+  color: var(--accent-dark);
   font-weight: 600;
   cursor: pointer;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Задачи */
@@ -335,7 +396,7 @@ body {
 }
 
 .daily-tasks-list::-webkit-scrollbar-thumb {
-  background: #333333 !important;
+  background: var(--border-color) !important;
   border-radius: 10px !important;
 }
 
@@ -343,7 +404,7 @@ body {
 .add-task-section {
   margin-bottom: 14px;
   padding-bottom: 12px;
-  border-bottom: 1px solid #333333;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .add-task-row {
@@ -354,26 +415,27 @@ body {
 .task-input {
   flex: 1;
   padding: 8px 10px;
-  background: #1e1e1e;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color-input);
   border-radius: 10px;
-  color: #e0e0e0;
+  color: var(--text-main);
   font-size: 13px;
   font-family: inherit;
+  transition: background 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
 .task-input:focus {
   outline: none;
-  border-color: #a186f1;
-  background: #2a2a2a;
+  border-color: var(--accent-color);
+  background: var(--bg-input-focus);
 }
 
 .add-task-btn {
-  background: #a186f1;
+  background: var(--accent-color);
   border: none;
   padding: 8px 12px;
   border-radius: 10px;
-  color: #1e1e1e;
+  color: var(--accent-dark);
   font-weight: 600;
   cursor: pointer;
   font-size: 14px;
@@ -381,7 +443,7 @@ body {
 }
 
 .add-task-btn:hover {
-  background: #b399ff;
+  background: var(--accent-hover);
 }
 
 .add-task-btn:active {
@@ -392,9 +454,9 @@ body {
 .tasks-calendar {
   margin-bottom: 14px;
   padding: 12px;
-  background: #1e1e1e;
+  background: var(--bg-input);
   border-radius: 10px;
-  border: 1px solid #333333;
+  border: 1px solid var(--border-color);
 }
 
 .calendar-header {
@@ -408,7 +470,7 @@ body {
 .calendar-month {
   font-size: 12px;
   font-weight: 600;
-  color: #a186f1;
+  color: var(--accent-color);
   flex: 1;
   text-align: center;
 }
@@ -419,9 +481,9 @@ body {
 }
 
 .calendar-nav button {
-  background: #333333;
+  background: var(--bg-button);
   border: none;
-  color: #a186f1;
+  color: var(--accent-color);
   width: 24px;
   height: 24px;
   border-radius: 6px;
@@ -431,7 +493,7 @@ body {
 }
 
 .calendar-nav button:hover {
-  background: #444444;
+  background: var(--bg-button-hover);
 }
 
 .calendar-weekdays {
@@ -444,7 +506,7 @@ body {
 .calendar-weekday {
   text-align: center;
   font-size: 10px;
-  color: #888888;
+  color: var(--text-muted);
   font-weight: 600;
 }
 
@@ -460,19 +522,19 @@ body {
   align-items: center;
   justify-content: center;
   font-size: 11px;
-  background: #252525;
-  border: 1px solid #333333;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
-  color: #999999;
+  color: var(--text-muted);
   position: relative;
   overflow: hidden;
 }
 
 .calendar-day:hover {
-  border-color: #a186f1;
-  background: #2a2a2a;
+  border-color: var(--accent-color);
+  background: var(--bg-input-focus);
 }
 
 .calendar-day.other-month {
@@ -480,10 +542,10 @@ body {
 }
 
 .calendar-day.today {
-  background: #a186f1;
-  color: #1e1e1e;
+  background: var(--accent-color);
+  color: var(--accent-dark);
   font-weight: 600;
-  border-color: #a186f1;
+  border-color: var(--accent-color);
 }
 
 .calendar-day.has-tasks::after {
@@ -499,7 +561,7 @@ body {
   align-items: flex-start;
   gap: 10px;
   padding: 8px 0 8px calc(var(--task-depth, 0) * 10px);
-  border-bottom: 1px solid #333333;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .task:last-child {
@@ -511,14 +573,14 @@ body {
   height: 16px;
   margin-top: 2px;
   cursor: pointer;
-  accent-color: #a186f1;
+  accent-color: var(--accent-color);
   flex-shrink: 0;
 }
 
 .task-text {
   flex: 1;
   font-size: 13px;
-  color: #e0e0e0;
+  color: var(--text-main);
   word-break: break-word;
   white-space: normal;
   line-height: 1.4;
@@ -526,18 +588,18 @@ body {
 }
 
 .task.done .task-text {
-  color: #777777;
+  color: var(--text-done);
   text-decoration: line-through;
 }
 
 .counter {
-  background: #2a2a2a;
+  background: var(--bg-input-focus);
   padding: 2px 8px;
   border-radius: 20px;
   font-size: 11px;
   margin-left: 8px;
   font-weight: normal;
-  color: #a186f1;
+  color: var(--accent-color);
 }
 
 input[type="date"], input[type="number"] {
@@ -600,16 +662,16 @@ input[type="date"], input[type="number"] {
 .task-tabs {
   display: flex;
   gap: 4px;
-  background: #1e1e1e;
+  background: var(--bg-input);
   padding: 2px;
   border-radius: 8px;
-  border: 1px solid #333333;
+  border: 1px solid var(--border-color);
 }
 
 .task-tab {
   background: none;
   border: none;
-  color: #888888;
+  color: var(--text-muted);
   padding: 4px 10px;
   font-size: 11px;
   font-weight: 600;
@@ -619,18 +681,18 @@ input[type="date"], input[type="number"] {
 }
 
 .task-tab:hover {
-  color: #e0e0e0;
+  color: var(--text-main);
 }
 
 .task-tab.active {
-  background: #333333;
-  color: #a186f1;
+  background: var(--bg-button-hover);
+  color: var(--accent-color);
 }
 
 /* Подзадачи (иерархия подцелей) */
 .subtasks-container {
   padding-left: 14px;
-  border-left: 1px dashed #3a3a3a;
+  border-left: 1px dashed var(--border-color-input);
   margin-left: 8px;
   margin-top: -2px;
   margin-bottom: 8px;
@@ -644,7 +706,7 @@ input[type="date"], input[type="number"] {
 
 .task.subtask .task-text {
   font-size: 12px;
-  color: #b0b0b0;
+  color: var(--text-subtask);
 }
 
 /* Опции задачи при наведении */
@@ -656,7 +718,7 @@ input[type="date"], input[type="number"] {
   pointer-events: none;
   background: none;
   border: none;
-  color: #888888;
+  color: var(--text-muted);
   cursor: pointer;
   font-size: 12px;
   font-weight: bold;
@@ -673,8 +735,8 @@ input[type="date"], input[type="number"] {
   pointer-events: auto;
 }
 .task-options-btn:hover {
-  color: #a186f1;
-  background: #2a2a2a;
+  color: var(--accent-color);
+  background: var(--bg-input-focus);
 }
 
 /* Модальное окно действий */
@@ -687,6 +749,7 @@ input[type="date"], input[type="number"] {
   z-index: 1000;
   transition: opacity 0.15s ease;
   opacity: 1;
+  background: rgba(15, 15, 15, 0.4);
 }
 .modal-overlay.hidden {
   opacity: 0;
@@ -694,14 +757,14 @@ input[type="date"], input[type="number"] {
   display: none !important;
 }
 .modal-content {
-  background: #252525;
-  border: 1px solid #444444;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color-modal);
   border-radius: 12px;
   width: 220px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
   padding: 10px;
   transform: scale(1);
-  transition: transform 0.15s ease;
+  transition: transform 0.15s ease, background 0.3s ease, border-color 0.3s ease;
   pointer-events: auto;
 }
 .modal-overlay.hidden .modal-content {
@@ -712,19 +775,19 @@ input[type="date"], input[type="number"] {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
-  border-bottom: 1px solid #333333;
+  border-bottom: 1px solid var(--border-color);
   padding-bottom: 6px;
 }
 .modal-title {
   font-size: 12px;
   font-weight: 600;
-  color: #a186f1;
+  color: var(--accent-color);
   letter-spacing: 0.3px;
 }
 .modal-close {
   background: none;
   border: none;
-  color: #888888;
+  color: var(--text-muted);
   font-size: 14px;
   cursor: pointer;
   transition: color 0.2s;
@@ -740,9 +803,9 @@ input[type="date"], input[type="number"] {
   overflow-y: auto;
 }
 .modal-action-btn {
-  background: #1e1e1e;
-  border: 1px solid #333333;
-  color: #e0e0e0;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
   padding: 9px 12px;
   border-radius: 10px;
   font-size: 12px;
@@ -774,9 +837,9 @@ input[type="date"], input[type="number"] {
 .file-select-btn {
   flex: 1;
   min-width: 0;
-  background: #1e1e1e;
-  border: 1px solid #333333;
-  color: #e0e0e0;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
   padding: 9px 12px;
   border-radius: 10px;
   font-size: 12px;
@@ -787,17 +850,17 @@ input[type="date"], input[type="number"] {
 }
 
 .file-select-btn:hover {
-  background: #2a2a2a;
-  border-color: #a186f1;
-  color: #a186f1;
+  background: var(--bg-input-focus);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
 }
 
 .file-options-btn {
   width: 34px;
   flex-shrink: 0;
-  background: #1e1e1e;
-  border: 1px solid #333333;
-  color: #888888;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
   border-radius: 10px;
   font-size: 12px;
   font-weight: 700;
@@ -806,14 +869,14 @@ input[type="date"], input[type="number"] {
 }
 
 .file-options-btn:hover {
-  color: #a186f1;
-  border-color: #a186f1;
-  background: #2a2a2a;
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+  background: var(--bg-input-focus);
 }
 .modal-action-btn:hover {
-  background: #2a2a2a;
-  border-color: #a186f1;
-  color: #a186f1;
+  background: var(--bg-input-focus);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
 }
 .modal-action-btn.delete {
   color: #ff5370;
@@ -835,18 +898,18 @@ input[type="date"], input[type="number"] {
   flex: 1;
   min-width: 0;
   padding: 8px 10px;
-  background: #1e1e1e;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color-input);
   border-radius: 8px;
-  color: #e0e0e0;
+  color: var(--text-main);
   font-size: 12px;
   font-family: inherit;
 }
 
 .create-file-input:focus {
   outline: none;
-  border-color: #a186f1;
-  background: #2a2a2a;
+  border-color: var(--accent-color);
+  background: var(--bg-input-focus);
 }
 
 .create-file-input.error {
@@ -857,15 +920,15 @@ input[type="date"], input[type="number"] {
   width: 34px;
   border: none;
   border-radius: 8px;
-  background: #a186f1;
-  color: #1e1e1e;
+  background: var(--accent-color);
+  color: var(--accent-dark);
   font-weight: 700;
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .create-file-submit:hover {
-  background: #b399ff;
+  background: var(--accent-hover);
 }
 
 /* Поле добавления подзадачи */
@@ -879,31 +942,31 @@ input[type="date"], input[type="number"] {
 .subtask-input {
   flex: 1;
   padding: 6px 10px;
-  background: #1e1e1e;
-  border: 1px solid #3a3a3a;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color-input);
   border-radius: 8px;
-  color: #e0e0e0;
+  color: var(--text-main);
   font-size: 12px;
   font-family: inherit;
 }
 .subtask-input:focus {
   outline: none;
-  border-color: #a186f1;
-  background: #2a2a2a;
+  border-color: var(--accent-color);
+  background: var(--bg-input-focus);
 }
 .add-subtask-btn-submit {
-  background: #a186f1;
+  background: var(--accent-color);
   border: none;
   padding: 6px 10px;
   border-radius: 8px;
-  color: #1e1e1e;
+  color: var(--accent-dark);
   font-weight: 600;
   cursor: pointer;
   font-size: 12px;
   transition: all 0.2s;
 }
 .add-subtask-btn-submit:hover {
-  background: #b399ff;
+  background: var(--accent-hover);
 }
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-5px); }
@@ -914,10 +977,10 @@ input[type="date"], input[type="number"] {
 .task-edit-input {
   flex: 1;
   padding: 4px 8px;
-  background: #1e1e1e;
-  border: 1px solid #a186f1;
+  background: var(--bg-input);
+  border: 1px solid var(--accent-color);
   border-radius: 6px;
-  color: #e0e0e0;
+  color: var(--text-main);
   font-size: 13px;
   font-family: inherit;
 }
@@ -934,10 +997,10 @@ input[type="date"], input[type="number"] {
   -webkit-app-region: no-drag;
 }
 .task-edit-save-btn {
-  color: #a186f1;
+  color: var(--accent-color);
 }
 .task-edit-save-btn:hover {
-  color: #b399ff;
+  color: var(--accent-hover);
 }
 .task-edit-cancel-btn {
   color: #ff5370;
@@ -963,7 +1026,7 @@ input[type="date"], input[type="number"] {
 .toggle-expand-btn {
   background: none;
   border: none;
-  color: #888888;
+  color: var(--text-muted);
   cursor: pointer;
   font-size: 10px;
   padding: 4px;
@@ -972,16 +1035,16 @@ input[type="date"], input[type="number"] {
   -webkit-app-region: no-drag;
 }
 .toggle-expand-btn:hover {
-  color: #a186f1;
-  background: #2a2a2a;
+  color: var(--accent-color);
+  background: var(--bg-input-focus);
 }
 .active-file-btn {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  background: #1e1e1e;
-  border: 1px solid #3a3a3a;
-  color: #a186f1;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color-input);
+  color: var(--accent-color);
   padding: 4px 10px;
   border-radius: 8px;
   font-size: 11px;
@@ -992,15 +1055,15 @@ input[type="date"], input[type="number"] {
   z-index: 5;
 }
 .active-file-btn:hover {
-  background: #2a2a2a;
-  border-color: #a186f1;
+  background: var(--bg-input-focus);
+  border-color: var(--accent-color);
 }
 .add-task-trigger-btn {
-  background: #a186f1;
+  background: var(--accent-color);
   border: none;
   padding: 4px 10px;
   border-radius: 8px;
-  color: #1e1e1e;
+  color: var(--accent-dark);
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -1011,7 +1074,7 @@ input[type="date"], input[type="number"] {
   -webkit-app-region: no-drag;
 }
 .add-task-trigger-btn:hover {
-  background: #b399ff;
+  background: var(--accent-hover);
 }
 
 /* Инлайновое добавление новой задачи */
@@ -1039,9 +1102,155 @@ input[type="date"], input[type="number"] {
   background: transparent !important;
 }
 .tasks-list.expanded::-webkit-scrollbar-thumb {
-  background: #333333 !important;
+  background: var(--border-color) !important;
   border-radius: 10px !important;
 }
 .tasks-list.expanded::-webkit-scrollbar-thumb:hover {
-  background: #a186f1 !important;
+  background: var(--accent-color) !important;
+}
+
+/* ==========================================================================
+   Специфичные стили для Настроек и Аналитики
+   ========================================================================== */
+
+/* Настройки модальное окно */
+.settings-modal-content {
+  width: 330px;
+}
+
+.settings-section {
+  padding-bottom: 12px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.settings-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+.settings-section-title {
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--accent-color);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.setting-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.setting-row:last-child {
+  margin-bottom: 0;
+}
+
+.setting-row label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.theme-toggle-group {
+  display: flex;
+  gap: 6px;
+}
+
+.theme-btn {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color-input);
+  color: var(--text-main);
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.theme-btn:hover {
+  background: var(--bg-input-focus);
+}
+
+.theme-btn.active {
+  background: var(--accent-color);
+  color: var(--accent-dark);
+  border-color: var(--accent-color);
+}
+
+.color-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.color-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.color-circle:hover {
+  transform: scale(1.15);
+}
+
+.color-circle.active {
+  border-color: var(--text-main);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.4);
+}
+
+.settings-select {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color-input);
+  color: var(--text-main);
+  border-radius: 10px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.3s ease, background 0.3s ease;
+}
+
+.settings-select:focus {
+  border-color: var(--accent-color);
+}
+
+.settings-input {
+  flex: 1;
+  padding: 8px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color-input);
+  color: var(--text-main);
+  border-radius: 10px;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+}
+
+.settings-action-btn {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color-input);
+  color: var(--text-main);
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.settings-action-btn:hover {
+  background: var(--bg-input-focus);
+  border-color: var(--accent-color);
 }

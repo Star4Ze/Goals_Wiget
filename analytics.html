@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Аналитика Ежедневных Задач</title>
+  <style>
+    :root {
+      --accent-color: #a186f1;
+      --accent-hover: #b399ff;
+      --bg-card: #252525;
+      --bg-body: #1e1e1e;
+      --border-color: #333333;
+      --text-main: #e0e0e0;
+      --text-muted: #888888;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      background: var(--bg-body);
+      color: var(--text-main);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      user-select: none;
+    }
+    
+    /* Draggable title bar */
+    .title-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--bg-card);
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      -webkit-app-region: drag;
+    }
+    
+    .title-bar .title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent-color);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .title-bar .close-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 16px;
+      cursor: pointer;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      -webkit-app-region: no-drag;
+      outline: none;
+    }
+    
+    .title-bar .close-btn:hover {
+      background: #3a3a3a;
+      color: #f07178;
+    }
+    
+    .content {
+      flex: 1;
+      padding: 16px;
+      display: flex;
+      gap: 16px;
+      overflow: hidden;
+      -webkit-app-region: no-drag;
+    }
+    
+    .main-panel {
+      flex: 3;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .detail-panel {
+      flex: 2;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+    }
+    
+    /* Month selector */
+    .month-selector {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 8px 12px;
+    }
+    
+    .month-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent-color);
+    }
+    
+    .nav-btn {
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      color: var(--accent-color);
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      transition: all 0.2s;
+      outline: none;
+    }
+    
+    .nav-btn:hover {
+      background: #333333;
+      border-color: var(--accent-color);
+    }
+    
+    /* Calendar Grid */
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+      flex: 1;
+    }
+    
+    .weekday-header {
+      text-align: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      padding: 4px 0;
+    }
+    
+    .calendar-day-cell {
+      aspect-ratio: 1.1;
+      border: 1px solid var(--border-color);
+      background: var(--bg-card);
+      border-radius: 8px;
+      padding: 6px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: all 0.2s;
+      position: relative;
+    }
+    
+    .calendar-day-cell:hover {
+      border-color: var(--accent-color);
+      transform: translateY(-1px);
+    }
+    
+    .calendar-day-cell.active-day {
+      border-color: var(--accent-color);
+      box-shadow: 0 0 8px rgba(161, 134, 241, 0.25);
+    }
+    
+    .calendar-day-cell.empty-cell {
+      background: transparent;
+      border: none;
+      cursor: default;
+      pointer-events: none;
+    }
+    
+    .day-num {
+      font-size: 11px;
+      font-weight: bold;
+      color: var(--text-muted);
+    }
+    
+    .calendar-day-cell:hover .day-num {
+      color: var(--text-main);
+    }
+    
+    /* Completion Indicator */
+    .progress-dot {
+      width: 100%;
+      height: 8px;
+      border-radius: 4px;
+      background: #333;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+    
+    .day-ratio {
+      font-size: 10px;
+      align-self: flex-end;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    
+    /* Sidebar Details */
+    .detail-header {
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px;
+    }
+    
+    .detail-date {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent-color);
+    }
+    
+    .detail-summary {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    
+    .detail-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
+    }
+    
+    .detail-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 12px;
+      padding: 4px 0;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    
+    .detail-item.done {
+      color: var(--text-muted);
+      text-decoration: line-through;
+    }
+    
+    .detail-check {
+      color: var(--accent-color);
+      font-weight: bold;
+    }
+    
+    .detail-check.not-done {
+      color: #f07178;
+    }
+    
+    .stats-summary {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+    
+    .stat-box {
+      background: #1e1e1e;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px;
+      text-align: center;
+    }
+    
+    .stat-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      display: block;
+      margin-bottom: 4px;
+    }
+    
+    .stat-value {
+      font-size: 18px;
+      font-weight: bold;
+      color: var(--accent-color);
+    }
+  </style>
+</head>
+<body>
+  <div class="title-bar">
+    <div class="title">📊 Аналитика Ежедневных Задач</div>
+    <button class="close-btn" id="close-btn" title="Закрыть">✕</button>
+  </div>
+  
+  <div class="content">
+    <div class="main-panel">
+      <div class="month-selector">
+        <button class="nav-btn" id="prev-month">◀</button>
+        <div class="month-title" id="month-title">...</div>
+        <button class="nav-btn" id="next-month">▶</button>
+      </div>
+      
+      <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; text-align: center;">
+        <div class="weekday-header">Пн</div>
+        <div class="weekday-header">Вт</div>
+        <div class="weekday-header">Ср</div>
+        <div class="weekday-header">Чт</div>
+        <div class="weekday-header">Пт</div>
+        <div class="weekday-header">Сб</div>
+        <div class="weekday-header">Вс</div>
+      </div>
+      
+      <div class="calendar-grid" id="calendar-days">
+        <!-- Cells injected here -->
+      </div>
+    </div>
+    
+    <div class="detail-panel">
+      <div class="detail-header">
+        <div class="detail-date" id="detail-date">Выберите день</div>
+        <div class="detail-summary" id="detail-summary">Подробная статистика за выбранную дату</div>
+      </div>
+      
+      <div class="stats-summary">
+        <div class="stat-box">
+          <span class="stat-label">Выполнено</span>
+          <span class="stat-value" id="stat-completed">—</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Процент</span>
+          <span class="stat-value" id="stat-percent">—</span>
+        </div>
+      </div>
+      
+      <ul class="detail-list" id="detail-list">
+        <li style="color: var(--text-muted); font-size: 12px; text-align: center; padding-top: 20px;">Нет данных для отображения</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+    
+    let history = {};
+    let currentYear, currentMonth;
+    let selectedDateStr = '';
+    
+    const monthsRu = [
+      "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+      "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+    ];
+    
+    // Apply styling passed via URL search params
+    const params = new URLSearchParams(window.location.search);
+    const accentColor = params.get('accent') || '#a186f1';
+    const accentHover = params.get('hover') || '#b399ff';
+    document.documentElement.style.setProperty('--accent-color', accentColor);
+    document.documentElement.style.setProperty('--accent-hover', accentHover);
+    
+    const today = new Date();
+    currentYear = today.getFullYear();
+    currentMonth = today.getMonth();
+    
+    async function loadHistory() {
+      history = await ipcRenderer.invoke('get-daily-history');
+      renderCalendar();
+      showDetailsForDate(getTodayKey(today));
+    }
+    
+    function getTodayKey(dateObj) {
+      return dateObj.getFullYear() + '-' + 
+             String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + 
+             String(dateObj.getDate()).padStart(2, '0');
+    }
+    
+    function getCompletionColor(percent) {
+      if (percent === 0) return '#f07178';
+      if (percent < 50) return '#ff8f59';
+      if (percent < 100) return '#ffcc00';
+      return '#3ddc84';
+    }
+    
+    function parseDayEntry(dayEntry) {
+      let daily = [];
+      let standard = [];
+      if (Array.isArray(dayEntry)) {
+        daily = dayEntry;
+      } else if (dayEntry && typeof dayEntry === 'object') {
+        daily = dayEntry.dailyTasks || [];
+        standard = dayEntry.completedStandardTasks || [];
+      }
+      return { daily, standard };
+    }
+    
+    function renderCalendar() {
+      const container = document.getElementById('calendar-days');
+      const monthTitle = document.getElementById('month-title');
+      
+      monthTitle.textContent = `${monthsRu[currentMonth]} ${currentYear}`;
+      container.innerHTML = '';
+      
+      const firstDay = new Date(currentYear, currentMonth, 1);
+      let startDayOfWeek = firstDay.getDay();
+      startDayOfWeek = startDayOfWeek === 0 ? 7 : startDayOfWeek;
+      
+      const totalDays = new Date(currentYear, currentMonth + 1, 0).getDate();
+      
+      for (let i = 1; i < startDayOfWeek; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'calendar-day-cell empty-cell';
+        container.appendChild(cell);
+      }
+      
+      for (let day = 1; day <= totalDays; day++) {
+        const cell = document.createElement('div');
+        cell.className = 'calendar-day-cell';
+        
+        const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        if (dateStr === selectedDateStr) {
+          cell.classList.add('active-day');
+        }
+        
+        const dayNumSpan = document.createElement('span');
+        dayNumSpan.className = 'day-num';
+        dayNumSpan.textContent = day;
+        cell.appendChild(dayNumSpan);
+        
+        const dayData = history[dateStr];
+        const { daily, standard } = parseDayEntry(dayData);
+        
+        if (daily.length > 0 || standard.length > 0) {
+          const completedCount = daily.filter(t => t.done).length;
+          const totalCount = daily.length;
+          const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 100;
+          const color = getCompletionColor(pct);
+          
+          const ratioSpan = document.createElement('span');
+          ratioSpan.className = 'day-ratio';
+          
+          let ratioText = '';
+          if (totalCount > 0) {
+            ratioText += `${completedCount}/${totalCount}`;
+          }
+          if (standard.length > 0) {
+            ratioText += (ratioText ? ' ' : '') + `+${standard.length}`;
+          }
+          ratioSpan.textContent = ratioText;
+          ratioSpan.style.color = color;
+          cell.appendChild(ratioSpan);
+          
+          const progressDot = document.createElement('div');
+          progressDot.className = 'progress-dot';
+          
+          const progressBar = document.createElement('div');
+          progressBar.className = 'progress-bar';
+          progressBar.style.width = `${pct}%`;
+          progressBar.style.backgroundColor = color;
+          
+          progressDot.appendChild(progressBar);
+          cell.appendChild(progressDot);
+        } else {
+          const noData = document.createElement('span');
+          noData.className = 'day-ratio';
+          noData.textContent = '—';
+          noData.style.fontSize = '12px';
+          cell.appendChild(noData);
+        }
+        
+        cell.onclick = () => {
+          document.querySelectorAll('.calendar-day-cell').forEach(c => c.classList.remove('active-day'));
+          cell.classList.add('active-day');
+          showDetailsForDate(dateStr);
+        };
+        
+        container.appendChild(cell);
+      }
+    }
+    
+    function showDetailsForDate(dateStr) {
+      selectedDateStr = dateStr;
+      const detailDate = document.getElementById('detail-date');
+      const detailSummary = document.getElementById('detail-summary');
+      const detailList = document.getElementById('detail-list');
+      const statCompleted = document.getElementById('stat-completed');
+      const statPercent = document.getElementById('stat-percent');
+      
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const parsedDate = new Date(parts[0], parts[1] - 1, parts[2]);
+        detailDate.textContent = parsedDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+      } else {
+        detailDate.textContent = dateStr;
+      }
+      
+      const dayData = history[dateStr];
+      const { daily, standard } = parseDayEntry(dayData);
+      
+      detailList.innerHTML = '';
+      
+      if (daily.length > 0 || standard.length > 0) {
+        const completedCount = daily.filter(t => t.done).length;
+        const totalCount = daily.length;
+        const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 100;
+        
+        detailSummary.textContent = `Ежедневные: ${completedCount}/${totalCount} | Разовые: ${standard.length}`;
+        statCompleted.textContent = `${completedCount + standard.length} всего`;
+        statPercent.textContent = `${pct}%`;
+        statPercent.style.color = getCompletionColor(pct);
+        
+        if (daily.length > 0) {
+          const subHeading = document.createElement('div');
+          subHeading.style.fontSize = '12px';
+          subHeading.style.fontWeight = 'bold';
+          subHeading.style.color = 'var(--accent-color)';
+          subHeading.style.margin = '8px 0 4px 0';
+          subHeading.textContent = '☀️ Ежедневные задачи:';
+          detailList.appendChild(subHeading);
+          
+          daily.forEach(task => {
+            const li = document.createElement('li');
+            li.className = task.done ? 'detail-item done' : 'detail-item';
+            
+            const icon = document.createElement('span');
+            icon.className = task.done ? 'detail-check' : 'detail-check not-done';
+            icon.textContent = task.done ? '✓' : '✕';
+            
+            const text = document.createElement('span');
+            text.textContent = task.text;
+            
+            li.appendChild(icon);
+            li.appendChild(text);
+            detailList.appendChild(li);
+          });
+        }
+        
+        if (standard.length > 0) {
+          const subHeading = document.createElement('div');
+          subHeading.style.fontSize = '12px';
+          subHeading.style.fontWeight = 'bold';
+          subHeading.style.color = 'var(--accent-color)';
+          subHeading.style.margin = '12px 0 4px 0';
+          subHeading.textContent = '📋 Выполненные разовые задачи:';
+          detailList.appendChild(subHeading);
+          
+          standard.forEach(task => {
+            const li = document.createElement('li');
+            li.className = 'detail-item done';
+            
+            const icon = document.createElement('span');
+            icon.className = 'detail-check';
+            icon.textContent = '✓';
+            
+            const text = document.createElement('span');
+            text.textContent = task.text + (task.file ? ` (${task.file})` : '');
+            
+            li.appendChild(icon);
+            li.appendChild(text);
+            detailList.appendChild(li);
+          });
+        }
+      } else {
+        detailSummary.textContent = 'Нет записей в истории';
+        statCompleted.textContent = '—';
+        statPercent.textContent = '—';
+        statPercent.style.color = '';
+        
+        const emptyLi = document.createElement('li');
+        emptyLi.style.color = 'var(--text-muted)';
+        emptyLi.style.fontSize = '12px';
+        emptyLi.style.textAlign = 'center';
+        emptyLi.style.paddingTop = '20px';
+        emptyLi.textContent = 'В этот день история не записывалась';
+        detailList.appendChild(emptyLi);
+      }
+    }
+    
+    document.getElementById('prev-month').onclick = () => {
+      if (currentMonth === 0) {
+        currentMonth = 11;
+        currentYear--;
+      } else {
+        currentMonth--;
+      }
+      renderCalendar();
+    };
+    
+    document.getElementById('next-month').onclick = () => {
+      if (currentMonth === 11) {
+        currentMonth = 0;
+        currentYear++;
+      } else {
+        currentMonth++;
+      }
+      renderCalendar();
+    };
+    
+    document.getElementById('close-btn').onclick = () => {
+      window.close();
+    };
+    
+    loadHistory();
+  </script>
+</body>
+</html>
