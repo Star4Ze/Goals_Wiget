@@ -56,6 +56,22 @@
       color: #b0b0b0;
       margin: 0 0 10px 0;
     }
+
+    .break-countdown {
+      color: #f2f2f2;
+      font-size: 44px;
+      font-weight: 700;
+      line-height: 1;
+      margin-top: 14px;
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    }
+
+    .break-countdown-label {
+      color: #9d9d9d;
+      font-size: 13px;
+      margin-top: 8px;
+    }
     
     .media-container {
       width: 480px;
@@ -131,53 +147,76 @@
     <div>
       <h1>Время сделать перерыв!</h1>
       <p>Оторвитесь от экрана, разомнитесь, выпейте воды.</p>
+      <div class="break-countdown" id="break-countdown">5:00</div>
+      <div class="break-countdown-label">Рекомендуемая длина перерыва</div>
     </div>
     
     <button class="close-btn" id="close-btn">Вернуться к работе</button>
   </div>
 
   <script>
-    // Play the synthesizer sound immediately
-    function playChime() {
+    function playToneSequence(sequence) {
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         const now = ctx.currentTime;
-        
-        const osc1 = ctx.createOscillator();
-        const osc2 = ctx.createOscillator();
-        const gain = ctx.createGain();
-        
-        osc1.type = 'sine';
-        osc1.frequency.setValueAtTime(523.25, now); // C5
-        osc1.frequency.exponentialRampToValueAtTime(783.99, now + 0.3); // G5
-        
-        osc2.type = 'sine';
-        osc2.frequency.setValueAtTime(659.25, now); // E5
-        osc2.frequency.exponentialRampToValueAtTime(1046.50, now + 0.3); // C6
-        
-        gain.gain.setValueAtTime(0.3, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
-        
-        osc1.connect(gain);
-        osc2.connect(gain);
-        gain.connect(ctx.destination);
-        
-        osc1.start(now);
-        osc1.stop(now + 1.5);
-        osc2.start(now);
-        osc2.stop(now + 1.5);
+
+        sequence.forEach((tone) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          const start = now + tone.delay;
+          const end = start + tone.duration;
+
+          osc.type = tone.type || 'sine';
+          osc.frequency.setValueAtTime(tone.from, start);
+          osc.frequency.exponentialRampToValueAtTime(tone.to || tone.from, end);
+          gain.gain.setValueAtTime(tone.volume || 0.22, start);
+          gain.gain.exponentialRampToValueAtTime(0.001, end);
+
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(start);
+          osc.stop(end);
+        });
       } catch (e) {
         console.error("Audio error:", e);
       }
     }
 
-    playChime();
+    function playSelectedSound(sound) {
+      const presets = {
+        chime: [
+          { from: 523.25, to: 783.99, delay: 0, duration: 1.4, volume: 0.24 },
+          { from: 659.25, to: 1046.50, delay: 0.05, duration: 1.4, volume: 0.2 }
+        ],
+        bell: [
+          { from: 880, to: 880, delay: 0, duration: 0.28, volume: 0.25 },
+          { from: 1174.66, to: 1174.66, delay: 0.18, duration: 0.4, volume: 0.2 },
+          { from: 1567.98, to: 1567.98, delay: 0.42, duration: 0.55, volume: 0.16 }
+        ],
+        focus: [
+          { from: 392, to: 523.25, delay: 0, duration: 0.35, volume: 0.22, type: 'triangle' },
+          { from: 523.25, to: 659.25, delay: 0.32, duration: 0.35, volume: 0.2, type: 'triangle' },
+          { from: 659.25, to: 783.99, delay: 0.64, duration: 0.45, volume: 0.18, type: 'triangle' }
+        ],
+        water: [
+          { from: 1046.5, to: 698.46, delay: 0, duration: 0.25, volume: 0.18 },
+          { from: 1318.51, to: 783.99, delay: 0.22, duration: 0.32, volume: 0.14 }
+        ]
+      };
+
+      if (sound !== 'none') {
+        playToneSequence(presets[sound] || presets.chime);
+      }
+    }
 
     // Get parameters
     const params = new URLSearchParams(window.location.search);
     const mediaPath = params.get('media');
     const accentColor = params.get('accent') || '#a186f1';
     const accentHover = params.get('hover') || '#b399ff';
+    const sound = params.get('sound') || 'chime';
+
+    playSelectedSound(sound);
     
     // Apply colors to variables
     document.documentElement.style.setProperty('--accent-color', accentColor);
@@ -208,6 +247,22 @@
       container.style.display = 'flex';
       ill.style.display = 'none';
     }
+
+    const countdownEl = document.getElementById('break-countdown');
+    const breakEndsAt = Date.now() + 5 * 60 * 1000;
+
+    function updateBreakCountdown() {
+      const remainingSeconds = Math.max(0, Math.ceil((breakEndsAt - Date.now()) / 1000));
+      const minutes = Math.floor(remainingSeconds / 60);
+      const seconds = remainingSeconds % 60;
+      countdownEl.textContent = `${minutes}:${String(seconds).padStart(2, '0')}`;
+      if (remainingSeconds <= 0) {
+        clearInterval(countdownTimer);
+      }
+    }
+
+    const countdownTimer = setInterval(updateBreakCountdown, 1000);
+    updateBreakCountdown();
     
     document.getElementById('close-btn').addEventListener('click', () => {
       window.close();

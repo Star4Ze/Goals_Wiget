@@ -22,7 +22,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Settings, Breaks & Analytics additions
   selectMediaFile: () => ipcRenderer.invoke('select-media-file'),
-  showBreakWindow: (mediaPath, accent, hover) => ipcRenderer.invoke('show-break-window', mediaPath, accent, hover),
+  showBreakWindow: (mediaPath, accent, hover, sound) => ipcRenderer.invoke('show-break-window', mediaPath, accent, hover, sound),
   showAnalyticsWindow: (accent, hover) => ipcRenderer.invoke('show-analytics-window', accent, hover),
+  onBreakWindowClosed: (callback) => ipcRenderer.on('break-window-closed', callback),
   onDayChanged: (callback) => ipcRenderer.on('day-changed', (event, today) => callback(today))
 });

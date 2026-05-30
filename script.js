@@ -89,6 +89,9 @@ let activeSubtaskInputTaskId = null;
 let activeEditTaskId = null;
 let activeTriggerBtnRect = null;
 var breakAlarmTimer = null;
+var breakCountdownTimer = null;
+var nextBreakAt = null;
+var isBreakWindowOpen = false;
 
 function getTaskKey(task, fileName) {
   return `${fileName}:${task.lineIndex}`;
@@ -1254,6 +1257,11 @@ function openSettingsModal() {
     if (select) {
       select.value = localStorage.getItem('break_interval') || '0';
     }
+
+    const soundSelect = document.getElementById('break-sound-select');
+    if (soundSelect) {
+      soundSelect.value = localStorage.getItem('break_sound') || 'chime';
+    }
     
     const mediaInput = document.getElementById('break-media-path');
     if (mediaInput) {
@@ -1263,6 +1271,7 @@ function openSettingsModal() {
     }
     
     modal.classList.remove('hidden');
+    updateBreakCountdownStatus();
     
     // Position modal centered since it's a primary system setting
     modalContent.style.position = 'absolute';
@@ -1278,26 +1287,83 @@ function closeSettingsModal() {
 
 function initBreakTimer() {
   if (breakAlarmTimer) {
-    clearInterval(breakAlarmTimer);
+    clearTimeout(breakAlarmTimer);
     breakAlarmTimer = null;
+  }
+
+  if (breakCountdownTimer) {
+    clearInterval(breakCountdownTimer);
+    breakCountdownTimer = null;
   }
   
   const interval = parseInt(localStorage.getItem('break_interval') || '0');
   if (interval > 0) {
     const ms = interval * 60 * 1000;
-    breakAlarmTimer = setInterval(() => {
-      triggerBreakWindow();
-    }, ms);
+    nextBreakAt = Date.now() + ms;
+    breakAlarmTimer = setTimeout(triggerBreakWindow, ms);
+    breakCountdownTimer = setInterval(updateBreakCountdownStatus, 1000);
+  } else {
+    nextBreakAt = null;
   }
+
+  updateBreakCountdownStatus();
 }
 
 function triggerBreakWindow() {
   if (window.electronAPI && window.electronAPI.showBreakWindow) {
+    if (breakAlarmTimer) {
+      clearTimeout(breakAlarmTimer);
+      breakAlarmTimer = null;
+    }
+    nextBreakAt = null;
+    isBreakWindowOpen = true;
+    updateBreakCountdownStatus();
+
     const mediaPath = localStorage.getItem('break_media_path') || '';
     const accent = localStorage.getItem('accent_primary') || '#a186f1';
     const hover = localStorage.getItem('accent_hover') || '#b399ff';
-    window.electronAPI.showBreakWindow(mediaPath, accent, hover);
+    const sound = localStorage.getItem('break_sound') || 'chime';
+    window.electronAPI.showBreakWindow(mediaPath, accent, hover, sound);
   }
+}
+
+function formatBreakDuration(ms) {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    return `${hours} ч ${String(minutes).padStart(2, '0')} мин`;
+  }
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
+
+function updateBreakCountdownStatus() {
+  const status = document.getElementById('break-countdown-status');
+  if (!status) return;
+
+  const interval = parseInt(localStorage.getItem('break_interval') || '0');
+  if (interval <= 0) {
+    status.textContent = 'Уведомления выключены';
+    return;
+  }
+
+  if (isBreakWindowOpen) {
+    status.textContent = 'Перерыв идет. Следующий отсчет начнется после кнопки "Вернуться к работе".';
+    return;
+  }
+
+  if (!nextBreakAt) {
+    status.textContent = 'Отсчет начнется после возврата к работе.';
+    return;
+  }
+
+  status.textContent = `Следующее уведомление через ${formatBreakDuration(nextBreakAt - Date.now())}`;
+}
+
+function handleBreakWindowClosed() {
+  isBreakWindowOpen = false;
+  initBreakTimer();
 }
 
 function initSettingsListeners() {
@@ -1322,6 +1388,10 @@ function initSettingsListeners() {
     localStorage.setItem('break_interval', e.target.value);
     initBreakTimer(); // restart timer
   });
+
+  document.getElementById('break-sound-select')?.addEventListener('change', (e) => {
+    localStorage.setItem('break_sound', e.target.value);
+  });
   
   // Choose media
   document.getElementById('select-media-btn')?.addEventListener('click', async () => {
@@ -1342,6 +1412,10 @@ function initSettingsListeners() {
   document.getElementById('test-break-btn')?.addEventListener('click', () => {
     triggerBreakWindow();
   });
+
+  if (window.electronAPI?.onBreakWindowClosed) {
+    window.electronAPI.onBreakWindowClosed(handleBreakWindowClosed);
+  }
 
   // Settings Modal Overlay Click cancels
   const settingsOverlay = document.getElementById('settings-modal');

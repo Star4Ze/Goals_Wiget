@@ -733,7 +733,7 @@ function setupHandlers() {
     return null;
   });
 
-  ipcMain.handle('show-break-window', (event, mediaPath, accentColor, accentHover) => {
+  ipcMain.handle('show-break-window', (event, mediaPath, accentColor, accentHover, sound) => {
     if (breakWindow) {
       breakWindow.focus();
       return;
@@ -743,6 +743,7 @@ function setupHandlers() {
     if (mediaPath) query.set('media', mediaPath);
     if (accentColor) query.set('accent', accentColor);
     if (accentHover) query.set('hover', accentHover);
+    if (sound) query.set('sound', sound);
     
     breakWindow = new BrowserWindow({
       width: 800,
@@ -762,6 +763,9 @@ function setupHandlers() {
     
     breakWindow.on('closed', () => {
       breakWindow = null;
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('break-window-closed');
+      }
     });
   });
 
