@@ -3,20 +3,1066 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TradeLog — MOEX Journal</title>
+  <title>TradeLog — Торговый дневник</title>
   <style>
-    html, body, #root { margin: 0; width: 100%; min-height: 100%; background: #080a10; }
+    :root {
+      --bg-dark: #080a10;
+      --bg-card: rgba(22, 28, 45, 0.45);
+      --bg-input: #101524;
+      --bg-input-focus: #161e33;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --border-color-hover: rgba(255, 255, 255, 0.16);
+      
+      --accent-color: #3ddc84; /* Mint accent default */
+      --accent-hover: #5beb9b;
+      
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+      
+      --win-color: #00e676;
+      --loss-color: #ff1744;
+      --active-color: #ffc400;
+      
+      --font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body, #root {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      color: var(--text-main);
+      font-family: var(--font-family);
+      overflow: hidden;
+    }
+
+    /* Glassmorphism Window Container */
+    .window-container {
+      width: 100%;
+      height: 100%;
+      background: rgba(8, 10, 16, 0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      overflow: hidden;
+    }
+
+    /* Window Header - Drag Region */
+    .window-header {
+      padding: 14px 20px;
+      background: rgba(16, 21, 36, 0.5);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      -webkit-app-region: drag;
+    }
+
+    .window-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .window-title span {
+      font-size: 20px;
+    }
+
+    .window-title h1 {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      color: var(--accent-color);
+    }
+
+    .window-close-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 16px;
+      cursor: pointer;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      -webkit-app-region: no-drag;
+    }
+
+    .window-close-btn:hover {
+      background: rgba(255, 23, 68, 0.15);
+      color: var(--loss-color);
+    }
+
+    /* Window Body */
+    .window-body {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Hide scrollbars but keep scroll functional */
+    .window-body::-webkit-scrollbar {
+      width: 6px;
+    }
+    .window-body::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .window-body::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+    }
+
+    /* Dashboard Layout */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+
+    .dashboard-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 14px 18px;
+      position: relative;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .card-lbl {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .card-val {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .card-val .sub-val {
+      font-size: 11px;
+      font-weight: normal;
+      color: var(--text-muted);
+    }
+
+    .card-val-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .settings-pencil-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--text-muted);
+      opacity: 0.6;
+      transition: opacity 0.2s;
+    }
+
+    .settings-pencil-btn:hover {
+      opacity: 1;
+      color: var(--accent-color);
+    }
+
+    .settings-inline-edit {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .settings-field-input {
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      color: var(--text-main);
+      font-size: 14px;
+      padding: 4px 8px;
+      width: 120px;
+      outline: none;
+    }
+
+    .settings-field-input:focus {
+      border-color: var(--accent-color);
+    }
+
+    .settings-save-btn {
+      background: var(--accent-color);
+      border: none;
+      color: #080a10;
+      font-weight: bold;
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .unit-percent {
+      font-size: 14px;
+      font-weight: bold;
+      color: var(--text-muted);
+    }
+
+    /* Risk Monthly Progress */
+    .risk-progress-bar {
+      height: 5px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 10px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+
+    .risk-progress-fill {
+      height: 100%;
+      background: var(--accent-color);
+      border-radius: 10px;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+
+    .risk-progress-fill.warning {
+      background: #ff9100;
+    }
+
+    .risk-progress-fill.critical {
+      background: var(--loss-color);
+    }
+
+    /* Custom color text helpers */
+    .critical-text { color: var(--loss-color); }
+    .warning-text { color: #ff9100; }
+    .success-text { color: var(--win-color); }
+
+    /* Main Content Splits */
+    .main-content-layout {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    .form-panel-column, .list-panel-column {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 20px;
+      height: auto;
+      max-height: 560px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .list-panel-column {
+      max-height: 560px;
+    }
+
+    .panel-section-title {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      color: var(--text-main);
+      margin-bottom: 16px;
+      border-left: 3px solid var(--accent-color);
+      padding-left: 10px;
+    }
+
+    /* Form Styles */
+    .add-trade-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .add-trade-form::-webkit-scrollbar {
+      width: 4px;
+    }
+    .add-trade-form::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.06);
+      border-radius: 4px;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .flex-2 { flex: 2; }
+    .flex-1 { flex: 1; }
+
+    .form-group label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .trade-input, .trade-textarea {
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .trade-input:focus, .trade-textarea:focus {
+      border-color: var(--accent-color);
+      background: var(--bg-input-focus);
+      box-shadow: 0 0 0 3px rgba(61, 220, 132, 0.1);
+    }
+
+    .text-upper {
+      text-transform: uppercase;
+    }
+
+    .trade-textarea {
+      height: 60px;
+      resize: none;
+    }
+
+    /* Calculator Summary Box */
+    .calc-summary-box {
+      background: rgba(61, 220, 132, 0.04);
+      border: 1px dashed rgba(61, 220, 132, 0.2);
+      border-radius: 8px;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .calc-summary-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .calc-summary-val {
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .calc-summary-val.highlighted-lots {
+      color: var(--accent-color);
+      font-size: 13px;
+    }
+
+    .calc-summary-val .sub {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-weight: normal;
+    }
+
+    .danger-text {
+      color: var(--loss-color);
+    }
+
+    /* Autocomplete Dropdown */
+    .autocomplete-wrapper {
+      position: relative;
+      width: 100%;
+    }
+
+    .autocomplete-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #111625;
+      border: 1px solid var(--border-color-hover);
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      z-index: 100;
+      max-height: 180px;
+      overflow-y: auto;
+      list-style: none;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+    }
+
+    .autocomplete-list li {
+      padding: 8px 12px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+
+    .autocomplete-list li:hover {
+      background: #192138;
+    }
+
+    .ticker-code {
+      font-weight: 700;
+      font-size: 12px;
+      color: var(--accent-color);
+    }
+
+    .ticker-name {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    /* Image Drop / Paste Zone */
+    .image-zone {
+      border: 2px dashed var(--border-color);
+      border-radius: 8px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-input);
+      cursor: pointer;
+      outline: none;
+      transition: all 0.2s ease;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .image-zone:hover, .image-zone:focus {
+      border-color: var(--accent-color);
+      background: var(--bg-input-focus);
+    }
+
+    .image-zone.dragover {
+      border-color: var(--accent-color);
+      background: rgba(61, 220, 132, 0.08);
+      transform: scale(1.01);
+    }
+
+    .empty-zone-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .zone-icon {
+      font-size: 18px;
+      opacity: 0.6;
+    }
+
+    .zone-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .zone-sub {
+      font-size: 9px;
+      color: var(--text-muted);
+    }
+
+    .preview-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    .preview-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .preview-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    .preview-container:hover .preview-overlay {
+      opacity: 1;
+    }
+
+    .preview-overlay span {
+      font-size: 10px;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    /* Submit Button */
+    .submit-trade-btn {
+      background: linear-gradient(135deg, var(--accent-color), #2cb96c);
+      color: #080a10;
+      border: none;
+      border-radius: 8px;
+      padding: 11px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .submit-trade-btn:hover {
+      box-shadow: 0 0 15px rgba(61, 220, 132, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .submit-trade-btn:active {
+      transform: translateY(0);
+    }
+
+    /* Right Panel List Layout */
+    .list-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+
+    .active-badge-indicator {
+      background: rgba(255, 196, 0, 0.15);
+      border: 1px solid rgba(255, 196, 0, 0.3);
+      color: var(--active-color);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+
+    .history-accordion-container {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .history-accordion-container::-webkit-scrollbar {
+      width: 6px;
+    }
+    .history-accordion-container::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .history-accordion-container::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.06);
+      border-radius: 10px;
+    }
+
+    .no-trades-card {
+      padding: 40px;
+      text-align: center;
+      color: var(--text-muted);
+      border: 1px dashed var(--border-color);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      margin-top: 40px;
+    }
+
+    .no-trades-icon {
+      font-size: 32px;
+      opacity: 0.5;
+    }
+
+    .no-trades-card p {
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    /* Accordion Structures */
+    .accordion-card {
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.01);
+      overflow: hidden;
+    }
+
+    .accordion-header {
+      padding: 10px 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      user-select: none;
+      transition: background 0.2s ease;
+    }
+
+    .accordion-header:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .accordion-toggle-arrow {
+      font-size: 9px;
+      color: var(--text-muted);
+      width: 12px;
+    }
+
+    .month-header {
+      background: rgba(22, 28, 45, 0.6);
+    }
+
+    .month-name {
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--accent-color);
+    }
+
+    .month-content {
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .week-header {
+      background: rgba(16, 21, 36, 0.4);
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .week-name {
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--text-main);
+    }
+
+    .week-content {
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .day-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .day-header-lbl {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      padding: 4px 6px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .trades-list-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    /* Individual Trade Card */
+    .trade-item-card {
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      background: #0f1320;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: relative;
+      transition: all 0.2s ease;
+    }
+
+    .trade-item-card.active-trade {
+      border-left: 4px solid var(--active-color);
+      box-shadow: inset 0 0 10px rgba(255, 196, 0, 0.05);
+      animation: pulse-border 2s infinite alternate;
+    }
+
+    @keyframes pulse-border {
+      0% { border-color: rgba(255, 196, 0, 0.4); }
+      100% { border-color: rgba(255, 196, 0, 0.9); }
+    }
+
+    .trade-item-card.win-trade {
+      border-left: 4px solid var(--win-color);
+    }
+
+    .trade-item-card.loss-trade {
+      border-left: 4px solid var(--loss-color);
+    }
+
+    /* Trade Card Rows */
+    .trade-card-top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      padding-bottom: 8px;
+    }
+
+    .trade-meta-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .trade-item-ticker {
+      font-weight: 800;
+      font-size: 13px;
+      color: #fff;
+    }
+
+    .trade-item-lots {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .trade-item-time {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .trade-meta-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .active-trade-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--active-color);
+      background: rgba(255, 196, 0, 0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .pnl-label {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    .pnl-win {
+      color: var(--win-color);
+      background: rgba(0, 230, 118, 0.1);
+    }
+
+    .pnl-loss {
+      color: var(--loss-color);
+      background: rgba(255, 23, 68, 0.1);
+    }
+
+    .delete-trade-btn {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.2);
+      cursor: pointer;
+      font-size: 12px;
+      transition: color 0.2s;
+    }
+
+    .delete-trade-btn:hover {
+      color: var(--loss-color);
+    }
+
+    /* Details Grid inside trade card */
+    .trade-card-details-grid {
+      display: grid;
+      grid-template-columns: 120px 1fr 100px;
+      gap: 12px;
+    }
+
+    .trade-prices-col {
+      font-size: 11.5px;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+
+    .trade-prices-col strong {
+      color: var(--text-main);
+    }
+
+    .trade-notes-col {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      justify-content: center;
+    }
+
+    .note-bubble {
+      font-size: 11.5px;
+      font-style: italic;
+      color: var(--text-muted);
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
+    .note-bubble .note-lbl {
+      font-weight: 700;
+      font-size: 10px;
+      text-transform: uppercase;
+      font-style: normal;
+      color: var(--text-main);
+      margin-right: 4px;
+    }
+
+    .trade-thumbs-col {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .trade-thumbnail-img {
+      width: 44px;
+      height: 44px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .trade-thumbnail-img:hover {
+      transform: scale(1.05);
+      border-color: var(--accent-color);
+    }
+
+    .empty-thumb-placeholder {
+      width: 44px;
+      height: 44px;
+      border: 1px dashed var(--border-color);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8px;
+      color: var(--text-muted);
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    /* Active Trade Actions Bar */
+    .active-trade-actions {
+      border-top: 1px solid rgba(255,255,255,0.03);
+      padding-top: 8px;
+      margin-top: 2px;
+    }
+
+    .close-trade-action-btn {
+      width: 100%;
+      background: rgba(255, 196, 0, 0.1);
+      border: 1px solid rgba(255, 196, 0, 0.3);
+      color: var(--active-color);
+      font-weight: 600;
+      font-size: 11px;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .close-trade-action-btn:hover {
+      background: var(--active-color);
+      color: #080a10;
+    }
+
+    /* Modal Form for closing trades */
+    .modal-overlay-trade {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 5, 8, 0.7);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-content-trade {
+      background: #111524;
+      border: 1px solid var(--border-color-hover);
+      width: 100%;
+      max-width: 400px;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .modal-header-trade {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      padding-bottom: 10px;
+    }
+
+    .modal-header-trade h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent-color);
+    }
+
+    .modal-close-trade {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .close-trade-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .modal-footer-trade {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .cancel-trade-btn, .save-trade-btn {
+      flex: 1;
+      padding: 9px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .cancel-trade-btn {
+      background: none;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+    }
+
+    .cancel-trade-btn:hover {
+      background: rgba(255,255,255,0.02);
+      color: var(--text-main);
+    }
+
+    .save-trade-btn {
+      background: var(--accent-color);
+      border: none;
+      color: #080a10;
+    }
+
+    .save-trade-btn:hover {
+      box-shadow: 0 0 15px rgba(61, 220, 132, 0.3);
+    }
+
+    /* Fullscreen Image Overlay */
+    .fullscreen-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(4, 5, 8, 0.95);
+      z-index: 2000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: zoom-out;
+    }
+
+    .fullscreen-img {
+      max-width: 92%;
+      max-height: 92%;
+      object-fit: contain;
+      border-radius: 8px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+    }
+
+    .fullscreen-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: #fff;
+      font-size: 18px;
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s;
+    }
+
+    .fullscreen-close:hover {
+      background: rgba(255,255,255,0.2);
+    }
   </style>
 </head>
 <body>
   <div id="root"></div>
 
+  <!-- React 18 & ReactDOM from CDN -->
   <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js"></script>
+  <!-- Babel standalone to compile JSX on-the-fly -->
   <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.0/babel.min.js"></script>
 
+  <!-- Load React Logic -->
   <script type="text/babel" data-presets="react" src="./trading-journal.jsx"></script>
   <script type="text/babel" data-presets="react">
+    // Dynamically update primary/accent theme color from query params
+    const urlParams = new URLSearchParams(window.location.search);
+    const accent = urlParams.get('accent');
+    if (accent) {
+      document.documentElement.style.setProperty('--accent-color', accent);
+      // Generate lighter color for hover
+      // Basic fallback since we don't have color parser
+      document.documentElement.style.setProperty('--accent-hover', accent + 'bb');
+    }
+
     const root = ReactDOM.createRoot(document.getElementById("root"));
     root.render(<window.TradingJournalApp />);
   </script>
