@@ -605,7 +605,7 @@ window.TradingJournalApp = function() {
       <div className="window-header">
         <div className="window-title">
           <span>📈</span>
-          <h1>TradeLog — Журнал сделок</h1>
+          <h1>TradingDiary — Журнал сделок</h1>
         </div>
 
         <div className="window-header-controls">
