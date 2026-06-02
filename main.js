@@ -5,6 +5,7 @@ const fs = require('fs');
 let mainWindow;
 let breakWindow = null;
 let analyticsWindow = null;
+let tradingJournalWindow = null;
 
 const TARGET_DIR = "C:\\Users\\HomePC\\Documents\\Obsidian\\Progects\\MyLife";
 const DAILY_TASKS_FILE_NAME = "Ежедневные задачи";
@@ -809,6 +810,128 @@ function setupHandlers() {
     
     analyticsWindow.on('closed', () => {
       analyticsWindow = null;
+    });
+  });
+
+  // ==========================================
+  // Trading Journal (TradeLog) handlers
+  // ==========================================
+  const TRADING_DIR = "D:\\GoogleDisk\\Docs\\TradingDiary";
+  const TRADING_IMAGES_DIR = path.join(TRADING_DIR, "images");
+  const TRADING_DB_PATH = path.join(TRADING_DIR, "trades.json");
+
+  function ensureTradingDir() {
+    try {
+      if (!fs.existsSync(TRADING_DIR)) {
+        fs.mkdirSync(TRADING_DIR, { recursive: true });
+      }
+      if (!fs.existsSync(TRADING_IMAGES_DIR)) {
+        fs.mkdirSync(TRADING_IMAGES_DIR, { recursive: true });
+      }
+    } catch (e) {
+      logAction(`Ошибка создания папок трейдинга: ${e.message}`);
+    }
+  }
+
+  ipcMain.handle('get-trading-data', async () => {
+    ensureTradingDir();
+    try {
+      if (fs.existsSync(TRADING_DB_PATH)) {
+        return JSON.parse(fs.readFileSync(TRADING_DB_PATH, 'utf-8'));
+      }
+    } catch (e) {
+      logAction(`Ошибка чтения базы сделок: ${e.message}`);
+    }
+    return {
+      deposit: 100000,
+      settings: {
+        maxRiskPerTradePercent: 2,
+        maxRiskPerMonthPercent: 6
+      },
+      trades: []
+    };
+  });
+
+  ipcMain.handle('save-trading-data', async (event, data) => {
+    ensureTradingDir();
+    try {
+      fs.writeFileSync(TRADING_DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
+      return true;
+    } catch (e) {
+      logAction(`Ошибка записи базы сделок: ${e.message}`);
+      return false;
+    }
+  });
+
+  ipcMain.handle('save-trade-screenshot', async (event, tradeId, imageBase64, type) => {
+    ensureTradingDir();
+    try {
+      const matches = imageBase64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      if (!matches || matches.length !== 3) {
+        throw new Error('Некорректный формат base64');
+      }
+      const mimeType = matches[1];
+      const buffer = Buffer.from(matches[2], 'base64');
+      
+      let ext = 'png';
+      if (mimeType.includes('jpeg') || mimeType.includes('jpg')) ext = 'jpg';
+      else if (mimeType.includes('webp')) ext = 'webp';
+      else if (mimeType.includes('gif')) ext = 'gif';
+      
+      const filename = `trade_${tradeId}_${type}.${ext}`;
+      const filepath = path.join(TRADING_IMAGES_DIR, filename);
+      
+      fs.writeFileSync(filepath, buffer);
+      
+      // Return absolute file URL
+      const fileUrl = `file:///${filepath.replace(/\\/g, '/')}`;
+      return { success: true, url: fileUrl, filename: filename };
+    } catch (e) {
+      logAction(`Ошибка сохранения скриншота: ${e.message}`);
+      return { success: false, error: e.message };
+    }
+  });
+
+  ipcMain.handle('get-tbank-token', async () => {
+    const config = loadConfig();
+    return config.tbankToken || '';
+  });
+
+  ipcMain.handle('save-tbank-token', async (event, token) => {
+    try {
+      saveConfigValue({ tbankToken: token });
+      return true;
+    } catch (e) {
+      logAction(`Ошибка сохранения токена Т-Банка: ${e.message}`);
+      return false;
+    }
+  });
+
+  ipcMain.handle('open-trading-journal', (event) => {
+    if (tradingJournalWindow) {
+      tradingJournalWindow.focus();
+      return;
+    }
+    
+    tradingJournalWindow = new BrowserWindow({
+      width: 1100,
+      height: 750,
+      frame: false,
+      transparent: true,
+      backgroundColor: '#00000000',
+      resizable: true,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, 'preload.js'),
+        webSecurity: false // allow loading local images using file://
+      }
+    });
+    
+    tradingJournalWindow.loadFile(path.join(__dirname, 'app', 'frontend.html'));
+    
+    tradingJournalWindow.on('closed', () => {
+      tradingJournalWindow = null;
     });
   });
 }
