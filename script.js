@@ -1277,14 +1277,6 @@ function openSettingsModal() {
       mediaInput.title = savedPath;
     }
 
-    // Load T-Bank token
-    if (window.electronAPI && window.electronAPI.getTBankToken) {
-      window.electronAPI.getTBankToken().then(token => {
-        const tokenInput = document.getElementById('tbank-token');
-        if (tokenInput) tokenInput.value = token || '';
-      });
-    }
-    
     modal.classList.remove('hidden');
     updateBreakCountdownStatus();
     
@@ -1440,27 +1432,6 @@ function initSettingsListeners() {
     });
   }
 
-  // Save T-Bank token
-  document.getElementById('save-tbank-token-btn')?.addEventListener('click', async () => {
-    const input = document.getElementById('tbank-token');
-    const token = input ? input.value.trim() : '';
-    if (window.electronAPI && window.electronAPI.saveTBankToken) {
-      const result = await window.electronAPI.saveTBankToken(token);
-      if (result) {
-        // Visual feedback
-        const saveBtn = document.getElementById('save-tbank-token-btn');
-        const oldText = saveBtn.textContent;
-        saveBtn.textContent = '✓';
-        saveBtn.style.borderColor = 'var(--accent-color)';
-        saveBtn.style.color = 'var(--accent-color)';
-        setTimeout(() => {
-          saveBtn.textContent = oldText;
-          saveBtn.style.borderColor = '';
-          saveBtn.style.color = '';
-        }, 1500);
-      }
-    }
-  });
 }
 
 function openAnalyticsWindow() {
