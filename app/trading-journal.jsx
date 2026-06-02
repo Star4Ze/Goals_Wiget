@@ -44,6 +44,14 @@ const popularTickers = [
   { name: 'TRNFP', lot: 1, fullname: 'Транснефть (преф.)' }
 ];
 
+const colorOptions = [
+  { name: 'Mint', primary: '#3ddc84', hover: '#5beb9b' },
+  { name: 'Purple', primary: '#a186f1', hover: '#b399ff' },
+  { name: 'Sky Blue', primary: '#4db8ff', hover: '#70c7ff' },
+  { name: 'Pink', primary: '#ff75b5', hover: '#ff94c7' },
+  { name: 'Sunset Orange', primary: '#ff8f59', hover: '#ffa57a' }
+];
+
 const { useState, useEffect, useRef } = React;
 
 // Helper to format currency
@@ -243,6 +251,18 @@ function ImageFullscreenModal({ url, onClose }) {
 
 window.TradingJournalApp = function() {
   const [data, setData] = useState({ deposit: 100000, settings: { maxRiskPerTradePercent: 2, maxRiskPerMonthPercent: 6 }, trades: [] });
+  
+  // Views states: 'trades' | 'analytics'
+  const [currentView, setCurrentView] = useState('trades');
+
+  // Custom visual states
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [windowOpacity, setWindowOpacity] = useState(() => parseFloat(localStorage.getItem('trade_opacity') || '0.9'));
+  const [accentColor, setAccentColor] = useState(() => localStorage.getItem('trade_accent') || '#3ddc84');
+  const [accentHover, setAccentHover] = useState(() => localStorage.getItem('trade_accent_hover') || '#5beb9b');
+
+  // Add trade form overlay
+  const [isAddFormOpen, setIsAddFormOpen] = useState(false);
   const [ticker, setTicker] = useState('');
   const [lotSize, setLotSize] = useState(1);
   const [entryPrice, setEntryPrice] = useState('');
@@ -250,8 +270,6 @@ window.TradingJournalApp = function() {
   const [takeProfit, setTakeProfit] = useState('');
   const [noteEntry, setNoteEntry] = useState('');
   const [screenshotEntry, setScreenshotEntry] = useState('');
-  
-  // Generating a persistent temp ID for unsaved trade assets
   const [tempTradeId, setTempTradeId] = useState(() => Date.now().toString());
 
   // Edit risk settings states
@@ -271,6 +289,19 @@ window.TradingJournalApp = function() {
 
   // Fullscreen image url
   const [fullscreenImageUrl, setFullscreenImageUrl] = useState(null);
+
+  // Apply custom accents on change
+  useEffect(() => {
+    document.documentElement.style.setProperty('--accent-color', accentColor);
+    document.documentElement.style.setProperty('--accent-hover', accentHover);
+    localStorage.setItem('trade_accent', accentColor);
+    localStorage.setItem('trade_accent_hover', accentHover);
+  }, [accentColor, accentHover]);
+
+  // Apply opacity setting changes
+  useEffect(() => {
+    localStorage.setItem('trade_opacity', windowOpacity.toString());
+  }, [windowOpacity]);
 
   // Initialize data from main Electron process
   useEffect(() => {
@@ -303,14 +334,13 @@ window.TradingJournalApp = function() {
     }
   };
 
-  // Close current Electron window
   const handleCloseWindow = () => {
     if (window.electronAPI && window.electronAPI.closeWindow) {
       window.electronAPI.closeWindow();
     }
   };
 
-  // Calculated variables for new trade live math
+  // Live calculator helper variables
   const calculatedRiskAmt = entryPrice && stopLoss ? Math.abs(parseFloat(entryPrice) - parseFloat(stopLoss)) : 0;
   const maxRiskPerTradeAmount = (data.deposit * data.settings.maxRiskPerTradePercent) / 100;
   const calculatedMaxLots = calculatedRiskAmt && lotSize 
@@ -327,7 +357,8 @@ window.TradingJournalApp = function() {
     return tradeDate.getMonth() === today.getMonth() && tradeDate.getFullYear() === today.getFullYear();
   });
 
-  const activeTradesCount = data.trades.filter(t => t.status === 'active').length;
+  const activeTrades = data.trades.filter(t => t.status === 'active');
+  const closedTrades = data.trades.filter(t => t.status === 'closed');
 
   const monthlyRealizedPnL = currentMonthTrades.reduce((sum, t) => {
     if (t.status === 'closed' && t.profitAmount) {
@@ -373,14 +404,13 @@ window.TradingJournalApp = function() {
     }
 
     if (calculatedMaxLots <= 0) {
-      alert('Риск-менеджер: Расчетное число лотов равно 0. Сделка отклонена из-за недостаточного капитала или слишком далекого стоп-лосса.');
+      alert('Риск-менеджер: Расчетное число лотов равно 0. Сделка отклонена из-за недостаточного капитала или слишком близкого/далекого стоп-лосса.');
       return;
     }
 
-    // Checking if risk violates monthly rules
     const plannedTradeRisk = calculatedRiskAmt * calculatedMaxLots * lotSize;
     if (plannedTradeRisk > remainingMonthlyRiskAmount) {
-      const proceed = confirm(`Предупреждение риск-менеджера:\nЭта сделка добавит риск в ${formatRub(plannedTradeRisk)}, что превышает оставшийся лимит потерь на месяц (${formatRub(remainingMonthlyRiskAmount)}).\nВы уверены, что хотите открыть сделку вопреки риск-менеджменту?`);
+      const proceed = confirm(`Предупреждение риск-менеджера:\nЭта сделка добавит риск в ${formatRub(plannedTradeRisk)}, что превышает оставшийся лимит потерь на месяц (${formatRub(remainingMonthlyRiskAmount)}).\nВы уверены, что хотите открыть сделку?`);
       if (!proceed) return;
     }
 
@@ -420,6 +450,7 @@ window.TradingJournalApp = function() {
     setNoteEntry('');
     setScreenshotEntry('');
     setTempTradeId(Date.now().toString());
+    setIsAddFormOpen(false); // Close modal overlay
   };
 
   // Opening the close trade form modal
@@ -442,9 +473,6 @@ window.TradingJournalApp = function() {
       return;
     }
 
-    // Calculate P&L: Assuming Long trade for simplistic formula.
-    // P&L per share = exitPrice - entryPrice.
-    // If stopLoss is greater than entryPrice, it is a Short trade.
     const isShort = trade.stopLoss > trade.entryPrice;
     const diff = exitVal - trade.entryPrice;
     const pnlPerShare = isShort ? -diff : diff;
@@ -493,15 +521,16 @@ window.TradingJournalApp = function() {
     }));
   };
 
-  // Structure trades hierarchically: Month -> Week -> Day -> Trades list
+  // Structure closed trades hierarchically: Month -> Week -> Day -> Trades list
   const getGroupedTrades = () => {
     const groups = {};
+    const historicalTrades = data.trades.filter(t => t.status === 'closed');
     
-    data.trades.forEach(t => {
+    historicalTrades.forEach(t => {
       const date = new Date(t.entryTime);
       const monthKey = `${getMonthNameRU(date)} ${date.getFullYear()}`;
       const weekKey = `Неделя ${getWeekNumber(date)} (${getStartAndEndOfWeek(date)})`;
-      const dayKey = `${getDayNameRU(date)}, ${date.getDate()} ${getMonthNameRU(date).toLowerCase().replace(/ь$/, 'я').replace(/т$/, 'та').replace(/й$/, 'я')}`; // basic RU date decline
+      const dayKey = `${getDayNameRU(date)}, ${date.getDate()} ${getMonthNameRU(date).toLowerCase().replace(/ь$/, 'я').replace(/т$/, 'та').replace(/й$/, 'я')}`;
       
       if (!groups[monthKey]) groups[monthKey] = {};
       if (!groups[monthKey][weekKey]) groups[monthKey][weekKey] = {};
@@ -515,15 +544,100 @@ window.TradingJournalApp = function() {
 
   const groupedTrades = getGroupedTrades();
 
+  // 📈 Analytics engine calculations
+  const totalTradesCount = data.trades.length;
+  const closedTradesCount = closedTrades.length;
+  const profitableTrades = closedTrades.filter(t => t.profitAmount >= 0);
+  const unprofitableTrades = closedTrades.filter(t => t.profitAmount < 0);
+  const winRate = closedTradesCount > 0 ? (profitableTrades.length / closedTradesCount) * 100 : 0;
+  
+  const totalProfitAmount = profitableTrades.reduce((sum, t) => sum + t.profitAmount, 0);
+  const totalLossAmount = Math.abs(unprofitableTrades.reduce((sum, t) => sum + t.profitAmount, 0));
+  const profitFactor = totalLossAmount > 0 ? (totalProfitAmount / totalLossAmount) : totalProfitAmount > 0 ? 99.9 : 0;
+
+  const averageWin = profitableTrades.length > 0 ? totalProfitAmount / profitableTrades.length : 0;
+  const averageLoss = unprofitableTrades.length > 0 ? totalLossAmount / unprofitableTrades.length : 0;
+  
+  const netPnLAmount = closedTrades.reduce((sum, t) => sum + (t.profitAmount || 0), 0);
+  const netPnLPercent = data.deposit > 0 ? (netPnLAmount / data.deposit) * 100 : 0;
+
+  // Day of week stats for analytics
+  const dayOfWeekStats = [
+    { name: 'Пн', count: 0, pnl: 0 },
+    { name: 'Вт', count: 0, pnl: 0 },
+    { name: 'Ср', count: 0, pnl: 0 },
+    { name: 'Чт', count: 0, pnl: 0 },
+    { name: 'Пт', count: 0, pnl: 0 }
+  ];
+  closedTrades.forEach(t => {
+    const date = new Date(t.entryTime);
+    const dayIndex = date.getDay() - 1; // 0 for Monday, 4 for Friday
+    if (dayIndex >= 0 && dayIndex <= 4) {
+      dayOfWeekStats[dayIndex].count++;
+      dayOfWeekStats[dayIndex].pnl += t.profitAmount || 0;
+    }
+  });
+
+  // Ticker performance analysis table
+  const tickerStatsMap = {};
+  closedTrades.forEach(t => {
+    if (!tickerStatsMap[t.ticker]) {
+      tickerStatsMap[t.ticker] = { count: 0, wins: 0, pnl: 0 };
+    }
+    tickerStatsMap[t.ticker].count++;
+    if (t.profitAmount >= 0) tickerStatsMap[t.ticker].wins++;
+    tickerStatsMap[t.ticker].pnl += t.profitAmount || 0;
+  });
+
+  const tickerPerformanceList = Object.keys(tickerStatsMap).map(tickerCode => {
+    const stat = tickerStatsMap[tickerCode];
+    return {
+      ticker: tickerCode,
+      count: stat.count,
+      winrate: stat.count > 0 ? (stat.wins / stat.count) * 100 : 0,
+      pnl: stat.pnl
+    };
+  }).sort((a, b) => b.pnl - a.pnl);
+
   return (
-    <div className="window-container">
-      {/* Title bar */}
+    <div className="window-container" style={{ '--window-opacity': windowOpacity }}>
+      {/* Window Header */}
       <div className="window-header">
         <div className="window-title">
           <span>📈</span>
-          <h1>TradeLog — Журнал торговых сделок</h1>
+          <h1>TradeLog — Журнал сделок</h1>
         </div>
-        <button className="window-close-btn" onClick={handleCloseWindow} title="Закрыть">✕</button>
+
+        <div className="window-header-controls">
+          {/* Main views toggles */}
+          {currentView === 'trades' ? (
+            <button 
+              className="header-action-btn" 
+              onClick={() => setCurrentView('analytics')} 
+              title="Перейти к аналитике"
+            >
+              📊 Аналитика
+            </button>
+          ) : (
+            <button 
+              className="header-action-btn" 
+              onClick={() => setCurrentView('trades')} 
+              title="Вернуться к истории"
+            >
+              ⬅ К сделкам
+            </button>
+          )}
+
+          <button 
+            className="header-action-btn icon-only" 
+            onClick={() => setIsSettingsOpen(!isSettingsOpen)} 
+            title="Настройки оформления"
+          >
+            ⚙️
+          </button>
+          
+          <button className="window-close-btn" onClick={handleCloseWindow} title="Закрыть">✕</button>
+        </div>
       </div>
 
       <div className="window-body">
@@ -544,7 +658,7 @@ window.TradingJournalApp = function() {
             ) : (
               <div className="card-val-row">
                 <div className="card-val">{formatRub(data.deposit)}</div>
-                <button onClick={() => setIsEditingSettings(true)} className="settings-pencil-btn" title="Редактировать">⚙️</button>
+                <button onClick={() => setIsEditingSettings(true)} className="settings-pencil-btn" title="Редактировать параметры риска">⚙️</button>
               </div>
             )}
           </div>
@@ -590,280 +704,517 @@ window.TradingJournalApp = function() {
           </div>
         </div>
 
-        <div className="main-content-layout">
-          {/* Left panel: Add new trade */}
-          <div className="form-panel-column">
-            <h2 className="panel-section-title">💼 Новая сделка</h2>
-            
-            <form onSubmit={handleAddTrade} className="add-trade-form">
-              <div className="form-row">
-                <div className="form-group flex-2">
-                  <label>Ассет (тикер)</label>
-                  <TickerAutocomplete 
-                    value={ticker} 
-                    onChange={setTicker} 
-                    onSelectLot={setLotSize}
-                  />
-                </div>
-                <div className="form-group flex-1">
-                  <label>Лотность</label>
-                  <input 
-                    type="number" 
-                    value={lotSize} 
-                    onChange={(e) => setLotSize(parseInt(e.target.value) || 1)} 
-                    placeholder="1" 
-                    className="trade-input"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Вход (цена)</label>
-                  <input 
-                    type="number" 
-                    step="0.0001" 
-                    value={entryPrice} 
-                    onChange={(e) => setEntryPrice(e.target.value)} 
-                    placeholder="0.00" 
-                    className="trade-input"
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Стоп-лосс</label>
-                  <input 
-                    type="number" 
-                    step="0.0001" 
-                    value={stopLoss} 
-                    onChange={(e) => setStopLoss(e.target.value)} 
-                    placeholder="0.00" 
-                    className="trade-input"
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Тейк-профит</label>
-                  <input 
-                    type="number" 
-                    step="0.0001" 
-                    value={takeProfit} 
-                    onChange={(e) => setTakeProfit(e.target.value)} 
-                    placeholder="0.00" 
-                    className="trade-input"
-                    required
-                  />
-                </div>
-              </div>
-
-              {/* Calculator output section */}
-              {entryPrice && stopLoss ? (
-                <div className="calc-summary-box">
-                  <div className="calc-summary-row">
-                    <span>Расчетный риск на акцию:</span>
-                    <span className="calc-summary-val">{formatRub(calculatedRiskAmt)}</span>
-                  </div>
-                  <div className="calc-summary-row">
-                    <span>Максимальный объем сделки:</span>
-                    <span className="calc-summary-val highlighted-lots">{calculatedMaxLots} лотов <span className="sub">({calculatedMaxLots * lotSize} акций)</span></span>
-                  </div>
-                  <div className="calc-summary-row">
-                    <span>Общая стоимость позиции:</span>
-                    <span className="calc-summary-val">{formatRub(totalPositionCost)}</span>
-                  </div>
-                  <div className="calc-summary-row">
-                    <span>Риск капитала на сделку:</span>
-                    <span className="calc-summary-val danger-text">
-                      {formatRub(calculatedRiskAmt * calculatedMaxLots * lotSize)} 
-                      &nbsp;({((calculatedRiskAmt * calculatedMaxLots * lotSize) / data.deposit * 100).toFixed(2)}%)
-                    </span>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="form-group">
-                <label>Анализ входа / Состояние / Мысли</label>
-                <textarea 
-                  value={noteEntry} 
-                  onChange={(e) => setNoteEntry(e.target.value)} 
-                  placeholder="В каком эмоциональном состоянии вхожу? Какие паттерны вижу на графике?" 
-                  className="trade-textarea"
-                ></textarea>
-              </div>
-
-              <div className="screenshot-uploads">
-                <ImageZone 
-                  label="Вход" 
-                  imageUrl={screenshotEntry} 
-                  onImageUploaded={setScreenshotEntry}
-                  tempId={tempTradeId}
-                />
-              </div>
-
-              <button type="submit" className="submit-trade-btn">
-                🚀 Открыть сделку
+        {/* View content switch */}
+        {currentView === 'analytics' ? (
+          /* ========================================================== */
+          /* ANALYTICS VIEW                                             */
+          /* ========================================================== */
+          <div className="analytics-view-container">
+            <div className="analytics-header-row">
+              <h2 className="panel-section-title">📊 Аналитика вашей торговли</h2>
+              <button className="analytics-back-btn" onClick={() => setCurrentView('trades')}>
+                ⬅ Вернуться в историю сделок
               </button>
-            </form>
-          </div>
-
-          {/* Right panel: trades list grouped in Accordions */}
-          <div className="list-panel-column">
-            <div className="list-header-row">
-              <h2 className="panel-section-title">📂 История сделок</h2>
-              <span className="active-badge-indicator">{activeTradesCount} активных</span>
             </div>
 
-            <div className="history-accordion-container">
-              {Object.keys(groupedTrades).length === 0 ? (
-                <div className="no-trades-card">
-                  <span className="no-trades-icon">📖</span>
-                  <p>У вас еще нет сделок. Заполните форму слева, чтобы открыть первую сделку.</p>
+            <div className="analytics-summary-cards">
+              <div className="a-card">
+                <div className="a-card-lbl">Чистая прибыль (закрытые)</div>
+                <div className={`a-card-val ${netPnLAmount >= 0 ? 'success-text' : 'critical-text'}`}>
+                  {netPnLAmount >= 0 ? '+' : ''}{formatRub(netPnLAmount)}
+                  <span className="sub-pct"> ({netPnLPercent >= 0 ? '+' : ''}{netPnLPercent.toFixed(2)}%)</span>
                 </div>
-              ) : (
-                Object.keys(groupedTrades).map(monthKey => {
-                  const isMonthExpanded = !!expandedSections[monthKey];
-                  const weeks = groupedTrades[monthKey];
-                  
-                  return (
-                    <div key={monthKey} className="accordion-card month-group">
-                      <div className="accordion-header month-header" onClick={() => toggleSection(monthKey)}>
-                        <span className="accordion-toggle-arrow">{isMonthExpanded ? '▼' : '▶'}</span>
-                        <span className="month-name">{monthKey}</span>
+              </div>
+
+              <div className="a-card">
+                <div className="a-card-lbl">Процент прибыльных сделок (Win Rate)</div>
+                <div className="a-card-val success-text">
+                  {winRate.toFixed(1)}%
+                  <span className="sub-pct text-muted"> ({profitableTrades.length} / {closedTradesCount} сд.)</span>
+                </div>
+                <div className="winrate-bar-track">
+                  <div className="winrate-bar-fill" style={{ width: `${winRate}%` }}></div>
+                </div>
+              </div>
+
+              <div className="a-card">
+                <div className="a-card-lbl">Профит-фактор</div>
+                <div className="a-card-val font-accent">
+                  {profitFactor.toFixed(2)}
+                </div>
+              </div>
+
+              <div className="a-card">
+                <div className="a-card-lbl">Ср. прибыль / Ср. убыток</div>
+                <div className="a-card-val-split">
+                  <span className="success-text">{formatRub(averageWin)}</span>
+                  <span className="text-muted">/</span>
+                  <span className="critical-text">{formatRub(averageLoss)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="analytics-charts-grid">
+              {/* Daily distribution */}
+              <div className="analytics-subcard">
+                <h3>Распределение P&L по дням недели</h3>
+                <div className="chart-bars-container">
+                  {dayOfWeekStats.map(d => {
+                    const isWin = d.pnl >= 0;
+                    // Max absolute height calculation
+                    const maxPnl = Math.max(...dayOfWeekStats.map(x => Math.abs(x.pnl))) || 1;
+                    const pctHeight = Math.min(100, Math.round((Math.abs(d.pnl) / maxPnl) * 100));
+                    
+                    return (
+                      <div key={d.name} className="chart-bar-column">
+                        <div className="chart-bar-label-top" style={{ color: d.pnl === 0 ? 'var(--text-muted)' : isWin ? 'var(--win-color)' : 'var(--loss-color)' }}>
+                          {d.pnl === 0 ? '—' : (isWin ? '+' : '-') + Math.round(Math.abs(d.pnl) / 1000) + 'k'}
+                        </div>
+                        <div className="chart-bar-track">
+                          <div 
+                            className={`chart-bar-fill ${isWin ? 'win-bar' : 'loss-bar'}`} 
+                            style={{ height: `${pctHeight}%` }}
+                            title={`${d.name}: ${formatRub(d.pnl)} (${d.count} сд.)`}
+                          ></div>
+                        </div>
+                        <div className="chart-bar-name">{d.name}</div>
                       </div>
+                    );
+                  })}
+                </div>
+              </div>
 
-                      {isMonthExpanded && (
-                        <div className="accordion-content month-content">
-                          {Object.keys(weeks).map(weekKey => {
-                            const fullWeekKey = `${monthKey}_${weekKey}`;
-                            const isWeekExpanded = !!expandedSections[fullWeekKey];
-                            const days = weeks[weekKey];
+              {/* Performance by ticker */}
+              <div className="analytics-subcard scrollable-card">
+                <h3>Эффективность тикеров</h3>
+                <table className="ticker-pnl-table">
+                  <thead>
+                    <tr>
+                      <th>Тикер</th>
+                      <th>Сделок</th>
+                      <th>Win Rate</th>
+                      <th>Результат P&L</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tickerPerformanceList.length === 0 ? (
+                      <tr>
+                        <td colSpan="4" className="text-center text-muted">Нет закрытых сделок для анализа</td>
+                      </tr>
+                    ) : (
+                      tickerPerformanceList.map(t => (
+                        <tr key={t.ticker}>
+                          <td className="bold">{t.ticker}</td>
+                          <td>{t.count}</td>
+                          <td className="success-text">{t.winrate.toFixed(0)}%</td>
+                          <td className={t.pnl >= 0 ? 'success-text bold' : 'critical-text bold'}>
+                            {t.pnl >= 0 ? '+' : ''}{formatRub(t.pnl)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* ========================================================== */
+          /* HISTORY AND ACTIVE TRADES VIEW                             */
+          /* ========================================================== */
+          <div className="trades-list-full-layout">
+            
+            {/* Control line containing the primary action button */}
+            <div className="trades-list-controls">
+              <button 
+                className="add-new-trade-trigger-btn"
+                onClick={() => setIsAddFormOpen(true)}
+              >
+                ➕ Добавить сделку
+              </button>
+            </div>
 
-                            return (
-                              <div key={weekKey} className="accordion-card week-group">
-                                <div className="accordion-header week-header" onClick={() => toggleSection(fullWeekKey)}>
-                                  <span className="accordion-toggle-arrow">{isWeekExpanded ? '▼' : '▶'}</span>
-                                  <span className="week-name">{weekKey}</span>
+            {/* Content panel */}
+            <div className="trades-scroll-container">
+              
+              {/* 1. Pinned Active Trades Section */}
+              {activeTrades.length > 0 && (
+                <div className="active-trades-pinned-section">
+                  <div className="pinned-section-title">
+                    <span className="pulse-indicator-dot"></span>
+                    <h2>Активные сделки в работе</h2>
+                  </div>
+                  
+                  <div className="trades-list-container">
+                    {activeTrades.map(t => {
+                      const formattedDate = new Date(t.entryTime).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short' }) + ' ' + new Date(t.entryTime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                      
+                      return (
+                        <div key={t.id} className="trade-item-card active-trade">
+                          <div className="trade-card-top-row">
+                            <div className="trade-meta-left">
+                              <span className="trade-item-ticker">{t.ticker}</span>
+                              <span className="trade-item-lots">{t.lots} лот. ({t.lots * (t.lotSize || 1)} шт)</span>
+                              <span className="trade-item-time">🕒 Открыта: {formattedDate}</span>
+                            </div>
+                            
+                            <div className="trade-meta-right">
+                              <span className="active-trade-label">АКТИВНА</span>
+                              <button onClick={() => handleDeleteTrade(t.id)} className="delete-trade-btn" title="Удалить сделку">🗑️</button>
+                            </div>
+                          </div>
+
+                          <div className="trade-card-details-grid">
+                            <div className="trade-prices-col">
+                              <div><strong>Вход:</strong> {t.entryPrice} ₽</div>
+                              <div><strong>Стоп:</strong> {t.stopLoss} ₽</div>
+                              <div><strong>Цель:</strong> {t.takeProfit} ₽</div>
+                            </div>
+
+                            <div className="trade-notes-col">
+                              {t.noteEntry && (
+                                <div className="note-bubble">
+                                  <span className="note-lbl">Вход:</span> "{t.noteEntry}"
                                 </div>
+                              )}
+                            </div>
 
-                                {isWeekExpanded && (
-                                  <div className="accordion-content week-content">
-                                    {Object.keys(days).map(dayKey => {
-                                      const trades = days[dayKey];
+                            <div className="trade-thumbs-col">
+                              {t.screenshotEntry ? (
+                                <img 
+                                  src={t.screenshotEntry} 
+                                  alt="Вход" 
+                                  className="trade-thumbnail-img" 
+                                  onClick={() => setFullscreenImageUrl(t.screenshotEntry)}
+                                  title="Кликните для увеличения"
+                                />
+                              ) : (
+                                <div className="empty-thumb-placeholder">Без скрина</div>
+                              )}
+                              <div className="empty-thumb-placeholder">В процессе</div>
+                            </div>
+                          </div>
 
-                                      return (
-                                        <div key={dayKey} className="day-group">
-                                          <div className="day-header-lbl">{dayKey}</div>
-                                          
-                                          <div className="trades-list-container">
-                                            {trades.map(t => {
-                                              const isTradeActive = t.status === 'active';
-                                              const formattedDate = new Date(t.entryTime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-                                              const endFormattedDate = t.exitTime 
-                                                ? new Date(t.exitTime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) 
-                                                : '';
+                          <div className="active-trade-actions">
+                            <button 
+                              onClick={() => handleOpenCloseTradeModal(t)} 
+                              className="close-trade-action-btn"
+                            >
+                              🔒 Закрыть сделку (зафиксировать выход)
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
-                                              return (
-                                                <div 
-                                                  key={t.id} 
-                                                  className={`trade-item-card ${isTradeActive ? 'active-trade' : t.profitAmount >= 0 ? 'win-trade' : 'loss-trade'}`}
-                                                >
-                                                  <div className="trade-card-top-row">
-                                                    <div className="trade-meta-left">
-                                                      <span className="trade-item-ticker">{t.ticker}</span>
-                                                      <span className="trade-item-lots">{t.lots} лот. ({t.lots * (t.lotSize || 1)} шт)</span>
-                                                      <span className="trade-item-time">🕒 {formattedDate} {t.exitTime ? ` - ${endFormattedDate}` : ''}</span>
-                                                    </div>
-                                                    
-                                                    <div className="trade-meta-right">
-                                                      {isTradeActive ? (
-                                                        <span className="active-trade-label">АКТИВНА</span>
-                                                      ) : (
+              {/* 2. Historical Grouped Trades */}
+              <div className="historical-trades-section">
+                <div className="pinned-section-title">
+                  <h2>Архив закрытых сделок</h2>
+                </div>
+
+                {Object.keys(groupedTrades).length === 0 ? (
+                  <div className="no-trades-card">
+                    <span className="no-trades-icon">📖</span>
+                    <p>Нет закрытых сделок. Открывайте и закрывайте сделки, чтобы наполнить историю.</p>
+                  </div>
+                ) : (
+                  Object.keys(groupedTrades).map(monthKey => {
+                    const isMonthExpanded = !!expandedSections[monthKey];
+                    const weeks = groupedTrades[monthKey];
+                    
+                    return (
+                      <div key={monthKey} className="accordion-card month-group">
+                        <div className="accordion-header month-header" onClick={() => toggleSection(monthKey)}>
+                          <span className="accordion-toggle-arrow">{isMonthExpanded ? '▼' : '▶'}</span>
+                          <span className="month-name">{monthKey}</span>
+                        </div>
+
+                        {isMonthExpanded && (
+                          <div className="accordion-content month-content">
+                            {Object.keys(weeks).map(weekKey => {
+                              const fullWeekKey = `${monthKey}_${weekKey}`;
+                              const isWeekExpanded = !!expandedSections[fullWeekKey];
+                              const days = weeks[weekKey];
+
+                              return (
+                                <div key={weekKey} className="accordion-card week-group">
+                                  <div className="accordion-header week-header" onClick={() => toggleSection(fullWeekKey)}>
+                                    <span className="accordion-toggle-arrow">{isWeekExpanded ? '▼' : '▶'}</span>
+                                    <span className="week-name">{weekKey}</span>
+                                  </div>
+
+                                  {isWeekExpanded && (
+                                    <div className="accordion-content week-content">
+                                      {Object.keys(days).map(dayKey => {
+                                        const trades = days[dayKey];
+
+                                        return (
+                                          <div key={dayKey} className="day-group">
+                                            <div className="day-header-lbl">{dayKey}</div>
+                                            
+                                            <div className="trades-list-container">
+                                              {trades.map(t => {
+                                                const formattedDate = new Date(t.entryTime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                                                const endFormattedDate = new Date(t.exitTime).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+
+                                                return (
+                                                  <div 
+                                                    key={t.id} 
+                                                    className={`trade-item-card ${t.profitAmount >= 0 ? 'win-trade' : 'loss-trade'}`}
+                                                  >
+                                                    <div className="trade-card-top-row">
+                                                      <div className="trade-meta-left">
+                                                        <span className="trade-item-ticker">{t.ticker}</span>
+                                                        <span className="trade-item-lots">{t.lots} лот. ({t.lots * (t.lotSize || 1)} шт)</span>
+                                                        <span className="trade-item-time">🕒 {formattedDate} - {endFormattedDate}</span>
+                                                      </div>
+                                                      
+                                                      <div className="trade-meta-right">
                                                         <span className={`pnl-label ${t.profitAmount >= 0 ? 'pnl-win' : 'pnl-loss'}`}>
                                                           {t.profitAmount >= 0 ? '+' : ''}{formatRub(t.profitAmount)} ({t.profitPercent >= 0 ? '+' : ''}{t.profitPercent.toFixed(2)}%)
                                                         </span>
-                                                      )}
-                                                      <button onClick={() => handleDeleteTrade(t.id)} className="delete-trade-btn" title="Удалить сделку">🗑️</button>
+                                                        <button onClick={() => handleDeleteTrade(t.id)} className="delete-trade-btn" title="Удалить сделку">🗑️</button>
+                                                      </div>
+                                                    </div>
+
+                                                    <div className="trade-card-details-grid">
+                                                      <div className="trade-prices-col">
+                                                        <div><strong>Вход:</strong> {t.entryPrice} ₽</div>
+                                                        <div><strong>Стоп:</strong> {t.stopLoss} ₽</div>
+                                                        <div><strong>Цель:</strong> {t.takeProfit} ₽</div>
+                                                        <div><strong>Выход:</strong> {t.exitPrice} ₽</div>
+                                                      </div>
+
+                                                      <div className="trade-notes-col">
+                                                        {t.noteEntry && (
+                                                          <div className="note-bubble">
+                                                            <span className="note-lbl">Вход:</span> "{t.noteEntry}"
+                                                          </div>
+                                                        )}
+                                                        {t.noteExit && (
+                                                          <div className="note-bubble">
+                                                            <span className="note-lbl">Выход:</span> "{t.noteExit}"
+                                                          </div>
+                                                        )}
+                                                      </div>
+
+                                                      <div className="trade-thumbs-col">
+                                                        {t.screenshotEntry ? (
+                                                          <img 
+                                                            src={t.screenshotEntry} 
+                                                            alt="Вход" 
+                                                            className="trade-thumbnail-img" 
+                                                            onClick={() => setFullscreenImageUrl(t.screenshotEntry)}
+                                                            title="Кликните для увеличения"
+                                                          />
+                                                        ) : (
+                                                          <div className="empty-thumb-placeholder">Вход</div>
+                                                        )}
+                                                        {t.screenshotExit ? (
+                                                          <img 
+                                                            src={t.screenshotExit} 
+                                                            alt="Выход" 
+                                                            className="trade-thumbnail-img" 
+                                                            onClick={() => setFullscreenImageUrl(t.screenshotExit)}
+                                                            title="Кликните для увеличения"
+                                                          />
+                                                        ) : (
+                                                          <div className="empty-thumb-placeholder">Выход</div>
+                                                        )}
+                                                      </div>
                                                     </div>
                                                   </div>
-
-                                                  <div className="trade-card-details-grid">
-                                                    <div className="trade-prices-col">
-                                                      <div><strong>Вход:</strong> {t.entryPrice} ₽</div>
-                                                      <div><strong>Стоп:</strong> {t.stopLoss} ₽</div>
-                                                      <div><strong>Цель:</strong> {t.takeProfit} ₽</div>
-                                                      {t.exitPrice && <div><strong>Выход:</strong> {t.exitPrice} ₽</div>}
-                                                    </div>
-
-                                                    <div className="trade-notes-col">
-                                                      {t.noteEntry && (
-                                                        <div className="note-bubble">
-                                                          <span className="note-lbl">Вход:</span> "{t.noteEntry}"
-                                                        </div>
-                                                      )}
-                                                      {t.noteExit && (
-                                                        <div className="note-bubble">
-                                                          <span className="note-lbl">Выход:</span> "{t.noteExit}"
-                                                        </div>
-                                                      )}
-                                                    </div>
-
-                                                    <div className="trade-thumbs-col">
-                                                      {t.screenshotEntry && (
-                                                        <img 
-                                                          src={t.screenshotEntry} 
-                                                          alt="Вход" 
-                                                          className="trade-thumbnail-img" 
-                                                          onClick={() => setFullscreenImageUrl(t.screenshotEntry)}
-                                                          title="Кликните для увеличения"
-                                                        />
-                                                      )}
-                                                      {t.screenshotExit ? (
-                                                        <img 
-                                                          src={t.screenshotExit} 
-                                                          alt="Выход" 
-                                                          className="trade-thumbnail-img" 
-                                                          onClick={() => setFullscreenImageUrl(t.screenshotExit)}
-                                                          title="Кликните для увеличения"
-                                                        />
-                                                      ) : isTradeActive ? (
-                                                        <div className="empty-thumb-placeholder">В процессе</div>
-                                                      ) : null}
-                                                    </div>
-                                                  </div>
-
-                                                  {isTradeActive && (
-                                                    <div className="active-trade-actions">
-                                                      <button 
-                                                        onClick={() => handleOpenCloseTradeModal(t)} 
-                                                        className="close-trade-action-btn"
-                                                      >
-                                                        🔒 Закрыть сделку (зафиксировать результат)
-                                                      </button>
-                                                    </div>
-                                                  )}
-                                                </div>
-                                              );
-                                            })}
+                                                );
+                                              })}
+                                            </div>
                                           </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Custom Overlay covering the bottom trades area only (keeping dashboard visible) */}
+            {isAddFormOpen && (
+              <div className="add-trade-overlay">
+                <div className="add-trade-overlay-content">
+                  <div className="overlay-header-row">
+                    <h3>➕ Открытие новой сделки</h3>
+                    <button className="overlay-close-btn" onClick={() => setIsAddFormOpen(false)}>✕</button>
+                  </div>
+
+                  <form onSubmit={handleAddTrade} className="add-trade-form">
+                    <div className="form-row">
+                      <div className="form-group flex-2">
+                        <label>Ассет (тикер на MOEX)</label>
+                        <TickerAutocomplete 
+                          value={ticker} 
+                          onChange={setTicker} 
+                          onSelectLot={setLotSize}
+                        />
+                      </div>
+                      <div className="form-group flex-1">
+                        <label>Лотность</label>
+                        <input 
+                          type="number" 
+                          value={lotSize} 
+                          onChange={(e) => setLotSize(parseInt(e.target.value) || 1)} 
+                          placeholder="1" 
+                          className="trade-input"
+                          required
+                        />
+                      </div>
                     </div>
-                  );
-                })
-              )}
+
+                    <div className="form-row">
+                      <div className="form-group">
+                        <label>Вход (цена)</label>
+                        <input 
+                          type="number" 
+                          step="0.0001" 
+                          value={entryPrice} 
+                          onChange={(e) => setEntryPrice(e.target.value)} 
+                          placeholder="0.00" 
+                          className="trade-input"
+                          required
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Стоп-лосс</label>
+                        <input 
+                          type="number" 
+                          step="0.0001" 
+                          value={stopLoss} 
+                          onChange={(e) => setStopLoss(e.target.value)} 
+                          placeholder="0.00" 
+                          className="trade-input"
+                          required
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Тейк-профит</label>
+                        <input 
+                          type="number" 
+                          step="0.0001" 
+                          value={takeProfit} 
+                          onChange={(e) => setTakeProfit(e.target.value)} 
+                          placeholder="0.00" 
+                          className="trade-input"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* Calculator output section */}
+                    {entryPrice && stopLoss ? (
+                      <div className="calc-summary-box">
+                        <div className="calc-summary-row">
+                          <span>Объем входа:</span>
+                          <span className="calc-summary-val highlighted-lots">{calculatedMaxLots} лотов <span className="sub">({calculatedMaxLots * lotSize} акций)</span></span>
+                        </div>
+                        <div className="calc-summary-row">
+                          <span>Стоимость позиции:</span>
+                          <span className="calc-summary-val">{formatRub(totalPositionCost)}</span>
+                        </div>
+                        <div className="calc-summary-row">
+                          <span>Риск сделки:</span>
+                          <span className="calc-summary-val danger-text">
+                            {formatRub(calculatedRiskAmt * calculatedMaxLots * lotSize)} 
+                            &nbsp;({((calculatedRiskAmt * calculatedMaxLots * lotSize) / data.deposit * 100).toFixed(2)}%)
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    <div className="form-group">
+                      <label>Мысли / Стратегия входа</label>
+                      <textarea 
+                        value={noteEntry} 
+                        onChange={(e) => setNoteEntry(e.target.value)} 
+                        placeholder="Какое эмоциональное состояние? Почему открываю эту сделку?" 
+                        className="trade-textarea"
+                      ></textarea>
+                    </div>
+
+                    <div className="screenshot-uploads">
+                      <ImageZone 
+                        label="Вход" 
+                        imageUrl={screenshotEntry} 
+                        onImageUploaded={setScreenshotEntry}
+                        tempId={tempTradeId}
+                      />
+                    </div>
+
+                    <div className="overlay-footer-buttons">
+                      <button type="button" className="cancel-trade-btn" onClick={() => setIsAddFormOpen(false)}>Отмена</button>
+                      <button type="submit" className="submit-trade-btn">🚀 Открыть активную сделку</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Modal: Transparency & Theme Customization */}
+      {isSettingsOpen && (
+        <div className="settings-overlay-floating">
+          <div className="settings-content-floating">
+            <div className="settings-header-floating">
+              <h3>🎨 Настройки оформления</h3>
+              <button className="settings-close-floating" onClick={() => setIsSettingsOpen(false)}>✕</button>
+            </div>
+            
+            <div className="settings-body-floating">
+              <div className="settings-row-floating">
+                <label>Прозрачность окна: {(windowOpacity * 100).toFixed(0)}%</label>
+                <input 
+                  type="range" 
+                  min="0.3" 
+                  max="1.0" 
+                  step="0.05"
+                  value={windowOpacity} 
+                  onChange={(e) => setWindowOpacity(parseFloat(e.target.value))}
+                  className="opacity-slider"
+                />
+              </div>
+
+              <div className="settings-row-floating">
+                <label>Цветовой оттенок:</label>
+                <div className="accents-palette-row">
+                  {colorOptions.map(color => (
+                    <div 
+                      key={color.name}
+                      className={`color-circle-option ${accentColor === color.primary ? 'active' : ''}`}
+                      style={{ backgroundColor: color.primary }}
+                      title={color.name}
+                      onClick={() => {
+                        setAccentColor(color.primary);
+                        setAccentHover(color.hover);
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Modal: Close Trade Form */}
       {closingTradeId && (
