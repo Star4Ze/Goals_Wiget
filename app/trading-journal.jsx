@@ -1279,6 +1279,28 @@ window.TradingJournalApp = function() {
                   ))}
                 </div>
               </div>
+
+              <div className="settings-row-floating">
+                <label>T-Bank API Токен:</label>
+                <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
+                  <input 
+                    type="password" 
+                    value={tbankToken} 
+                    onChange={(e) => setTbankToken(e.target.value)} 
+                    placeholder="Токен API..." 
+                    className="trade-input" 
+                    style={{ flex: 1, padding: '6px 8px', fontSize: '11px', minHeight: 'auto' }}
+                  />
+                  <button 
+                    type="button" 
+                    onClick={handleSaveTbankToken} 
+                    className="submit-trade-btn" 
+                    style={{ flexShrink: 0, padding: '6px 10px', fontSize: '11px', width: 'auto', margin: 0 }}
+                  >
+                    {isTokenSaved ? '✓' : 'Сохранить'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
