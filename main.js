@@ -907,28 +907,35 @@ function setupHandlers() {
     if (!token) return { success: false, error: 'Токен пуст' };
     
     try {
-      logAction('Запуск синхронизации тикеров с Т-Банком...');
-      const response = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Shares', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ instrumentStatus: 'INSTRUMENT_STATUS_BASE' })
-      });
+      logAction('Запуск синхронизации тикеров с Т-Банком (Акции и Фьючерсы)...');
       
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`API error: ${response.status} | ${errText}`);
+      const [sharesRes, futuresRes] = await Promise.all([
+        fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Shares', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ instrumentStatus: 'INSTRUMENT_STATUS_BASE' })
+        }),
+        fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Futures', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ instrumentStatus: 'INSTRUMENT_STATUS_BASE' })
+        })
+      ]);
+      
+      if (!sharesRes.ok && !futuresRes.ok) {
+        throw new Error(`Обе попытки запроса API завершились с ошибками. Shares status: ${sharesRes.status}, Futures status: ${futuresRes.status}`);
       }
       
-      const result = await response.json();
-      if (!result.instruments || !Array.isArray(result.instruments)) {
-        throw new Error('В ответе API отсутствует список инструментов');
-      }
+      const sharesData = sharesRes.ok ? await sharesRes.json() : { instruments: [] };
+      const futuresData = futuresRes.ok ? await futuresRes.json() : { instruments: [] };
       
-      // Filter Russian shares (TQBR) and ETFs (TQTF) traded on MOEX
-      const tickers = result.instruments
+      const sharesList = (sharesData.instruments || [])
         .filter(ins => ins.ticker && ins.figi && (ins.classCode === 'TQBR' || ins.classCode === 'TQTF'))
         .map(ins => ({
           name: ins.ticker,
@@ -937,8 +944,19 @@ function setupHandlers() {
           figi: ins.figi
         }));
         
+      const futuresList = (futuresData.instruments || [])
+        .filter(ins => ins.ticker && ins.figi && ins.classCode === 'SPBFUT')
+        .map(ins => ({
+          name: ins.ticker,
+          lot: parseInt(ins.lot) || 1,
+          fullname: ins.name || '',
+          figi: ins.figi
+        }));
+        
+      const tickers = [...sharesList, ...futuresList];
+      
       fs.writeFileSync(TRADING_TICKERS_PATH, JSON.stringify(tickers, null, 2), 'utf-8');
-      logAction(`Синхронизировано ${tickers.length} тикеров MOEX (TQBR/TQTF). Успешно сохранено в ${TRADING_TICKERS_PATH}`);
+      logAction(`Синхронизировано ${tickers.length} тикеров MOEX (Акции: ${sharesList.length}, Фьючерсы: ${futuresList.length}). Успешно сохранено в ${TRADING_TICKERS_PATH}`);
       return { success: true, count: tickers.length };
     } catch (e) {
       logAction(`Ошибка синхронизации тикеров: ${e.message}`);
