@@ -92,7 +92,7 @@ const getMonthNameRU = (date) => {
 };
 
 // Autocomplete Component
-function TickerAutocomplete({ value, onChange, onSelectLot }) {
+function TickerAutocomplete({ value, onChange, onSelectLot, tickersList }) {
   const [suggestions, setSuggestions] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef(null);
@@ -111,7 +111,7 @@ function TickerAutocomplete({ value, onChange, onSelectLot }) {
     const val = e.target.value.toUpperCase();
     onChange(val);
     if (val.trim()) {
-      const filtered = popularTickers.filter(t => 
+      const filtered = (tickersList || []).filter(t => 
         t.name.includes(val) || t.fullname.toLowerCase().includes(val.toLowerCase())
       );
       setSuggestions(filtered);
@@ -289,6 +289,39 @@ window.TradingJournalApp = function() {
 
   // Fullscreen image url
   const [fullscreenImageUrl, setFullscreenImageUrl] = useState(null);
+
+  // Dynamic Tickers List State
+  const [tickersList, setTickersList] = useState(popularTickers);
+
+  // Load synced tickers from local data directory on mount
+  useEffect(() => {
+    if (window.electronAPI && window.electronAPI.getSyncedTickers) {
+      window.electronAPI.getSyncedTickers().then(synced => {
+        if (synced && synced.length > 0) {
+          setTickersList(synced);
+        }
+      });
+    }
+  }, []);
+
+  // Watch ticker changes to auto-update lot size and fetch last price from T-Bank API
+  useEffect(() => {
+    const upperTicker = ticker.toUpperCase().trim();
+    if (!upperTicker) return;
+
+    const found = tickersList.find(t => t.name === upperTicker);
+    if (found) {
+      setLotSize(found.lot);
+      
+      if (window.electronAPI && window.electronAPI.getTickerPrice) {
+        window.electronAPI.getTickerPrice(upperTicker).then(price => {
+          if (price) {
+            setEntryPrice(price.toString());
+          }
+        });
+      }
+    }
+  }, [ticker, tickersList]);
 
   // Apply custom accents on change
   useEffect(() => {
@@ -1065,6 +1098,7 @@ window.TradingJournalApp = function() {
                           value={ticker} 
                           onChange={setTicker} 
                           onSelectLot={setLotSize}
+                          tickersList={tickersList}
                         />
                       </div>
                       <div className="form-group flex-1">
