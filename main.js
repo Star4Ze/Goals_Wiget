@@ -946,12 +946,20 @@ function setupHandlers() {
         
       const futuresList = (futuresData.instruments || [])
         .filter(ins => ins.ticker && ins.figi && ins.classCode === 'SPBFUT')
-        .map(ins => ({
-          name: ins.ticker,
-          lot: parseInt(ins.lot) || 1,
-          fullname: ins.name || '',
-          figi: ins.figi
-        }));
+        .map(ins => {
+          let assetSize = 1;
+          if (ins.basicAssetSize) {
+            const units = parseInt(ins.basicAssetSize.units) || 0;
+            const nano = parseInt(ins.basicAssetSize.nano) || 0;
+            assetSize = units + (nano / 1e9);
+          }
+          return {
+            name: ins.ticker,
+            lot: assetSize || parseInt(ins.lot) || 1,
+            fullname: ins.name || '',
+            figi: ins.figi
+          };
+        });
         
       const tickers = [...sharesList, ...futuresList];
       
