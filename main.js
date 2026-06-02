@@ -819,11 +819,13 @@ function setupHandlers() {
   });
 
   // ==========================================
-  // Trading Journal (TradeLog) handlers
+  // Trading Journal (TradingDiary) handlers
   // ==========================================
   const TRADING_DIR = "D:\\GoogleDisk\\Docs\\TradingDiary";
   const TRADING_IMAGES_DIR = path.join(TRADING_DIR, "images");
   const TRADING_DB_PATH = path.join(TRADING_DIR, "trades.json");
+  const TRADING_DATA_DIR = path.join(TRADING_DIR, "data");
+  const TRADING_TICKERS_PATH = path.join(TRADING_DATA_DIR, "tickers.json");
 
   function ensureTradingDir() {
     try {
@@ -832,6 +834,9 @@ function setupHandlers() {
       }
       if (!fs.existsSync(TRADING_IMAGES_DIR)) {
         fs.mkdirSync(TRADING_IMAGES_DIR, { recursive: true });
+      }
+      if (!fs.existsSync(TRADING_DATA_DIR)) {
+        fs.mkdirSync(TRADING_DATA_DIR, { recursive: true });
       }
     } catch (e) {
       logAction(`Ошибка создания папок трейдинга: ${e.message}`);
@@ -897,6 +902,124 @@ function setupHandlers() {
     }
   });
 
+  async function syncTBankTickers(token) {
+    ensureTradingDir();
+    if (!token) return { success: false, error: 'Токен пуст' };
+    
+    try {
+      logAction('Запуск синхронизации тикеров с Т-Банком...');
+      const response = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Shares', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ instrumentStatus: 'INSTRUMENT_STATUS_BASE' })
+      });
+      
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`API error: ${response.status} | ${errText}`);
+      }
+      
+      const result = await response.json();
+      if (!result.instruments || !Array.isArray(result.instruments)) {
+        throw new Error('В ответе API отсутствует список инструментов');
+      }
+      
+      // Filter Russian shares (TQBR) and ETFs (TQTF) traded on MOEX
+      const tickers = result.instruments
+        .filter(ins => ins.ticker && ins.figi && (ins.classCode === 'TQBR' || ins.classCode === 'TQTF'))
+        .map(ins => ({
+          name: ins.ticker,
+          lot: parseInt(ins.lot) || 1,
+          fullname: ins.name || '',
+          figi: ins.figi
+        }));
+        
+      fs.writeFileSync(TRADING_TICKERS_PATH, JSON.stringify(tickers, null, 2), 'utf-8');
+      logAction(`Синхронизировано ${tickers.length} тикеров MOEX (TQBR/TQTF). Успешно сохранено в ${TRADING_TICKERS_PATH}`);
+      return { success: true, count: tickers.length };
+    } catch (e) {
+      logAction(`Ошибка синхронизации тикеров: ${e.message}`);
+      return { success: false, error: e.message };
+    }
+  }
+
+  ipcMain.handle('get-synced-tickers', async () => {
+    ensureTradingDir();
+    try {
+      if (fs.existsSync(TRADING_TICKERS_PATH)) {
+        return JSON.parse(fs.readFileSync(TRADING_TICKERS_PATH, 'utf-8'));
+      }
+    } catch (e) {}
+    return [];
+  });
+
+  ipcMain.handle('get-ticker-price', async (event, tickerName) => {
+    const config = loadConfig();
+    const token = config.tbankToken;
+    if (!token) return null;
+    
+    ensureTradingDir();
+    try {
+      let figi = null;
+      if (fs.existsSync(TRADING_TICKERS_PATH)) {
+        const tickers = JSON.parse(fs.readFileSync(TRADING_TICKERS_PATH, 'utf-8'));
+        const found = tickers.find(t => t.name === tickerName.toUpperCase());
+        if (found) figi = found.figi;
+      }
+      
+      // Fallback figi dictionary for popular assets
+      if (!figi) {
+        const popularFigis = {
+          'SBER': 'BBG004730N88',
+          'SBERP': 'BBG004730DP9',
+          'GAZP': 'BBG004730RP0',
+          'LKOH': 'BBG004731032',
+          'ROSN': 'BBG004730ZJ9',
+          'VTBR': 'BBG004730JJ2',
+          'YNDX': 'BBG006L8G4H1',
+          'GMKN': 'BBG004731489',
+          'AFLT': 'BBG004730G32',
+          'MGNT': 'BBG0047315Y7',
+          'TATN': 'BBG0047315D0'
+        };
+        figi = popularFigis[tickerName.toUpperCase()];
+      }
+      
+      if (!figi) return null;
+      
+      const response = await fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.MarketDataService/GetLastPrices', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ figi: [figi] })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      if (result.lastPrices && result.lastPrices.length > 0) {
+        const priceObj = result.lastPrices[0].price;
+        if (priceObj) {
+          const units = parseInt(priceObj.units) || 0;
+          const nano = parseInt(priceObj.nano) || 0;
+          const finalPrice = units + (nano / 1e9);
+          return finalPrice;
+        }
+      }
+      return null;
+    } catch (e) {
+      logAction(`Ошибка получения цены для ${tickerName}: ${e.message}`);
+      return null;
+    }
+  });
+
   ipcMain.handle('get-tbank-token', async () => {
     const config = loadConfig();
     return config.tbankToken || '';
@@ -905,6 +1028,14 @@ function setupHandlers() {
   ipcMain.handle('save-tbank-token', async (event, token) => {
     try {
       saveConfigValue({ tbankToken: token });
+      if (token) {
+        // Run background sync immediately
+        syncTBankTickers(token).then(res => {
+          if (res.success) {
+            logAction(`Авто-синхронизация при сохранении токена успешна. Загружено ${res.count} тикеров.`);
+          }
+        });
+      }
       return true;
     } catch (e) {
       logAction(`Ошибка сохранения токена Т-Банка: ${e.message}`);

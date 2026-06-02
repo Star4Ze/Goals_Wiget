@@ -33,5 +33,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveTradingData: (data) => ipcRenderer.invoke('save-trading-data', data),
   saveTradeScreenshot: (tradeId, imageBase64, type) => ipcRenderer.invoke('save-trade-screenshot', tradeId, imageBase64, type),
   getTBankToken: () => ipcRenderer.invoke('get-tbank-token'),
-  saveTBankToken: (token) => ipcRenderer.invoke('save-tbank-token', token)
+  saveTBankToken: (token) => ipcRenderer.invoke('save-tbank-token', token),
+  getSyncedTickers: () => ipcRenderer.invoke('get-synced-tickers'),
+  getTickerPrice: (ticker) => ipcRenderer.invoke('get-ticker-price', ticker)
 });
