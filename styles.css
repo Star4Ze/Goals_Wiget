@@ -1264,3 +1264,44 @@ input[type="date"], input[type="number"] {
   font-size: 11px;
   line-height: 1.35;
 }
+
+/* Дополнительные приложения под финансовой целью */
+.addons-panel {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  margin-bottom: 2px;
+  -webkit-app-region: no-drag;
+}
+
+.addon-btn {
+  background: var(--bg-button);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+
+.addon-btn:hover {
+  background: var(--bg-button-hover);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+  transform: translateY(-1px);
+}
+
+.addon-btn:active {
+  transform: translateY(0);
+}
+
+.addon-icon {
+  font-size: 14px;
+}
+

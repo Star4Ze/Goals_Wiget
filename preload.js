@@ -25,5 +25,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showBreakWindow: (mediaPath, accent, hover, sound) => ipcRenderer.invoke('show-break-window', mediaPath, accent, hover, sound),
   showAnalyticsWindow: (accent, hover) => ipcRenderer.invoke('show-analytics-window', accent, hover),
   onBreakWindowClosed: (callback) => ipcRenderer.on('break-window-closed', callback),
-  onDayChanged: (callback) => ipcRenderer.on('day-changed', (event, today) => callback(today))
+  onDayChanged: (callback) => ipcRenderer.on('day-changed', (event, today) => callback(today)),
+
+  // Trading Journal additions
+  openTradingJournal: () => ipcRenderer.invoke('open-trading-journal'),
+  getTradingData: () => ipcRenderer.invoke('get-trading-data'),
+  saveTradingData: (data) => ipcRenderer.invoke('save-trading-data', data),
+  saveTradeScreenshot: (tradeId, imageBase64, type) => ipcRenderer.invoke('save-trade-screenshot', tradeId, imageBase64, type),
+  getTBankToken: () => ipcRenderer.invoke('get-tbank-token'),
+  saveTBankToken: (token) => ipcRenderer.invoke('save-tbank-token', token)
 });

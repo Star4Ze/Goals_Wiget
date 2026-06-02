@@ -24,6 +24,12 @@
       </div>
     </div>
     <div class="progress"><div class="bar"><div class="fill" id="bar"></div><span class="percent" id="percent">0%</span></div></div>
+    <div class="addons-panel" id="addons-panel">
+      <button id="addon-trading-btn" class="addon-btn" title="Дневник трейдинга">
+        <span class="addon-icon">📈</span>
+        <span class="addon-name">TradeLog</span>
+      </button>
+    </div>
     <div class="stats goal-content" id="goal-stats">
       <div class="stat"><span class="label">Осталось</span><span class="value" id="remain">—</span></div>
       <div class="stat"><span class="label">Дней</span><span class="value" id="days">—</span></div>
@@ -223,6 +229,18 @@
               <button id="select-media-btn" class="settings-action-btn" style="flex-shrink: 0; padding: 6px 10px;">Выбрать...</button>
             </div>
             <button id="test-break-btn" class="settings-action-btn" style="align-self: flex-start; color: var(--accent-color); padding: 6px 12px; margin-top: 4px;">⚡ Тест сигнала</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Раздел: Интеграция Т-Банк -->
+      <div class="settings-section">
+        <div class="settings-section-title">📈 Интеграция Т-Банк</div>
+        <div class="setting-row" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+          <label for="tbank-token">API Токен:</label>
+          <div style="display: flex; gap: 6px; width: 100%;">
+            <input type="password" id="tbank-token" class="settings-input" placeholder="Введите токен T-Bank API..." style="flex: 1;">
+            <button id="save-tbank-token-btn" class="settings-action-btn" style="flex-shrink: 0; padding: 6px 10px;">Сохранить</button>
           </div>
         </div>
       </div>
