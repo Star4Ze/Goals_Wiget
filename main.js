@@ -1123,6 +1123,18 @@ function setupHandlers() {
 app.whenReady().then(() => {
   setupHandlers();
   createWindow();
+  
+  // Asynchronously sync tickers 5 seconds after startup if token exists
+  const config = loadConfig();
+  if (config.tbankToken) {
+    setTimeout(() => {
+      syncTBankTickers(config.tbankToken).then(res => {
+        if (res.success) {
+          logAction(`Авто-синхронизация при запуске успешна. Обновлено ${res.count} тикеров с актуальной стоимостью шага.`);
+        }
+      }).catch(() => {});
+    }, 5000);
+  }
 });
 
 app.on('window-all-closed', () => {
