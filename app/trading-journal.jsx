@@ -329,6 +329,7 @@ window.TradingJournalApp = function() {
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
   const [ticker, setTicker] = useState('');
   const [lotSize, setLotSize] = useState(1);
+  const [multiplier, setMultiplier] = useState(1);
   const [entryPrice, setEntryPrice] = useState('');
   const [stopLoss, setStopLoss] = useState('');
   const [takeProfit, setTakeProfit] = useState('');
@@ -444,6 +445,7 @@ window.TradingJournalApp = function() {
     const found = tickersList.find(t => t.name === upperTicker);
     if (found) {
       setLotSize(found.lot);
+      setMultiplier(found.multiplier || found.lot || 1);
       
       if (window.electronAPI && window.electronAPI.getTickerPrice) {
         window.electronAPI.getTickerPrice(upperTicker).then(price => {
@@ -508,11 +510,11 @@ window.TradingJournalApp = function() {
   // Live calculator helper variables
   const calculatedRiskAmt = entryPrice && stopLoss ? Math.abs(parseFloat(entryPrice) - parseFloat(stopLoss)) : 0;
   const maxRiskPerTradeAmount = (data.deposit * data.settings.maxRiskPerTradePercent) / 100;
-  const calculatedMaxLots = calculatedRiskAmt && lotSize 
-    ? Math.floor(maxRiskPerTradeAmount / (calculatedRiskAmt * lotSize)) 
+  const calculatedMaxLots = calculatedRiskAmt && multiplier 
+    ? Math.floor(maxRiskPerTradeAmount / (calculatedRiskAmt * multiplier)) 
     : 0;
   const totalPositionCost = entryPrice && calculatedMaxLots 
-    ? calculatedMaxLots * lotSize * parseFloat(entryPrice) 
+    ? calculatedMaxLots * multiplier * parseFloat(entryPrice) 
     : 0;
 
   // Monthly stats calculations
@@ -536,7 +538,7 @@ window.TradingJournalApp = function() {
     .filter(t => t.status === 'active')
     .reduce((sum, t) => {
       const riskPerShare = Math.abs(t.entryPrice - t.stopLoss);
-      return sum + (riskPerShare * t.lots * (t.lotSize || 1));
+      return sum + (riskPerShare * t.lots * (t.multiplier || t.lotSize || 1));
     }, 0);
 
   const totalMonthlyRiskUsedAmount = Math.max(0, -monthlyRealizedPnL) + monthlyActiveRisk;
@@ -573,7 +575,7 @@ window.TradingJournalApp = function() {
       return;
     }
 
-    const plannedTradeRisk = calculatedRiskAmt * calculatedMaxLots * lotSize;
+    const plannedTradeRisk = calculatedRiskAmt * calculatedMaxLots * multiplier;
     if (plannedTradeRisk > remainingMonthlyRiskAmount) {
       const proceed = confirm(`Предупреждение риск-менеджера:\nЭта сделка добавит риск в ${formatRub(plannedTradeRisk)}, что превышает оставшийся лимит потерь на месяц (${formatRub(remainingMonthlyRiskAmount)}).\nВы уверены, что хотите открыть сделку?`);
       if (!proceed) return;
@@ -583,6 +585,7 @@ window.TradingJournalApp = function() {
       id: tempTradeId,
       ticker: ticker.toUpperCase(),
       lotSize: lotSize,
+      multiplier: multiplier,
       entryPrice: parseFloat(entryPrice),
       stopLoss: parseFloat(stopLoss),
       takeProfit: parseFloat(takeProfit),
@@ -641,7 +644,7 @@ window.TradingJournalApp = function() {
     const isShort = trade.stopLoss > trade.entryPrice;
     const diff = exitVal - trade.entryPrice;
     const pnlPerShare = isShort ? -diff : diff;
-    const totalPnl = pnlPerShare * trade.lots * trade.lotSize;
+    const totalPnl = pnlPerShare * trade.lots * (trade.multiplier || trade.lotSize || 1);
     const pnlPercent = (pnlPerShare / trade.entryPrice) * 100;
 
     const updatedTrades = data.trades.map(t => {
@@ -1302,7 +1305,7 @@ window.TradingJournalApp = function() {
                         </div>
                         <div className="calc-summary-row">
                           <span>Объем входа:</span>
-                          <span className="calc-summary-val highlighted-lots">{calculatedMaxLots} лотов <span className="sub">({calculatedMaxLots * lotSize} акций)</span></span>
+                          <span className="calc-summary-val highlighted-lots">{calculatedMaxLots} лотов <span className="sub">({calculatedMaxLots * lotSize} ед. актива)</span></span>
                         </div>
                         <div className="calc-summary-row">
                           <span>Стоимость позиции:</span>
@@ -1311,8 +1314,8 @@ window.TradingJournalApp = function() {
                         <div className="calc-summary-row">
                           <span>Риск сделки:</span>
                           <span className="calc-summary-val danger-text">
-                            {formatRub(calculatedRiskAmt * calculatedMaxLots * lotSize)} 
-                            &nbsp;({((calculatedRiskAmt * calculatedMaxLots * lotSize) / data.deposit * 100).toFixed(2)}%)
+                            {formatRub(calculatedRiskAmt * calculatedMaxLots * multiplier)} 
+                            &nbsp;({((calculatedRiskAmt * calculatedMaxLots * multiplier) / data.deposit * 100).toFixed(2)}%)
                           </span>
                         </div>
                       </div>
