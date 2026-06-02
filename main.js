@@ -1061,6 +1061,13 @@ function setupHandlers() {
     }
   });
 
+  ipcMain.handle('sync-tbank-tickers', async () => {
+    const config = loadConfig();
+    const token = config.tbankToken;
+    if (!token) return { success: false, error: 'Токен отсутствует. Сохраните сначала токен.' };
+    return await syncTBankTickers(token);
+  });
+
   ipcMain.handle('open-trading-journal', (event) => {
     if (tradingJournalWindow) {
       tradingJournalWindow.focus();

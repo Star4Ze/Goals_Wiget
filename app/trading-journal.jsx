@@ -324,6 +324,40 @@ window.TradingJournalApp = function() {
     }
   };
 
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState('');
+
+  const handleSyncTickers = async () => {
+    if (!tbankToken.trim()) {
+      alert('Сначала введите и сохраните токен API');
+      return;
+    }
+    setIsSyncing(true);
+    setSyncStatus('Синхронизация...');
+    try {
+      if (window.electronAPI && window.electronAPI.syncTBankTickers) {
+        const res = await window.electronAPI.syncTBankTickers();
+        if (res.success) {
+          setSyncStatus(`Успешно: ${res.count} тикеров`);
+          if (window.electronAPI.getSyncedTickers) {
+            const synced = await window.electronAPI.getSyncedTickers();
+            if (synced && synced.length > 0) {
+              setTickersList(synced);
+            }
+          }
+        } else {
+          setSyncStatus(`Ошибка: ${res.error}`);
+        }
+      } else {
+        setSyncStatus('API недоступно');
+      }
+    } catch (err) {
+      setSyncStatus(`Ошибка: ${err.message}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   // Dynamic Tickers List State
   const [tickersList, setTickersList] = useState(popularTickers);
 
@@ -1294,7 +1328,7 @@ window.TradingJournalApp = function() {
 
               <div className="settings-row-floating">
                 <label>T-Bank API Токен:</label>
-                <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
+                <div style={{ display: 'flex', gap: '6px', width: '100%', marginBottom: '8px' }}>
                   <input 
                     type="password" 
                     value={tbankToken} 
@@ -1312,6 +1346,24 @@ window.TradingJournalApp = function() {
                     {isTokenSaved ? '✓' : 'Сохранить'}
                   </button>
                 </div>
+                {tbankToken && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+                    <button
+                      type="button"
+                      onClick={handleSyncTickers}
+                      disabled={isSyncing}
+                      className="submit-trade-btn"
+                      style={{ padding: '6px 10px', fontSize: '11px', width: 'auto', margin: 0, background: 'var(--accent-hover)', color: '#000' }}
+                    >
+                      {isSyncing ? 'Синхронизация...' : '🔄 Синхронизировать тикеры'}
+                    </button>
+                    {syncStatus && (
+                      <span style={{ fontSize: '10px', color: syncStatus.startsWith('Ошибка') ? '#ff7575' : '#3ddc84', wordBreak: 'break-all' }}>
+                        {syncStatus}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
