@@ -200,7 +200,7 @@ function TickerAutocomplete({ value, onChange, onSelectLot, tickersList }) {
                     {isFav ? '★' : '☆'}
                   </span>
                 </div>
-                <span className="ticker-name">{s.fullname} (лот: {s.lot})</span>
+                <span className="ticker-name">{s.fullname} (лот: {s.lot}{s.multiplier && Math.abs(s.multiplier - s.lot) > 0.001 ? ` | пункт: ${s.multiplier} ₽` : ''})</span>
               </li>
             );
           })}
@@ -1241,6 +1241,23 @@ window.TradingJournalApp = function() {
                           onSelectLot={setLotSize}
                           tickersList={tickersList}
                         />
+                      </div>
+                      <div className="form-group flex-1">
+                        <label>Стоимость пункта</label>
+                        <div className="trade-input-readonly" style={{
+                          background: 'rgba(16, 21, 36, 0.45)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '8px',
+                          padding: '10px 12px',
+                          fontSize: '11.5px',
+                          color: 'var(--accent-color)',
+                          height: '35px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          fontWeight: '600'
+                        }}>
+                          {multiplier.toLocaleString('ru-RU')} ₽
+                        </div>
                       </div>
                       <div className="form-group flex-1">
                         <label>Лотность</label>
