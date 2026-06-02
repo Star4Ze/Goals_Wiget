@@ -290,6 +290,40 @@ window.TradingJournalApp = function() {
   // Fullscreen image url
   const [fullscreenImageUrl, setFullscreenImageUrl] = useState(null);
 
+  // T-Bank Token Configuration states
+  const [tbankToken, setTbankToken] = useState('');
+  const [isTokenSaved, setIsTokenSaved] = useState(false);
+
+  // Load T-Bank token from config on mount
+  useEffect(() => {
+    if (window.electronAPI && window.electronAPI.getTBankToken) {
+      window.electronAPI.getTBankToken().then(token => {
+        setTbankToken(token || '');
+      });
+    }
+  }, []);
+
+  const handleSaveTbankToken = async () => {
+    if (window.electronAPI && window.electronAPI.saveTBankToken) {
+      const success = await window.electronAPI.saveTBankToken(tbankToken);
+      if (success) {
+        setIsTokenSaved(true);
+        setTimeout(() => setIsTokenSaved(false), 1500);
+        
+        // Auto trigger reload of tickers 3 seconds after save
+        if (window.electronAPI.getSyncedTickers) {
+          setTimeout(() => {
+            window.electronAPI.getSyncedTickers().then(synced => {
+              if (synced && synced.length > 0) {
+                setTickersList(synced);
+              }
+            });
+          }, 3000);
+        }
+      }
+    }
+  };
+
   // Dynamic Tickers List State
   const [tickersList, setTickersList] = useState(popularTickers);
 
