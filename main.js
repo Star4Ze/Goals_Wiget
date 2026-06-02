@@ -397,8 +397,13 @@ setInterval(() => {
 }, 10000);
 
 function setupHandlers() {
-  ipcMain.handle('close-window', () => {
-    if (mainWindow) mainWindow.close();
+  ipcMain.handle('close-window', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) {
+      win.close();
+    } else if (mainWindow) {
+      mainWindow.close();
+    }
   });
 
   ipcMain.handle('resize-window', (event, width, height) => {
