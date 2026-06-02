@@ -921,6 +921,9 @@ window.TradingJournalApp = function() {
                           <div className="trade-card-top-row">
                             <div className="trade-meta-left">
                               <span className="trade-item-ticker">{t.ticker}</span>
+                              <span className={`direction-badge ${t.stopLoss > t.entryPrice ? 'direction-short' : 'direction-long'}`}>
+                                {t.stopLoss > t.entryPrice ? 'ШОРТ' : 'ЛОНГ'}
+                              </span>
                               <span className="trade-item-lots">{t.lots} лот. ({t.lots * (t.lotSize || 1)} шт)</span>
                               <span className="trade-item-time">🕒 Открыта: {formattedDate}</span>
                             </div>
@@ -1036,6 +1039,9 @@ window.TradingJournalApp = function() {
                                                     <div className="trade-card-top-row">
                                                       <div className="trade-meta-left">
                                                         <span className="trade-item-ticker">{t.ticker}</span>
+                                                        <span className={`direction-badge ${t.stopLoss > t.entryPrice ? 'direction-short' : 'direction-long'}`}>
+                                                          {t.stopLoss > t.entryPrice ? 'ШОРТ' : 'ЛОНГ'}
+                                                        </span>
                                                         <span className="trade-item-lots">{t.lots} лот. ({t.lots * (t.lotSize || 1)} шт)</span>
                                                         <span className="trade-item-time">🕒 {formattedDate} - {endFormattedDate}</span>
                                                       </div>
@@ -1190,6 +1196,12 @@ window.TradingJournalApp = function() {
                     {/* Calculator output section */}
                     {entryPrice && stopLoss ? (
                       <div className="calc-summary-box">
+                        <div className="calc-summary-row">
+                          <span>Направление сделки:</span>
+                          <span className={`calc-summary-val ${parseFloat(stopLoss) > parseFloat(entryPrice) ? 'danger-text' : 'success-text'}`}>
+                            {parseFloat(stopLoss) > parseFloat(entryPrice) ? '🔴 ШОРТ (Продажа)' : '🟢 ЛОНГ (Покупка)'}
+                          </span>
+                        </div>
                         <div className="calc-summary-row">
                           <span>Объем входа:</span>
                           <span className="calc-summary-val highlighted-lots">{calculatedMaxLots} лотов <span className="sub">({calculatedMaxLots * lotSize} акций)</span></span>
