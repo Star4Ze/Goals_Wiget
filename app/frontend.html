@@ -907,6 +907,32 @@
       background: #192138;
     }
 
+    .ticker-code-col {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+    }
+
+    .star-btn {
+      cursor: pointer;
+      color: rgba(255, 255, 255, 0.2);
+      font-size: 14px;
+      transition: all 0.15s ease;
+      padding: 0 6px;
+      user-select: none;
+    }
+
+    .star-btn:hover {
+      color: #ffd600;
+      transform: scale(1.25);
+    }
+
+    .star-btn.active {
+      color: #ffd600;
+      text-shadow: 0 0 5px rgba(255, 214, 0, 0.6);
+    }
+
     .ticker-code {
       font-weight: 700;
       color: var(--accent-color);

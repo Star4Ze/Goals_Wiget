@@ -95,7 +95,19 @@ const getMonthNameRU = (date) => {
 function TickerAutocomplete({ value, onChange, onSelectLot, tickersList }) {
   const [suggestions, setSuggestions] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
+  const [favorites, setFavorites] = useState(() => {
+    try {
+      const saved = localStorage.getItem('trade_favorites');
+      return saved ? JSON.parse(saved) : ['SBER', 'GAZP', 'LKOH'];
+    } catch (e) {
+      return [];
+    }
+  });
   const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem('trade_favorites', JSON.stringify(favorites));
+  }, [favorites]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -107,19 +119,35 @@ function TickerAutocomplete({ value, onChange, onSelectLot, tickersList }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleInputChange = (e) => {
-    const val = e.target.value.toUpperCase();
-    onChange(val);
-    if (val.trim()) {
-      const filtered = (tickersList || []).filter(t => 
-        t.name.includes(val) || t.fullname.toLowerCase().includes(val.toLowerCase())
-      );
-      setSuggestions(filtered);
-      setIsOpen(true);
-    } else {
-      setSuggestions([]);
-      setIsOpen(false);
+  const getFilteredSuggestions = (val) => {
+    const searchVal = val.toUpperCase().trim();
+    if (!searchVal) {
+      // If search is empty, show favorited tickers
+      return (tickersList || []).filter(t => favorites.includes(t.name));
     }
+    const matching = (tickersList || []).filter(t => 
+      t.name.includes(searchVal) || t.fullname.toLowerCase().includes(searchVal.toLowerCase())
+    );
+    // Sort so favorited tickers are shown first
+    return matching.sort((a, b) => {
+      const aFav = favorites.includes(a.name) ? 1 : 0;
+      const bFav = favorites.includes(b.name) ? 1 : 0;
+      return bFav - aFav;
+    });
+  };
+
+  const handleInputChange = (e) => {
+    const val = e.target.value;
+    onChange(val);
+    const filtered = getFilteredSuggestions(val);
+    setSuggestions(filtered);
+    setIsOpen(true);
+  };
+
+  const handleFocus = () => {
+    const filtered = getFilteredSuggestions(value);
+    setSuggestions(filtered);
+    setIsOpen(true);
   };
 
   const handleSelect = (ticker) => {
@@ -128,25 +156,61 @@ function TickerAutocomplete({ value, onChange, onSelectLot, tickersList }) {
     setIsOpen(false);
   };
 
+  const toggleFavorite = (e, tickerName) => {
+    e.stopPropagation(); // Prevent trigger selection when clicking the star
+    setFavorites(prev => {
+      const updated = prev.includes(tickerName)
+        ? prev.filter(name => name !== tickerName)
+        : [...prev, tickerName];
+      return updated;
+    });
+  };
+
+  // Re-run suggestion filter when favorites or tickers list change
+  useEffect(() => {
+    if (isOpen) {
+      setSuggestions(getFilteredSuggestions(value));
+    }
+  }, [favorites, tickersList, value]);
+
   return (
     <div ref={wrapperRef} className="autocomplete-wrapper">
       <input 
         type="text" 
         value={value} 
         onChange={handleInputChange} 
-        onFocus={() => { if (value) setIsOpen(true); }}
+        onFocus={handleFocus}
         placeholder="Напр. SBER" 
         className="trade-input text-upper"
         required
       />
       {isOpen && suggestions.length > 0 && (
         <ul className="autocomplete-list">
-          {suggestions.map(s => (
-            <li key={s.name} onClick={() => handleSelect(s)}>
-              <span className="ticker-code">{s.name}</span>
-              <span className="ticker-name">{s.fullname} (лот: {s.lot})</span>
-            </li>
-          ))}
+          {suggestions.map(s => {
+            const isFav = favorites.includes(s.name);
+            return (
+              <li key={s.name} onClick={() => handleSelect(s)}>
+                <div className="ticker-code-col">
+                  <span className="ticker-code">{s.name}</span>
+                  <span 
+                    className={`star-btn ${isFav ? 'active' : ''}`} 
+                    onClick={(e) => toggleFavorite(e, s.name)}
+                    title={isFav ? "Убрать из избранного" : "Добавить в избранное"}
+                  >
+                    {isFav ? '★' : '☆'}
+                  </span>
+                </div>
+                <span className="ticker-name">{s.fullname} (лот: {s.lot})</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {isOpen && value.trim() === '' && suggestions.length === 0 && (
+        <ul className="autocomplete-list">
+          <li className="text-center text-muted" style={{ padding: '8px 10px', fontSize: '10.5px' }}>
+            Нет избранных тикеров. Начните вводить тикер и нажмите ☆, чтобы добавить в избранное.
+          </li>
         </ul>
       )}
     </div>
