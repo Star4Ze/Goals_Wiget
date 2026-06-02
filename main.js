@@ -937,12 +937,16 @@ function setupHandlers() {
       
       const sharesList = (sharesData.instruments || [])
         .filter(ins => ins.ticker && ins.figi && (ins.classCode === 'TQBR' || ins.classCode === 'TQTF'))
-        .map(ins => ({
-          name: ins.ticker,
-          lot: parseInt(ins.lot) || 1,
-          fullname: ins.name || '',
-          figi: ins.figi
-        }));
+        .map(ins => {
+          const lotVal = parseInt(ins.lot) || 1;
+          return {
+            name: ins.ticker,
+            lot: lotVal,
+            fullname: ins.name || '',
+            figi: ins.figi,
+            multiplier: lotVal
+          };
+        });
         
       const futuresList = (futuresData.instruments || [])
         .filter(ins => ins.ticker && ins.figi && ins.classCode === 'SPBFUT')
@@ -953,11 +957,22 @@ function setupHandlers() {
             const nano = parseInt(ins.basicAssetSize.nano) || 0;
             assetSize = units + (nano / 1e9);
           }
+          
+          let priceMult = assetSize || parseInt(ins.lot) || 1;
+          if (ins.minPriceIncrement && ins.minPriceIncrementAmount) {
+            const inc = (parseInt(ins.minPriceIncrement.units) || 0) + ((parseInt(ins.minPriceIncrement.nano) || 0) / 1e9);
+            const amt = (parseInt(ins.minPriceIncrementAmount.units) || 0) + ((parseInt(ins.minPriceIncrementAmount.nano) || 0) / 1e9);
+            if (inc > 0) {
+              priceMult = amt / inc;
+            }
+          }
+          
           return {
             name: ins.ticker,
             lot: assetSize || parseInt(ins.lot) || 1,
             fullname: ins.name || '',
-            figi: ins.figi
+            figi: ins.figi,
+            multiplier: priceMult
           };
         });
         
