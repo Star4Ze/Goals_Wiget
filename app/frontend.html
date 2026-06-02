@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TradeLog — MOEX Journal</title>
+  <style>
+    html, body, #root { margin: 0; width: 100%; min-height: 100%; background: #080a10; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.0/babel.min.js"></script>
+
+  <script type="text/babel" data-presets="react" src="./trading-journal.jsx"></script>
+  <script type="text/babel" data-presets="react">
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<window.TradingJournalApp />);
+  </script>
+</body>
+</html>
