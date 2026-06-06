@@ -1165,6 +1165,13 @@ async function init() {
     });
   }
   
+  if (window.electronAPI && window.electronAPI.onExternalFileChange) {
+    window.electronAPI.onExternalFileChange(() => {
+      loadObsidianTasks();
+      loadDailyTasks();
+    });
+  }
+  
   // Open trading journal
   document.getElementById('addon-trading-btn')?.addEventListener('click', () => {
     if (window.electronAPI && window.electronAPI.openTradingJournal) {

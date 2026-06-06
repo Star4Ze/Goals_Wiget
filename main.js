@@ -1,6 +1,9 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, MenuItem } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { exec } = require('child_process');
+const util = require('util');
+const execPromise = util.promisify(exec);
 
 let mainWindow;
 let breakWindow = null;
@@ -9,6 +12,119 @@ let tradingJournalWindow = null;
 
 const TARGET_DIR = "C:\\Users\\HomePC\\Documents\\Obsidian\\Progects\\MyLife";
 const DAILY_TASKS_FILE_NAME = "Ежедневные задачи";
+
+async function runGitCommand(args) {
+  try {
+    const { stdout, stderr } = await execPromise(`git -C "${TARGET_DIR}" ${args}`);
+    return { success: true, stdout: stdout.trim(), stderr: stderr.trim() };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+let isGitSyncing = false;
+let gitSyncPending = false;
+
+async function triggerGitSync() {
+  if (isGitSyncing) {
+    gitSyncPending = true;
+    return;
+  }
+
+  isGitSyncing = true;
+  gitSyncPending = false;
+
+  try {
+    logAction("🔄 Автосинк Git: Проверка изменений...");
+    
+    // 1. Проверяем наличие локальных изменений
+    const statusRes = await runGitCommand("status --porcelain");
+    let hasLocalChanges = statusRes.success && statusRes.stdout !== "";
+
+    if (hasLocalChanges) {
+      logAction(`🔄 Автосинк Git: найдены измененные файлы:\n${statusRes.stdout}`);
+      
+      // 2. Индексируем изменения
+      await runGitCommand("add .");
+      
+      // Проверяем, есть ли проиндексированные файлы в нашей директории
+      const diffCachedRes = await runGitCommand("diff --cached --quiet");
+      const hasStagedChanges = !diffCachedRes.success; // если есть изменения, diff возвращает exit код 1
+      
+      if (hasStagedChanges) {
+        // 3. Создаем коммит локально
+        const commitRes = await runGitCommand('commit -m "Auto-sync from Goals Widget"');
+        if (!commitRes.success) {
+          logAction(`⚠️ Автосинк Git (commit): ${commitRes.error || commitRes.stderr}`);
+          return; // Если коммит не удался, прекращаем
+        }
+        logAction("🔄 Автосинк Git: Локальный коммит создан.");
+      } else {
+        logAction("🔄 Автосинк Git: Нет изменений для коммита в отслеживаемой папке.");
+      }
+    }
+
+    // 4. Подтягиваем изменения с удаленного репозитория с использованием rebase
+    logAction("🔄 Автосинк Git: Получение свежих изменений (pull --rebase)...");
+    
+    const beforePullRes = await runGitCommand("rev-parse HEAD");
+    const beforePullSha = beforePullRes.success ? beforePullRes.stdout : "";
+
+    const pullRes = await runGitCommand("pull --rebase");
+    if (!pullRes.success) {
+      logAction(`⚠️ Автосинк Git (pull --rebase ошибка): ${pullRes.error || pullRes.stderr}`);
+      logAction("🔄 Автосинк Git: Отмена rebase...");
+      await runGitCommand("rebase --abort");
+      return; // Прекращаем выполнение, так как есть конфликт
+    }
+
+    const afterPullRes = await runGitCommand("rev-parse HEAD");
+    const afterPullSha = afterPullRes.success ? afterPullRes.stdout : "";
+
+    // Если хэш изменился, значит, прилетели изменения с другого устройства
+    if (beforePullSha && afterPullSha && beforePullSha !== afterPullSha) {
+      logAction("🔄 Автосинк Git: Получены новые коммиты с другого устройства. Обновление интерфейса...");
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('external-file-change');
+      }
+    }
+
+    // 5. Отправляем изменения на сервер, если были локальные коммиты
+    const logRes = await runGitCommand("log @{u}..@{0} --oneline");
+    const needsPush = logRes.success && logRes.stdout !== "";
+
+    if (needsPush) {
+      logAction("🔄 Автосинк Git: Отправка изменений в удаленный репозиторий (push)...");
+      const pushRes = await runGitCommand("push");
+      if (pushRes.success) {
+        logAction("✅ Автосинк Git: Все изменения успешно отправлены в репозиторий!");
+      } else {
+        logAction(`⚠️ Автосинк Git (push): ${pushRes.error || pushRes.stderr}`);
+      }
+    } else {
+      logAction("✅ Автосинк Git: Репозиторий синхронизирован.");
+    }
+
+  } catch (err) {
+    logAction(`⚠️ Автосинк Git: Непредвиденная ошибка: ${err.message}`);
+  } finally {
+    isGitSyncing = false;
+    if (gitSyncPending) {
+      setTimeout(triggerGitSync, 5000);
+    }
+  }
+}
+
+let gitSyncTimeout = null;
+
+function scheduleGitSync() {
+  if (gitSyncTimeout) {
+    clearTimeout(gitSyncTimeout);
+  }
+  gitSyncTimeout = setTimeout(() => {
+    triggerGitSync();
+  }, 5000);
+}
 
 function loadConfig() {
   const configPath = path.join(__dirname, 'config.json');
@@ -97,6 +213,11 @@ function createWindow() {
   mainWindow.on('move', () => {
     const bounds = mainWindow.getBounds();
     saveWindowBounds({ x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height });
+  });
+
+  mainWindow.on('focus', () => {
+    // При получении фокуса окном виджета запускаем синхронизацию для получения изменений
+    scheduleGitSync();
   });
   
   mainWindow.webContents.on('did-finish-load', () => {
@@ -396,6 +517,116 @@ setInterval(() => {
   }
 }, 10000);
 
+// ==========================================
+// Trading Journal (TradingDiary) Config & Helpers
+// ==========================================
+const TRADING_DIR = "D:\\GoogleDisk\\Docs\\TradingDiary";
+const TRADING_IMAGES_DIR = path.join(TRADING_DIR, "images");
+const TRADING_DB_PATH = path.join(TRADING_DIR, "trades.json");
+const TRADING_DATA_DIR = path.join(TRADING_DIR, "data");
+const TRADING_TICKERS_PATH = path.join(TRADING_DATA_DIR, "tickers.json");
+
+function ensureTradingDir() {
+  try {
+    if (!fs.existsSync(TRADING_DIR)) {
+      fs.mkdirSync(TRADING_DIR, { recursive: true });
+    }
+    if (!fs.existsSync(TRADING_IMAGES_DIR)) {
+      fs.mkdirSync(TRADING_IMAGES_DIR, { recursive: true });
+    }
+    if (!fs.existsSync(TRADING_DATA_DIR)) {
+      fs.mkdirSync(TRADING_DATA_DIR, { recursive: true });
+    }
+  } catch (e) {
+    logAction(`Ошибка создания папок трейдинга: ${e.message}`);
+  }
+}
+
+async function syncTBankTickers(token) {
+  ensureTradingDir();
+  if (!token) return { success: false, error: 'Токен пуст' };
+  
+  try {
+    logAction('Запуск синхронизации тикеров с Т-Банком (Акции и Фьючерсы)...');
+    
+    const [sharesRes, futuresRes] = await Promise.all([
+      fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Shares', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ instrumentStatus: 'INSTRUMENT_STATUS_BASE' })
+      }),
+      fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Futures', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ instrumentStatus: 'INSTRUMENT_STATUS_BASE' })
+      })
+    ]);
+    
+    if (!sharesRes.ok && !futuresRes.ok) {
+      throw new Error(`Обе попытки запроса API завершились с ошибками. Shares status: ${sharesRes.status}, Futures status: ${futuresRes.status}`);
+    }
+    
+    const sharesData = sharesRes.ok ? await sharesRes.json() : { instruments: [] };
+    const futuresData = futuresRes.ok ? await futuresRes.json() : { instruments: [] };
+    
+    const sharesList = (sharesData.instruments || [])
+      .filter(ins => ins.ticker && ins.figi && (ins.classCode === 'TQBR' || ins.classCode === 'TQTF'))
+      .map(ins => {
+        const lotVal = parseInt(ins.lot) || 1;
+        return {
+          name: ins.ticker,
+          lot: lotVal,
+          fullname: ins.name || '',
+          figi: ins.figi,
+          multiplier: lotVal
+        };
+      });
+      
+    const futuresList = (futuresData.instruments || [])
+      .filter(ins => ins.ticker && ins.figi && ins.classCode === 'SPBFUT')
+      .map(ins => {
+        let assetSize = 1;
+        if (ins.basicAssetSize) {
+          const units = parseInt(ins.basicAssetSize.units) || 0;
+          const nano = parseInt(ins.basicAssetSize.nano) || 0;
+          assetSize = units + (nano / 1e9);
+        }
+        
+        let priceMult = assetSize || parseInt(ins.lot) || 1;
+        if (ins.minPriceIncrement && ins.minPriceIncrementAmount) {
+          const inc = (parseInt(ins.minPriceIncrement.units) || 0) + ((parseInt(ins.minPriceIncrement.nano) || 0) / 1e9);
+          const amt = (parseInt(ins.minPriceIncrementAmount.units) || 0) + ((parseInt(ins.minPriceIncrementAmount.nano) || 0) / 1e9);
+          if (inc > 0) {
+            priceMult = amt / inc;
+          }
+        }
+        
+        return {
+          name: ins.ticker,
+          lot: assetSize || parseInt(ins.lot) || 1,
+          fullname: ins.name || '',
+          figi: ins.figi,
+          multiplier: priceMult
+        };
+      });
+      
+    const tickers = [...sharesList, ...futuresList];
+    
+    fs.writeFileSync(TRADING_TICKERS_PATH, JSON.stringify(tickers, null, 2), 'utf-8');
+    logAction(`Синхронизировано ${tickers.length} тикеров MOEX (Акции: ${sharesList.length}, Фьючерсы: ${futuresList.length}). Успешно сохранено в ${TRADING_TICKERS_PATH}`);
+    return { success: true, count: tickers.length };
+  } catch (e) {
+    logAction(`Ошибка синхронизации тикеров: ${e.message}`);
+    return { success: false, error: e.message };
+  }
+}
+
 function setupHandlers() {
   ipcMain.handle('close-window', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
@@ -440,6 +671,7 @@ function setupHandlers() {
       if (!fs.existsSync(filePath)) {
         fs.writeFileSync(filePath, "", "utf-8");
         logAction(`📂 Создан новый файл задач: ${fileName}.md`);
+        scheduleGitSync();
         return true;
       }
       return false;
@@ -462,6 +694,7 @@ function setupHandlers() {
       if (fs.existsSync(newPath)) return { success: false, error: 'exists' };
       fs.renameSync(oldPath, newPath);
       logAction(`📂 Файл задач переименован: ${oldName}.md → ${safeNewName}.md`);
+      scheduleGitSync();
       return { success: true, fileName: safeNewName };
     } catch (e) {
       logAction(`Ошибка переименования файла задач: ${e.message}`);
@@ -476,6 +709,7 @@ function setupHandlers() {
       if (!fs.existsSync(filePath)) return false;
       fs.unlinkSync(filePath);
       logAction(`🗑️ Удален файл задач: ${fileName}.md`);
+      scheduleGitSync();
       return true;
     } catch (e) {
       logAction(`Ошибка удаления файла задач: ${e.message}`);
@@ -507,6 +741,7 @@ function setupHandlers() {
       fs.writeFileSync(filePath, newContent, 'utf-8');
       saveDailyTasksHistoryIfNeeded(fileName);
       logAction(`📝 Добавлена новая задача в начало ${path.basename(filePath)}: ${taskText}`);
+      scheduleGitSync();
       return true;
     } catch (err) {
       logAction(`Ошибка добавления задачи: ${err.message}`);
@@ -545,6 +780,7 @@ function setupHandlers() {
         fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
         saveDailyTasksHistoryIfNeeded(fileName);
         logAction(`✅ Выполнена задача на строке ${lineIndex + 1} в ${path.basename(filePath)}`);
+        scheduleGitSync();
         return true;
       }
       return false;
@@ -567,6 +803,7 @@ function setupHandlers() {
         fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
         saveDailyTasksHistoryIfNeeded(fileName);
         logAction(`🗑️ Удалена задача (и её подзадачи, всего строк: ${size}) с индекса ${lineIndex + 1} в ${path.basename(filePath)}`);
+        scheduleGitSync();
         return true;
       }
       return false;
@@ -594,6 +831,7 @@ function setupHandlers() {
           fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
           saveDailyTasksHistoryIfNeeded(fileName);
           logAction(`✏️ Отредактирована задача на строке ${lineIndex + 1}: "${newText}"`);
+          scheduleGitSync();
           return true;
         }
       }
@@ -630,6 +868,7 @@ function setupHandlers() {
         fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
         saveDailyTasksHistoryIfNeeded(fileName);
         logAction(`↳ Добавлена подзадача к строке ${parentLineIndex + 1}: "${subtaskText}"`);
+        scheduleGitSync();
         return true;
       }
       return false;
@@ -663,6 +902,7 @@ function setupHandlers() {
         
         fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
         saveDailyTasksHistoryIfNeeded(fileName);
+        scheduleGitSync();
         return true;
       }
       return false;
@@ -705,6 +945,7 @@ function setupHandlers() {
         fs.writeFileSync(targetPath, targetContent, 'utf-8');
         
         logAction(`📂 Перенесена задача со строки ${lineIndex + 1} из "${sourceFileName}" в "${targetFileName}"`);
+        scheduleGitSync();
         return true;
       }
       return false;
@@ -818,30 +1059,7 @@ function setupHandlers() {
     });
   });
 
-  // ==========================================
-  // Trading Journal (TradingDiary) handlers
-  // ==========================================
-  const TRADING_DIR = "D:\\GoogleDisk\\Docs\\TradingDiary";
-  const TRADING_IMAGES_DIR = path.join(TRADING_DIR, "images");
-  const TRADING_DB_PATH = path.join(TRADING_DIR, "trades.json");
-  const TRADING_DATA_DIR = path.join(TRADING_DIR, "data");
-  const TRADING_TICKERS_PATH = path.join(TRADING_DATA_DIR, "tickers.json");
-
-  function ensureTradingDir() {
-    try {
-      if (!fs.existsSync(TRADING_DIR)) {
-        fs.mkdirSync(TRADING_DIR, { recursive: true });
-      }
-      if (!fs.existsSync(TRADING_IMAGES_DIR)) {
-        fs.mkdirSync(TRADING_IMAGES_DIR, { recursive: true });
-      }
-      if (!fs.existsSync(TRADING_DATA_DIR)) {
-        fs.mkdirSync(TRADING_DATA_DIR, { recursive: true });
-      }
-    } catch (e) {
-      logAction(`Ошибка создания папок трейдинга: ${e.message}`);
-    }
-  }
+  // Trading Journal handlers will use the global TRADING_* constants and ensureTradingDir()
 
   ipcMain.handle('get-trading-data', async () => {
     ensureTradingDir();
@@ -902,90 +1120,7 @@ function setupHandlers() {
     }
   });
 
-  async function syncTBankTickers(token) {
-    ensureTradingDir();
-    if (!token) return { success: false, error: 'Токен пуст' };
-    
-    try {
-      logAction('Запуск синхронизации тикеров с Т-Банком (Акции и Фьючерсы)...');
-      
-      const [sharesRes, futuresRes] = await Promise.all([
-        fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Shares', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ instrumentStatus: 'INSTRUMENT_STATUS_BASE' })
-        }),
-        fetch('https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Futures', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ instrumentStatus: 'INSTRUMENT_STATUS_BASE' })
-        })
-      ]);
-      
-      if (!sharesRes.ok && !futuresRes.ok) {
-        throw new Error(`Обе попытки запроса API завершились с ошибками. Shares status: ${sharesRes.status}, Futures status: ${futuresRes.status}`);
-      }
-      
-      const sharesData = sharesRes.ok ? await sharesRes.json() : { instruments: [] };
-      const futuresData = futuresRes.ok ? await futuresRes.json() : { instruments: [] };
-      
-      const sharesList = (sharesData.instruments || [])
-        .filter(ins => ins.ticker && ins.figi && (ins.classCode === 'TQBR' || ins.classCode === 'TQTF'))
-        .map(ins => {
-          const lotVal = parseInt(ins.lot) || 1;
-          return {
-            name: ins.ticker,
-            lot: lotVal,
-            fullname: ins.name || '',
-            figi: ins.figi,
-            multiplier: lotVal
-          };
-        });
-        
-      const futuresList = (futuresData.instruments || [])
-        .filter(ins => ins.ticker && ins.figi && ins.classCode === 'SPBFUT')
-        .map(ins => {
-          let assetSize = 1;
-          if (ins.basicAssetSize) {
-            const units = parseInt(ins.basicAssetSize.units) || 0;
-            const nano = parseInt(ins.basicAssetSize.nano) || 0;
-            assetSize = units + (nano / 1e9);
-          }
-          
-          let priceMult = assetSize || parseInt(ins.lot) || 1;
-          if (ins.minPriceIncrement && ins.minPriceIncrementAmount) {
-            const inc = (parseInt(ins.minPriceIncrement.units) || 0) + ((parseInt(ins.minPriceIncrement.nano) || 0) / 1e9);
-            const amt = (parseInt(ins.minPriceIncrementAmount.units) || 0) + ((parseInt(ins.minPriceIncrementAmount.nano) || 0) / 1e9);
-            if (inc > 0) {
-              priceMult = amt / inc;
-            }
-          }
-          
-          return {
-            name: ins.ticker,
-            lot: assetSize || parseInt(ins.lot) || 1,
-            fullname: ins.name || '',
-            figi: ins.figi,
-            multiplier: priceMult
-          };
-        });
-        
-      const tickers = [...sharesList, ...futuresList];
-      
-      fs.writeFileSync(TRADING_TICKERS_PATH, JSON.stringify(tickers, null, 2), 'utf-8');
-      logAction(`Синхронизировано ${tickers.length} тикеров MOEX (Акции: ${sharesList.length}, Фьючерсы: ${futuresList.length}). Успешно сохранено в ${TRADING_TICKERS_PATH}`);
-      return { success: true, count: tickers.length };
-    } catch (e) {
-      logAction(`Ошибка синхронизации тикеров: ${e.message}`);
-      return { success: false, error: e.message };
-    }
-  }
+  // syncTBankTickers is defined globally
 
   ipcMain.handle('get-synced-tickers', async () => {
     ensureTradingDir();
@@ -1120,9 +1255,52 @@ function setupHandlers() {
   });
 }
 
+// Global context menu for text fields (Cut, Copy, Paste, Select All)
+app.on('web-contents-created', (event, contents) => {
+  contents.on('context-menu', (e, params) => {
+    const menu = new Menu();
+
+    if (params.dictionarySuggestions && params.dictionarySuggestions.length > 0) {
+      for (const suggestion of params.dictionarySuggestions) {
+        menu.append(new MenuItem({
+          label: suggestion,
+          click: () => contents.replaceMisspelling(suggestion)
+        }));
+      }
+      menu.append(new MenuItem({ type: 'separator' }));
+    }
+
+    if (params.isEditable) {
+      menu.append(new MenuItem({ label: 'Вырезать', role: 'cut' }));
+      menu.append(new MenuItem({ label: 'Копировать', role: 'copy' }));
+      menu.append(new MenuItem({ label: 'Вставить', role: 'paste' }));
+      menu.append(new MenuItem({ type: 'separator' }));
+      menu.append(new MenuItem({ label: 'Выделить всё', role: 'selectall' }));
+    } else if (params.selectionText && params.selectionText.trim() !== '') {
+      menu.append(new MenuItem({ label: 'Копировать', role: 'copy' }));
+      menu.append(new MenuItem({ type: 'separator' }));
+      menu.append(new MenuItem({ label: 'Выделить всё', role: 'selectall' }));
+    } else {
+      return;
+    }
+
+    menu.popup({ window: BrowserWindow.fromWebContents(contents) });
+  });
+});
+
 app.whenReady().then(() => {
   setupHandlers();
   createWindow();
+  
+  // Запуск фоновой синхронизации Git при старте приложения через 2 секунды
+  setTimeout(() => {
+    triggerGitSync().catch(err => logAction(`Ошибка автосинка при старте: ${err.message}`));
+  }, 2000);
+
+  // Периодический опрос обновлений Git каждые 10 минут
+  setInterval(() => {
+    triggerGitSync().catch(err => logAction(`Ошибка периодического автосинка: ${err.message}`));
+  }, 10 * 60 * 1000);
   
   // Asynchronously sync tickers 5 seconds after startup if token exists
   const config = loadConfig();

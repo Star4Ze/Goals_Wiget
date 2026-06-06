@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showAnalyticsWindow: (accent, hover) => ipcRenderer.invoke('show-analytics-window', accent, hover),
   onBreakWindowClosed: (callback) => ipcRenderer.on('break-window-closed', callback),
   onDayChanged: (callback) => ipcRenderer.on('day-changed', (event, today) => callback(today)),
+  onExternalFileChange: (callback) => ipcRenderer.on('external-file-change', () => callback()),
 
   // Trading Journal additions
   openTradingJournal: () => ipcRenderer.invoke('open-trading-journal'),

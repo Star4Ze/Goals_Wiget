@@ -349,6 +349,22 @@ window.TradingJournalApp = function() {
   const [noteExit, setNoteExit] = useState('');
   const [screenshotExit, setScreenshotExit] = useState('');
 
+  // Edit trade modal states
+  const [editingTrade, setEditingTrade] = useState(null);
+  const [editTradeTicker, setEditTradeTicker] = useState('');
+  const [editTradeLots, setEditTradeLots] = useState(0);
+  const [editTradeLotSize, setEditTradeLotSize] = useState(1);
+  const [editTradeMultiplier, setEditTradeMultiplier] = useState(1);
+  const [editTradeEntryPrice, setEditTradeEntryPrice] = useState('');
+  const [editTradeStopLoss, setEditTradeStopLoss] = useState('');
+  const [editTradeTakeProfit, setEditTradeTakeProfit] = useState('');
+  const [editTradeNoteEntry, setEditTradeNoteEntry] = useState('');
+  const [editTradeScreenshotEntry, setEditTradeScreenshotEntry] = useState('');
+  const [editTradeStatus, setEditTradeStatus] = useState('active');
+  const [editTradeExitPrice, setEditTradeExitPrice] = useState('');
+  const [editTradeNoteExit, setEditTradeNoteExit] = useState('');
+  const [editTradeScreenshotExit, setEditTradeScreenshotExit] = useState('');
+
   // Accordion collapsed state: store keys of open sections
   const [expandedSections, setExpandedSections] = useState({});
 
@@ -456,6 +472,21 @@ window.TradingJournalApp = function() {
       }
     }
   }, [ticker, tickersList]);
+
+  // Watch editTradeTicker changes to auto-update lot size and multiplier
+  useEffect(() => {
+    if (!editingTrade) return;
+    const upperTicker = editTradeTicker.toUpperCase().trim();
+    if (!upperTicker) return;
+    
+    if (upperTicker !== editingTrade.ticker) {
+      const found = tickersList.find(t => t.name === upperTicker);
+      if (found) {
+        setEditTradeLotSize(found.lot);
+        setEditTradeMultiplier(found.multiplier || found.lot || 1);
+      }
+    }
+  }, [editTradeTicker, tickersList, editingTrade]);
 
   // Apply custom accents on change
   useEffect(() => {
@@ -679,6 +710,111 @@ window.TradingJournalApp = function() {
       ...data,
       trades: filtered
     });
+  };
+
+  // Opening the edit trade modal
+  const handleOpenEditTradeModal = (trade) => {
+    setEditingTrade(trade);
+    setEditTradeTicker(trade.ticker || '');
+    setEditTradeLots(trade.lots || 0);
+    setEditTradeLotSize(trade.lotSize || 1);
+    setEditTradeMultiplier(trade.multiplier || trade.lotSize || 1);
+    setEditTradeEntryPrice(trade.entryPrice ? trade.entryPrice.toString() : '');
+    setEditTradeStopLoss(trade.stopLoss ? trade.stopLoss.toString() : '');
+    setEditTradeTakeProfit(trade.takeProfit ? trade.takeProfit.toString() : '');
+    setEditTradeNoteEntry(trade.noteEntry || '');
+    setEditTradeScreenshotEntry(trade.screenshotEntry || '');
+    setEditTradeStatus(trade.status || 'active');
+    setEditTradeExitPrice(trade.exitPrice ? trade.exitPrice.toString() : '');
+    setEditTradeNoteExit(trade.noteExit || '');
+    setEditTradeScreenshotExit(trade.screenshotExit || '');
+  };
+
+  // Submitting the edited trade
+  const handleEditTradeSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingTrade) return;
+
+    if (!editTradeTicker.trim() || !editTradeEntryPrice || !editTradeStopLoss || !editTradeTakeProfit) {
+      alert('Заполните обязательные поля');
+      return;
+    }
+
+    const entryVal = parseFloat(editTradeEntryPrice);
+    const stopVal = parseFloat(editTradeStopLoss);
+    const takeVal = parseFloat(editTradeTakeProfit);
+    const lotsVal = parseInt(editTradeLots) || 0;
+
+    if (isNaN(entryVal) || isNaN(stopVal) || isNaN(takeVal) || lotsVal <= 0) {
+      alert('Укажите корректные числовые параметры');
+      return;
+    }
+
+    let finalStatus = editTradeStatus;
+    let exitVal = null;
+    let finalExitTime = editingTrade.exitTime;
+    let finalNoteExit = '';
+    let finalScreenshotExit = '';
+    let totalPnl = null;
+    let pnlPercent = null;
+
+    if (finalStatus === 'closed') {
+      exitVal = parseFloat(editTradeExitPrice);
+      if (isNaN(exitVal)) {
+        alert('Укажите корректную цену закрытия для закрытой сделки');
+        return;
+      }
+      finalNoteExit = editTradeNoteExit;
+      finalScreenshotExit = editTradeScreenshotExit;
+      if (!finalExitTime) {
+        finalExitTime = new Date().toISOString();
+      }
+      
+      const isShort = stopVal > entryVal;
+      const diff = exitVal - entryVal;
+      const pnlPerShare = isShort ? -diff : diff;
+      totalPnl = pnlPerShare * lotsVal * (editTradeMultiplier || editTradeLotSize || 1);
+      pnlPercent = (pnlPerShare / entryVal) * 100;
+    } else {
+      finalExitTime = null;
+      exitVal = null;
+      finalNoteExit = '';
+      finalScreenshotExit = '';
+      totalPnl = null;
+      pnlPercent = null;
+    }
+
+    const updatedTrades = data.trades.map(t => {
+      if (t.id === editingTrade.id) {
+        return {
+          ...t,
+          ticker: editTradeTicker.toUpperCase(),
+          lots: lotsVal,
+          lotSize: editTradeLotSize,
+          multiplier: editTradeMultiplier,
+          entryPrice: entryVal,
+          stopLoss: stopVal,
+          takeProfit: takeVal,
+          noteEntry: editTradeNoteEntry,
+          screenshotEntry: editTradeScreenshotEntry,
+          status: finalStatus,
+          exitPrice: exitVal,
+          exitTime: finalExitTime,
+          noteExit: finalNoteExit,
+          screenshotExit: finalScreenshotExit,
+          profitAmount: totalPnl,
+          profitPercent: pnlPercent
+        };
+      }
+      return t;
+    });
+
+    await saveData({
+      ...data,
+      trades: updatedTrades
+    });
+
+    setEditingTrade(null);
   };
 
   // Collapsible accordion controller
@@ -1031,6 +1167,7 @@ window.TradingJournalApp = function() {
                             
                             <div className="trade-meta-right">
                               <span className="active-trade-label">АКТИВНА</span>
+                              <button onClick={() => handleOpenEditTradeModal(t)} className="edit-trade-btn" title="Редактировать сделку" style={{ marginRight: '6px' }}>✏️</button>
                               <button onClick={() => handleDeleteTrade(t.id)} className="delete-trade-btn" title="Удалить сделку">🗑️</button>
                             </div>
                           </div>
@@ -1151,6 +1288,7 @@ window.TradingJournalApp = function() {
                                                         <span className={`pnl-label ${t.profitAmount >= 0 ? 'pnl-win' : 'pnl-loss'}`}>
                                                           {t.profitAmount >= 0 ? '+' : ''}{formatRub(t.profitAmount)} ({t.profitPercent >= 0 ? '+' : ''}{t.profitPercent.toFixed(2)}%)
                                                         </span>
+                                                        <button onClick={() => handleOpenEditTradeModal(t)} className="edit-trade-btn" title="Редактировать сделку" style={{ marginRight: '6px' }}>✏️</button>
                                                         <button onClick={() => handleDeleteTrade(t.id)} className="delete-trade-btn" title="Удалить сделку">🗑️</button>
                                                       </div>
                                                     </div>
@@ -1499,6 +1637,174 @@ window.TradingJournalApp = function() {
               <div className="modal-footer-trade">
                 <button type="button" onClick={() => setClosingTradeId(null)} className="cancel-trade-btn">Отмена</button>
                 <button type="submit" className="save-trade-btn">Сохранить и зафиксировать</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit Trade Form */}
+      {editingTrade && (
+        <div className="modal-overlay-trade">
+          <div className="modal-content-trade" style={{ maxWidth: '580px', maxHeight: '95vh', overflowY: 'auto' }}>
+            <div className="modal-header-trade">
+              <h3>✏️ Редактирование сделки #{editingTrade.id}</h3>
+              <button onClick={() => setEditingTrade(null)} className="modal-close-trade">✕</button>
+            </div>
+            
+            <form onSubmit={handleEditTradeSubmit} className="add-trade-form">
+              <div className="form-row">
+                <div className="form-group flex-2">
+                  <label>Ассет (тикер на MOEX)</label>
+                  <TickerAutocomplete 
+                    value={editTradeTicker} 
+                    onChange={setEditTradeTicker} 
+                    onSelectLot={setEditTradeLotSize}
+                    tickersList={tickersList}
+                  />
+                </div>
+                <div className="form-group flex-1">
+                  <label>Стоимость пункта</label>
+                  <input 
+                    type="number" 
+                    value={editTradeMultiplier} 
+                    onChange={(e) => setEditTradeMultiplier(parseFloat(e.target.value) || 1)} 
+                    className="trade-input"
+                    required
+                  />
+                </div>
+                <div className="form-group flex-1">
+                  <label>Лотность</label>
+                  <input 
+                    type="number" 
+                    value={editTradeLotSize} 
+                    onChange={(e) => setEditTradeLotSize(parseInt(e.target.value) || 1)} 
+                    className="trade-input"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Вход (цена)</label>
+                  <input 
+                    type="number" 
+                    step="0.0001" 
+                    value={editTradeEntryPrice} 
+                    onChange={(e) => setEditTradeEntryPrice(e.target.value)} 
+                    className="trade-input"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Стоп-лосс</label>
+                  <input 
+                    type="number" 
+                    step="0.0001" 
+                    value={editTradeStopLoss} 
+                    onChange={(e) => setEditTradeStopLoss(e.target.value)} 
+                    className="trade-input"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Тейк-профит</label>
+                  <input 
+                    type="number" 
+                    step="0.0001" 
+                    value={editTradeTakeProfit} 
+                    onChange={(e) => setEditTradeTakeProfit(e.target.value)} 
+                    className="trade-input"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Кол-во лотов</label>
+                  <input 
+                    type="number" 
+                    value={editTradeLots} 
+                    onChange={(e) => setEditTradeLots(parseInt(e.target.value) || 0)} 
+                    className="trade-input"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Мысли / Стратегия входа</label>
+                <textarea 
+                  value={editTradeNoteEntry} 
+                  onChange={(e) => setEditTradeNoteEntry(e.target.value)} 
+                  className="trade-textarea"
+                ></textarea>
+              </div>
+
+              <div className="screenshot-uploads">
+                <ImageZone 
+                  label="Вход" 
+                  imageUrl={editTradeScreenshotEntry} 
+                  onImageUploaded={setEditTradeScreenshotEntry}
+                  tempId={editingTrade.id}
+                />
+              </div>
+
+              <hr style={{ border: 'none', borderBottom: '1px solid rgba(255, 255, 255, 0.05)', margin: '10px 0' }} />
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Статус сделки</label>
+                  <select 
+                    value={editTradeStatus} 
+                    onChange={(e) => setEditTradeStatus(e.target.value)}
+                    className="trade-input"
+                    style={{ background: 'var(--bg-input)', color: '#fff' }}
+                  >
+                    <option value="active">Активная (в работе)</option>
+                    <option value="closed">Закрытая (архив)</option>
+                  </select>
+                </div>
+              </div>
+
+              {editTradeStatus === 'closed' && (
+                <>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Цена выхода</label>
+                      <input 
+                        type="number" 
+                        step="0.0001" 
+                        value={editTradeExitPrice} 
+                        onChange={(e) => setEditTradeExitPrice(e.target.value)} 
+                        className="trade-input"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label>Анализ выхода / Состояние / Уроки</label>
+                    <textarea 
+                      value={editTradeNoteExit} 
+                      onChange={(e) => setEditTradeNoteExit(e.target.value)} 
+                      className="trade-textarea"
+                    ></textarea>
+                  </div>
+
+                  <div className="screenshot-uploads">
+                    <ImageZone 
+                      label="Выход" 
+                      imageUrl={editTradeScreenshotExit} 
+                      onImageUploaded={setEditTradeScreenshotExit}
+                      tempId={editingTrade.id}
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="modal-footer-trade" style={{ marginTop: '15px' }}>
+                <button type="button" onClick={() => setEditingTrade(null)} className="cancel-trade-btn">Отмена</button>
+                <button type="submit" className="save-trade-btn">Сохранить изменения</button>
               </div>
             </form>
           </div>
