@@ -1142,6 +1142,7 @@ async function init() {
 
   const modalPinBtn = document.getElementById('modal-pin-btn');
   const modalEditBtn = document.getElementById('modal-edit-btn');
+  const modalCopyBtn = document.getElementById('modal-copy-btn');
   const modalAddSubtaskBtn = document.getElementById('modal-add-subtask-btn');
   const modalMoveBtn = document.getElementById('modal-move-btn');
   const modalDeleteBtn = document.getElementById('modal-delete-btn');
@@ -1190,6 +1191,20 @@ async function init() {
         closeTaskModal();
         renderTasks();
         renderDailyTasks();
+      }
+    });
+  }
+
+  if (modalCopyBtn) {
+    modalCopyBtn.addEventListener('click', async () => {
+      if (selectedTask) {
+        try {
+          await navigator.clipboard.writeText(selectedTask.text);
+          showToast('Текст задачи скопирован!', '📋');
+        } catch (err) {
+          console.error('Не удалось скопировать: ', err);
+        }
+        closeTaskModal();
       }
     });
   }
@@ -1527,4 +1542,28 @@ function openAnalyticsWindow() {
     const hover = localStorage.getItem('accent_hover') || '#b399ff';
     window.electronAPI.showAnalyticsWindow(accent, hover);
   }
+}
+
+function showToast(message, icon = 'ℹ️') {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-text">${message}</span>`;
+  container.appendChild(toast);
+
+  // Trigger browser paint then animate
+  requestAnimationFrame(() => {
+    toast.classList.add('show');
+  });
+
+  // Remove after 3 seconds
+  setTimeout(() => {
+    toast.classList.remove('show');
+    // Wait for transition to finish before removing from DOM
+    toast.addEventListener('transitionend', () => {
+      toast.remove();
+    });
+  }, 3000);
 }

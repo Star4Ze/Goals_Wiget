@@ -22,6 +22,51 @@ async function runGitCommand(args) {
   }
 }
 
+const localWrites = new Map();
+let fileWatcher = null;
+let fileWatcherDebounceTimers = new Map();
+
+function startFileWatcher() {
+  if (fileWatcher) {
+    fileWatcher.close();
+  }
+  try {
+    if (!fs.existsSync(TARGET_DIR)) {
+      fs.mkdirSync(TARGET_DIR, { recursive: true });
+    }
+    
+    fileWatcher = fs.watch(TARGET_DIR, (eventType, filename) => {
+      if (!filename || !filename.endsWith('.md')) return;
+      
+      // Debounce changes per file
+      if (fileWatcherDebounceTimers.has(filename)) {
+        clearTimeout(fileWatcherDebounceTimers.get(filename));
+      }
+      
+      const timer = setTimeout(() => {
+        fileWatcherDebounceTimers.delete(filename);
+        
+        // Check if this was a local write
+        const lastWrite = localWrites.get(filename);
+        if (lastWrite && Date.now() - lastWrite < 2000) {
+          return;
+        }
+        
+        logAction(`🔔 Файловый наблюдатель обнаружил внешнее изменение: ${filename}`);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('external-file-change', filename);
+        }
+      }, 150);
+      
+      fileWatcherDebounceTimers.set(filename, timer);
+    });
+    
+    logAction(`👁️ Запущен файловый наблюдатель для папки: ${TARGET_DIR}`);
+  } catch (err) {
+    logAction(`⚠️ Ошибка запуска файлового наблюдателя: ${err.message}`);
+  }
+}
+
 let isGitSyncing = false;
 let gitSyncPending = false;
 
@@ -1408,6 +1453,7 @@ app.on('web-contents-created', (event, contents) => {
 
 app.whenReady().then(() => {
   setupHandlers();
+  startFileWatcher();
   createWindow();
   
   // Запуск фоновой синхронизации Git при старте приложения через 2 секунды
