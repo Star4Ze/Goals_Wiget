@@ -41,15 +41,16 @@
     .window-container {
       width: 100%;
       height: 100%;
-      background: rgba(8, 10, 16, 0.92);
-      backdrop-filter: blur(25px);
-      -webkit-backdrop-filter: blur(25px);
+      background: rgba(8, 10, 16, var(--window-opacity, 0.92));
+      backdrop-filter: blur(var(--window-blur, 25px));
+      -webkit-backdrop-filter: blur(var(--window-blur, 25px));
       border: 1px solid var(--border-color);
       border-radius: 12px;
       display: flex;
       flex-direction: column;
       box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
       overflow: hidden;
+      transition: background 0.25s ease;
     }
 
     /* Window Header - Drag Region */
@@ -81,11 +82,18 @@
       color: var(--accent-color);
     }
 
-    .window-close-btn {
+    .window-header-controls {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      -webkit-app-region: no-drag;
+    }
+
+    .window-action-btn {
       background: none;
       border: none;
       color: var(--text-muted);
-      font-size: 16px;
+      font-size: 14px;
       cursor: pointer;
       width: 28px;
       height: 28px;
@@ -94,10 +102,14 @@
       align-items: center;
       justify-content: center;
       transition: all 0.2s;
-      -webkit-app-region: no-drag;
     }
 
-    .window-close-btn:hover {
+    .window-action-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--accent-color);
+    }
+
+    .window-action-btn.close:hover {
       background: rgba(255, 83, 112, 0.15);
       color: var(--danger-color);
     }
@@ -360,6 +372,131 @@
       display: none !important;
     }
 
+    /* Profile Tab Styling */
+    .profile-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+      flex-shrink: 0;
+    }
+
+    .profile-card-metric {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .profile-card-lbl {
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    .profile-card-val {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-main);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .profile-health-badge {
+      grid-column: span 3;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    }
+
+    .profile-health-badge.good {
+      background: rgba(61, 220, 132, 0.08);
+      border: 1px solid rgba(61, 220, 132, 0.2);
+      color: var(--success-color);
+    }
+
+    .profile-health-badge.warning {
+      background: rgba(255, 145, 0, 0.08);
+      border: 1px solid rgba(255, 145, 0, 0.2);
+      color: #ff9100;
+    }
+
+    .profile-health-badge.alert {
+      background: rgba(255, 83, 112, 0.08);
+      border: 1px solid rgba(255, 83, 112, 0.2);
+      color: var(--danger-color);
+    }
+
+    .profile-rendered-body {
+      flex: 1;
+      padding-top: 10px;
+    }
+
+    .profile-rendered-body h1, .profile-rendered-body h2, .profile-rendered-body h3 {
+      color: var(--accent-color);
+      margin-top: 18px;
+      margin-bottom: 8px;
+      font-weight: 600;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      padding-bottom: 4px;
+    }
+
+    .profile-rendered-body h1:first-child, .profile-rendered-body h2:first-child, .profile-rendered-body h3:first-child {
+      margin-top: 0;
+    }
+
+    .profile-rendered-body p {
+      margin-bottom: 12px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .profile-rendered-body ul, .profile-rendered-body ol {
+      margin-left: 20px;
+      margin-bottom: 14px;
+    }
+
+    .profile-rendered-body li {
+      margin-bottom: 5px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .profile-rendered-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 12.5px;
+    }
+
+    .profile-rendered-body th, .profile-rendered-body td {
+      border: 1px solid var(--border-color);
+      padding: 8px 12px;
+      text-align: left;
+    }
+
+    .profile-rendered-body th {
+      background: rgba(22, 28, 45, 0.6);
+      color: var(--accent-color);
+      font-weight: 600;
+    }
+
+    .profile-rendered-body tr:nth-child(even) {
+      background: rgba(255, 255, 255, 0.01);
+    }
+
     /* Editor Area */
     .editor-wrapper {
       flex: 1;
@@ -399,14 +536,13 @@
     /* AI Analysis Styles */
     .ai-control-box {
       background: rgba(161, 134, 241, 0.05);
-      border: 1px border var(--accent-color);
+      border: 1px solid rgba(161, 134, 241, 0.15);
       border-radius: 10px;
       padding: 16px;
       display: flex;
       flex-direction: column;
       align-items: flex-start;
       gap: 10px;
-      border: 1px solid rgba(161, 134, 241, 0.15);
     }
 
     .ai-status-text {
@@ -504,7 +640,7 @@
       color: var(--bg-dark);
     }
 
-    /* Modal Overlay (Create Connection) */
+    /* Modal Overlay (Universal) */
     .modal-overlay {
       position: fixed;
       top: 0;
@@ -532,7 +668,6 @@
       background: #111524;
       border: 1px solid var(--border-color-hover);
       border-radius: 12px;
-      width: 320px;
       padding: 18px 22px;
       box-shadow: 0 10px 35px rgba(0,0,0,0.6);
       display: flex;
@@ -569,7 +704,7 @@
     .form-group {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 6px;
     }
 
     .form-group label {
@@ -591,6 +726,21 @@
     .form-input:focus {
       border-color: var(--accent-color);
       background-color: var(--bg-input-focus);
+    }
+
+    /* Color circle selector inside connections settings */
+    .color-circle-option {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .color-circle-option.active {
+      border-color: #fff;
+      transform: scale(1.1);
     }
 
     /* AI Loading Indicator */
@@ -619,7 +769,10 @@
         <span>🤝</span>
         <h1>Мои связи — Картотека контактов</h1>
       </div>
-      <button class="window-close-btn" id="close-connections-btn" title="Закрыть">✕</button>
+      <div class="window-header-controls">
+        <button class="window-action-btn" id="connections-settings-btn" title="Настройки">⚙️</button>
+        <button class="window-action-btn close" id="close-connections-btn" title="Закрыть">✕</button>
+      </div>
     </div>
 
     <!-- Main Window Area -->
@@ -656,13 +809,24 @@
 
           <!-- Tabs -->
           <div class="details-tabs">
-            <button class="tab-btn active" id="tab-editor-btn">📝 Карточка</button>
+            <button class="tab-btn active" id="tab-profile-btn">📇 Профиль</button>
+            <button class="tab-btn" id="tab-editor-btn">✏️ Редактор</button>
             <button class="tab-btn" id="tab-ai-btn">🤖 ИИ-Анализ</button>
           </div>
 
           <div class="tab-content-container">
+            <!-- Profile Viewer Tab -->
+            <div class="tab-content" id="tab-content-profile">
+              <div class="profile-grid" id="profile-meta-grid">
+                <!-- Will be dynamically populated with YAML fields -->
+              </div>
+              <div class="profile-rendered-body" id="profile-body-content">
+                <!-- Rendered Markdown Body -->
+              </div>
+            </div>
+
             <!-- Markdown Editor Tab -->
-            <div class="tab-content" id="tab-content-editor">
+            <div class="tab-content hidden" id="tab-content-editor">
               <div class="editor-wrapper">
                 <textarea id="markdown-textarea" class="markdown-editor" placeholder="Содержимое карточки в Markdown..."></textarea>
                 <div class="action-row">
@@ -723,6 +887,30 @@
       <div style="display: flex; gap: 8px; margin-top: 8px;">
         <button class="btn" style="flex: 1;" id="create-modal-cancel">Отмена</button>
         <button class="btn primary" style="flex: 1;" id="create-modal-submit">Создать</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Connections Window Settings Modal Overlay -->
+  <div class="modal-overlay hidden" id="connections-settings-modal">
+    <div class="modal-content" style="width: 290px;">
+      <div class="modal-header-row">
+        <h3>⚙️ Настройки окна</h3>
+        <button class="modal-close-btn" id="connections-settings-close">✕</button>
+      </div>
+      <div class="form-group">
+        <label id="opacity-label">Прозрачность окна: 92%</label>
+        <input type="range" id="connections-opacity-slider" min="0.2" max="1.0" step="0.05" class="form-input" style="padding:0; accent-color:var(--accent-color); cursor:pointer;">
+      </div>
+      <div class="form-group">
+        <label id="blur-label">Размытие фона: 25px</label>
+        <input type="range" id="connections-blur-slider" min="0" max="40" step="1" class="form-input" style="padding:0; accent-color:var(--accent-color); cursor:pointer;">
+      </div>
+      <div class="form-group">
+        <label>Цветовой оттенок:</label>
+        <div class="color-palette" id="connections-color-palette" style="display:flex; flex-wrap:wrap; gap:8px; padding:4px 0;">
+          <!-- Will be rendered dynamically via JS -->
+        </div>
       </div>
     </div>
   </div>
