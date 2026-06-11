@@ -775,6 +775,86 @@ function renderTaskNode(task, options, depth = 0, indexLabel = '') {
       openTaskModal(task, e);
     };
     div.appendChild(optBtn);
+
+    // Make the task draggable and add event handlers for drag & drop
+    div.draggable = true;
+
+    div.ondragstart = (e) => {
+      div.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', JSON.stringify({
+        lineIndex: task.lineIndex,
+        fileName: fileName
+      }));
+    };
+
+    div.ondragend = () => {
+      div.classList.remove('dragging');
+      document.querySelectorAll('.task').forEach(el => {
+        el.classList.remove('drag-over-before', 'drag-over-after', 'drag-over-inside');
+      });
+    };
+
+    div.ondragover = (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+
+      if (div.classList.contains('dragging')) return;
+
+      const rect = div.getBoundingClientRect();
+      const relativeY = e.clientY - rect.top;
+      const height = rect.height;
+
+      div.classList.remove('drag-over-before', 'drag-over-after', 'drag-over-inside');
+
+      if (relativeY < height * 0.25) {
+        div.classList.add('drag-over-before');
+      } else if (relativeY > height * 0.75) {
+        div.classList.add('drag-over-after');
+      } else {
+        div.classList.add('drag-over-inside');
+      }
+    };
+
+    div.ondragleave = () => {
+      div.classList.remove('drag-over-before', 'drag-over-after', 'drag-over-inside');
+    };
+
+    div.ondrop = async (e) => {
+      e.preventDefault();
+      div.classList.remove('drag-over-before', 'drag-over-after', 'drag-over-inside');
+
+      try {
+        const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+        if (data && data.fileName === fileName) {
+          const sourceLineIndex = data.lineIndex;
+          const targetLineIndex = task.lineIndex;
+
+          if (sourceLineIndex === targetLineIndex) return;
+
+          const rect = div.getBoundingClientRect();
+          const relativeY = e.clientY - rect.top;
+          const height = rect.height;
+
+          let position = 'inside';
+          if (relativeY < height * 0.25) {
+            position = 'before';
+          } else if (relativeY > height * 0.75) {
+            position = 'after';
+          }
+
+          if (window.electronAPI && window.electronAPI.moveTask) {
+            const success = await window.electronAPI.moveTask(sourceLineIndex, targetLineIndex, position, fileName);
+            if (success) {
+              const reload = fileName === 'Ежедневные задачи' ? loadDailyTasks : loadObsidianTasks;
+              await reload();
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Drop error:', err);
+      }
+    };
   }
 
   group.appendChild(div);

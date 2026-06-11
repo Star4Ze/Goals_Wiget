@@ -253,6 +253,29 @@ function getTaskBlockSize(lines, P) {
   return size;
 }
 
+function shiftBlockIndent(blockLines, delta) {
+  if (delta === 0) return blockLines;
+  return blockLines.map(line => {
+    const match = line.match(/^(\s*)(.*)$/);
+    if (!match) return line;
+    const currentIndentStr = match[1];
+    const rest = match[2];
+    
+    let indent = 0;
+    for (let char of currentIndentStr) {
+      if (char === '\t') indent += 1;
+      else if (char === ' ') indent += 0.25;
+    }
+    indent = Math.round(indent);
+    
+    const newIndent = Math.max(0, indent + delta);
+    const isTab = currentIndentStr.includes('\t');
+    const newIndentStr = isTab ? '\t'.repeat(newIndent) : '    '.repeat(newIndent);
+    
+    return newIndentStr + rest;
+  });
+}
+
 function setTaskDoneState(line, done) {
   if (line.match(/\s*-\s*\[[ xX]\]\s*/)) {
     return line.replace(/-\s*\[[ xX]\]\s*/, done ? '- [x] ' : '- [ ] ');
@@ -908,6 +931,101 @@ function setupHandlers() {
       return false;
     } catch (err) {
       logAction(`Ошибка приоритезации задачи: ${err.message}`);
+      return false;
+    }
+  });
+
+  ipcMain.handle('move-task', async (event, sourceLineIndex, targetLineIndex, position, fileName) => {
+    const filePath = getFilePath(fileName);
+    try {
+      if (!fs.existsSync(filePath)) return false;
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const lines = content.split(/\r?\n/);
+      
+      if (sourceLineIndex < 0 || sourceLineIndex >= lines.length) {
+        return false;
+      }
+      
+      const size = getTaskBlockSize(lines, sourceLineIndex);
+      
+      // Safety Check: Prevent nesting a parent inside its own descendants
+      if (targetLineIndex >= sourceLineIndex && targetLineIndex < sourceLineIndex + size) {
+        logAction(`⚠️ Попытка переместить задачу саму в себя или в свои подзадачи.`);
+        return false;
+      }
+      
+      const oldParentLineIndex = getParentIndex(lines, sourceLineIndex);
+      
+      // Extract block
+      const block = lines.splice(sourceLineIndex, size);
+      
+      // Adjust target line index after splice
+      let adjustedTargetIndex = targetLineIndex;
+      if (sourceLineIndex < targetLineIndex) {
+        adjustedTargetIndex -= size;
+      }
+      
+      if (adjustedTargetIndex < 0 || adjustedTargetIndex > lines.length) {
+        return false;
+      }
+      
+      // Calculate delta indent
+      const rootLine = block[0];
+      const rootIndent = getLineIndent(rootLine);
+      
+      let newIndent = 0;
+      let insertIndex = adjustedTargetIndex;
+      
+      if (position === 'inside') {
+        const targetLine = lines[adjustedTargetIndex];
+        const targetIndent = getLineIndent(targetLine);
+        newIndent = targetIndent + 1;
+        
+        const targetBlockSize = getTaskBlockSize(lines, adjustedTargetIndex);
+        insertIndex = adjustedTargetIndex + targetBlockSize;
+        
+        // Ensure parent is not completed
+        lines[adjustedTargetIndex] = setTaskDoneState(lines[adjustedTargetIndex], false);
+      } else if (position === 'before') {
+        const targetLine = lines[adjustedTargetIndex];
+        newIndent = getLineIndent(targetLine);
+        insertIndex = adjustedTargetIndex;
+      } else if (position === 'after') {
+        const targetLine = lines[adjustedTargetIndex];
+        newIndent = getLineIndent(targetLine);
+        const targetBlockSize = getTaskBlockSize(lines, adjustedTargetIndex);
+        insertIndex = adjustedTargetIndex + targetBlockSize;
+      }
+      
+      const delta = newIndent - rootIndent;
+      const shiftedBlock = shiftBlockIndent(block, delta);
+      
+      lines.splice(insertIndex, 0, ...shiftedBlock);
+      
+      // Adjust oldParentLineIndex if it was after the insertion point (or if the insertion shifted it)
+      let adjustedOldParentIndex = oldParentLineIndex;
+      if (oldParentLineIndex >= 0) {
+        if (sourceLineIndex < oldParentLineIndex) {
+          adjustedOldParentIndex -= size;
+        }
+        if (insertIndex <= adjustedOldParentIndex) {
+          adjustedOldParentIndex += size;
+        }
+      }
+      
+      // Update parent completions
+      if (adjustedOldParentIndex >= 0) {
+        updateParentCompletion(lines, adjustedOldParentIndex);
+      }
+      updateParentCompletion(lines, insertIndex);
+      
+      fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
+      saveDailyTasksHistoryIfNeeded(fileName);
+      logAction(`↕ Перемещена задача со строки ${sourceLineIndex + 1} в позицию "${position}" относительно строки ${targetLineIndex + 1}`);
+      scheduleGitSync();
+      return true;
+    } catch (err) {
+      logAction(`Ошибка перемещения задачи: ${err.message}`);
       return false;
     }
   });
