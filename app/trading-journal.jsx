@@ -1230,7 +1230,10 @@ window.TradingJournalApp = function() {
                               {t.screenshotEntry ? (
                                 <img 
                                   src={t.screenshotEntry} 
-
+                                  alt="Вход" 
+                                  className="trade-thumbnail-img" 
+                                  onClick={() => setFullscreenTrade(t)}
+                                  title="Кликните для увеличения"
                                 />
                               ) : (
                                 <div className="empty-thumb-placeholder">Без скрина</div>
