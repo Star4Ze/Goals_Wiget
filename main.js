@@ -1585,9 +1585,39 @@ function setupHandlers() {
       
       const filePath = path.join(dirPath, `${safeName}.md`);
       if (fs.existsSync(filePath)) return false;
+
+      // Scan existing cards for PER-XXX IDs to auto-increment
+      let nextNum = 1;
+      try {
+        if (fs.existsSync(CONNECTIONS_DIR)) {
+          const scanDir = (dir) => {
+            const list = fs.readdirSync(dir);
+            list.forEach(file => {
+              const fullPath = path.join(dir, file);
+              const stat = fs.statSync(fullPath);
+              if (stat.isDirectory()) {
+                scanDir(fullPath);
+              } else if (file.endsWith('.md')) {
+                const content = fs.readFileSync(fullPath, 'utf-8');
+                const idMatch = content.match(/id:\s*PER-(\d+)/i);
+                if (idMatch) {
+                  const num = parseInt(idMatch[1]);
+                  if (num >= nextNum) {
+                    nextNum = num + 1;
+                  }
+                }
+              }
+            });
+          };
+          scanDir(CONNECTIONS_DIR);
+        }
+      } catch (e) {
+        logAction(`Ошибка при расчете следующего ID контакта: ${e.message}`);
+      }
+      const nextId = `PER-${String(nextNum).padStart(3, '0')}`;
       
       const defaultTemplate = `---
-id: PER-000
+id: ${nextId}
 статус: друг
 город: 
 телефон: 
@@ -1595,7 +1625,7 @@ id: PER-000
 дата_знакомства: YYYY-MM-DD
 последний_контакт: YYYY-MM-DD
 частота_поддежки_связей_дней: 30
-сила_связи: 5/10
+сила_связи: 
 ---
 
 # ${safeName}

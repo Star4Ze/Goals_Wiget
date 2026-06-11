@@ -33,17 +33,26 @@ document.addEventListener('DOMContentLoaded', () => {
   initUI();
   initSettingsValues();
   loadContacts();
-  checkGeminiKey();
+  checkLLMConfig();
 });
 
-// Check if Gemini key is set and display warnings/placeholders accordingly
-async function checkGeminiKey() {
-  if (window.electronAPI && window.electronAPI.getGeminiKey) {
-    const key = await window.electronAPI.getGeminiKey();
+// Check if LLM config is valid and display warnings/placeholders accordingly
+async function checkLLMConfig() {
+  if (window.electronAPI && window.electronAPI.getLLMConfig) {
+    const config = await window.electronAPI.getLLMConfig();
     const warning = document.getElementById('gemini-warning');
     const runBtn = document.getElementById('run-ai-btn');
     
-    if (!key) {
+    let isValid = false;
+    if (config.provider === 'gemini') {
+      isValid = !!config.geminiKey;
+      if (warning) warning.innerHTML = '⚠️ API ключ Gemini не задан в настройках ИИ (иконка ⚙️)!';
+    } else {
+      isValid = !!config.localUrl;
+      if (warning) warning.innerHTML = '⚠️ URL локального LLM не задан в настройках ИИ (иконка ⚙️)!';
+    }
+    
+    if (!isValid) {
       if (warning) warning.style.display = 'block';
       if (runBtn) runBtn.disabled = true;
     } else {
@@ -117,6 +126,52 @@ function initSettingsValues() {
       palette.appendChild(circle);
     });
   }
+
+  // LLM settings load
+  const providerSelect = document.getElementById('connections-llm-provider');
+  const geminiGroup = document.getElementById('connections-gemini-group');
+  const localGroup = document.getElementById('connections-local-group');
+  const geminiKeyInput = document.getElementById('connections-gemini-key');
+  const localUrlInput = document.getElementById('connections-local-url');
+  const localModelInput = document.getElementById('connections-local-model');
+
+  if (window.electronAPI && window.electronAPI.getLLMConfig) {
+    window.electronAPI.getLLMConfig().then(config => {
+      if (providerSelect) providerSelect.value = config.provider || 'gemini';
+      if (geminiKeyInput) geminiKeyInput.value = config.geminiKey || '';
+      if (localUrlInput) localUrlInput.value = config.localUrl || 'http://localhost:11434/v1';
+      if (localModelInput) localModelInput.value = config.localModel || 'llama3';
+
+      const isLocal = config.provider === 'local';
+      if (geminiGroup) geminiGroup.style.display = isLocal ? 'none' : 'flex';
+      if (localGroup) localGroup.style.display = isLocal ? 'flex' : 'none';
+      
+      checkLLMConfig();
+    });
+  }
+
+  // Save handlers
+  const saveLLMConfig = async () => {
+    if (!window.electronAPI || !window.electronAPI.saveLLMConfig) return;
+    const provider = providerSelect?.value || 'gemini';
+    const geminiKey = geminiKeyInput?.value.trim() || '';
+    const localUrl = localUrlInput?.value.trim() || 'http://localhost:11434/v1';
+    const localModel = localModelInput?.value.trim() || 'llama3';
+
+    await window.electronAPI.saveLLMConfig({ provider, geminiKey, localUrl, localModel });
+    checkLLMConfig(); // Refresh warnings
+  };
+
+  providerSelect?.addEventListener('change', (e) => {
+    const isLocal = e.target.value === 'local';
+    if (geminiGroup) geminiGroup.style.display = isLocal ? 'none' : 'flex';
+    if (localGroup) localGroup.style.display = isLocal ? 'flex' : 'none';
+    saveLLMConfig();
+  });
+
+  geminiKeyInput?.addEventListener('change', saveLLMConfig);
+  localUrlInput?.addEventListener('change', saveLLMConfig);
+  localModelInput?.addEventListener('change', saveLLMConfig);
 }
 
 function initUI() {
