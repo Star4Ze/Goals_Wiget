@@ -336,6 +336,7 @@ window.TradingJournalApp = function() {
   const [noteEntry, setNoteEntry] = useState('');
   const [screenshotEntry, setScreenshotEntry] = useState('');
   const [tempTradeId, setTempTradeId] = useState(() => Date.now().toString());
+  const [lotsInput, setLotsInput] = useState('');
 
   // Edit risk settings states
   const [isEditingSettings, setIsEditingSettings] = useState(false);
@@ -368,8 +369,8 @@ window.TradingJournalApp = function() {
   // Accordion collapsed state: store keys of open sections
   const [expandedSections, setExpandedSections] = useState({});
 
-  // Fullscreen image url
-  const [fullscreenImageUrl, setFullscreenImageUrl] = useState(null);
+  // Fullscreen trade object
+  const [fullscreenTrade, setFullscreenTrade] = useState(null);
 
   // T-Bank Token Configuration states
   const [tbankToken, setTbankToken] = useState('');
@@ -452,6 +453,14 @@ window.TradingJournalApp = function() {
       });
     }
   }, []);
+  const autoCalculateTakeProfit = (epStr, slStr) => {
+    const ep = parseFloat(epStr);
+    const sl = parseFloat(slStr);
+    if (!isNaN(ep) && !isNaN(sl)) {
+      const tp = ep + 2 * (ep - sl);
+      setTakeProfit(Number(tp.toFixed(4)).toString());
+    }
+  };
 
   // Watch ticker changes to auto-update lot size and fetch last price from T-Bank API
   useEffect(() => {
@@ -467,12 +476,12 @@ window.TradingJournalApp = function() {
         window.electronAPI.getTickerPrice(upperTicker).then(price => {
           if (price) {
             setEntryPrice(price.toString());
+            autoCalculateTakeProfit(price.toString(), stopLoss);
           }
         });
       }
     }
   }, [ticker, tickersList]);
-
   // Watch editTradeTicker changes to auto-update lot size and multiplier
   useEffect(() => {
     if (!editingTrade) return;
@@ -495,12 +504,19 @@ window.TradingJournalApp = function() {
     localStorage.setItem('trade_accent', accentColor);
     localStorage.setItem('trade_accent_hover', accentHover);
   }, [accentColor, accentHover]);
-
   // Apply opacity setting changes
   useEffect(() => {
     localStorage.setItem('trade_opacity', windowOpacity.toString());
   }, [windowOpacity]);
 
+  // Sync recommended lots to lotsInput when calculatedMaxLots changes
+  useEffect(() => {
+    if (calculatedMaxLots > 0) {
+      setLotsInput(calculatedMaxLots.toString());
+    } else {
+      setLotsInput('');
+    }
+  }, [calculatedMaxLots]);
   // Initialize data from main Electron process
   useEffect(() => {
     async function loadData() {
@@ -537,17 +553,18 @@ window.TradingJournalApp = function() {
       window.electronAPI.closeWindow();
     }
   };
-
   // Live calculator helper variables
   const calculatedRiskAmt = entryPrice && stopLoss ? Math.abs(parseFloat(entryPrice) - parseFloat(stopLoss)) : 0;
   const maxRiskPerTradeAmount = (data.deposit * data.settings.maxRiskPerTradePercent) / 100;
   const calculatedMaxLots = calculatedRiskAmt && multiplier 
     ? Math.floor(maxRiskPerTradeAmount / (calculatedRiskAmt * multiplier)) 
     : 0;
-  const totalPositionCost = entryPrice && calculatedMaxLots 
-    ? calculatedMaxLots * multiplier * parseFloat(entryPrice) 
-    : 0;
 
+  const finalLots = parseInt(lotsInput) || calculatedMaxLots || 0;
+
+  const totalPositionCost = entryPrice && finalLots 
+    ? finalLots * multiplier * parseFloat(entryPrice) 
+    : 0;
   // Monthly stats calculations
   const today = new Date();
   const currentMonthTrades = data.trades.filter(t => {
@@ -601,12 +618,12 @@ window.TradingJournalApp = function() {
       return;
     }
 
-    if (calculatedMaxLots <= 0) {
-      alert('Риск-менеджер: Расчетное число лотов равно 0. Сделка отклонена из-за недостаточного капитала или слишком близкого/далекого стоп-лосса.');
+    if (finalLots <= 0) {
+      alert('Риск-менеджер: Расчетное число лотов равно 0 или не указано. Укажите корректный объем.');
       return;
     }
 
-    const plannedTradeRisk = calculatedRiskAmt * calculatedMaxLots * multiplier;
+    const plannedTradeRisk = calculatedRiskAmt * finalLots * multiplier;
     if (plannedTradeRisk > remainingMonthlyRiskAmount) {
       const proceed = confirm(`Предупреждение риск-менеджера:\nЭта сделка добавит риск в ${formatRub(plannedTradeRisk)}, что превышает оставшийся лимит потерь на месяц (${formatRub(remainingMonthlyRiskAmount)}).\nВы уверены, что хотите открыть сделку?`);
       if (!proceed) return;
@@ -620,7 +637,7 @@ window.TradingJournalApp = function() {
       entryPrice: parseFloat(entryPrice),
       stopLoss: parseFloat(stopLoss),
       takeProfit: parseFloat(takeProfit),
-      lots: calculatedMaxLots,
+      lots: finalLots,
       entryTime: new Date().toISOString(),
       exitTime: null,
       exitPrice: null,
@@ -648,9 +665,7 @@ window.TradingJournalApp = function() {
     setTakeProfit('');
     setNoteEntry('');
     setScreenshotEntry('');
-    setTempTradeId(Date.now().toString());
-    setIsAddFormOpen(false); // Close modal overlay
-  };
+    setLotsInput('');
 
   // Opening the close trade form modal
   const handleOpenCloseTradeModal = (trade) => {
@@ -1409,7 +1424,6 @@ window.TradingJournalApp = function() {
                         />
                       </div>
                     </div>
-
                     <div className="form-row">
                       <div className="form-group">
                         <label>Вход (цена)</label>
@@ -1417,7 +1431,10 @@ window.TradingJournalApp = function() {
                           type="number" 
                           step="0.0001" 
                           value={entryPrice} 
-                          onChange={(e) => setEntryPrice(e.target.value)} 
+                          onChange={(e) => {
+                            setEntryPrice(e.target.value);
+                            autoCalculateTakeProfit(e.target.value, stopLoss);
+                          }} 
                           placeholder="0.00" 
                           className="trade-input"
                           required
@@ -1429,13 +1446,15 @@ window.TradingJournalApp = function() {
                           type="number" 
                           step="0.0001" 
                           value={stopLoss} 
-                          onChange={(e) => setStopLoss(e.target.value)} 
+                          onChange={(e) => {
+                            setStopLoss(e.target.value);
+                            autoCalculateTakeProfit(entryPrice, e.target.value);
+                          }} 
                           placeholder="0.00" 
                           className="trade-input"
                           required
                         />
-                      </div>
-                      <div className="form-group">
+                      </div>                      <div className="form-group">
                         <label>Тейк-профит</label>
                         <input 
                           type="number" 
