@@ -424,6 +424,112 @@ function calculateDaysSince(dateStr) {
   }
 }
 
+// Helper to parse markdown into template sections
+function parseProfileSections(markdownText) {
+  const sections = {
+    'о человеке': '',
+    'знакомство': '',
+    'контакты': '',
+    'связи': '',
+    'заметки': '',
+    'план общения (ии)': '',
+    'other': ''
+  };
+
+  const lines = markdownText.split(/\r?\n/);
+  let currentKey = 'other';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith('## ')) {
+      const headerTitle = trimmed.substring(3).trim().toLowerCase();
+      if (headerTitle.includes('о человеке')) {
+        currentKey = 'о человеке';
+      } else if (headerTitle.includes('знакомство')) {
+        currentKey = 'знакомство';
+      } else if (headerTitle.includes('контакты')) {
+        currentKey = 'контакты';
+      } else if (headerTitle.includes('связи')) {
+        currentKey = 'связи';
+      } else if (headerTitle.includes('заметки')) {
+        currentKey = 'заметки';
+      } else if (headerTitle.includes('план общения')) {
+        currentKey = 'план общения (ии)';
+      } else {
+        currentKey = 'other';
+      }
+      continue;
+    }
+
+    if (trimmed.startsWith('# ')) {
+      continue;
+    }
+
+    sections[currentKey] += line + '\n';
+  }
+
+  for (const k in sections) {
+    sections[k] = sections[k].trim();
+  }
+
+  return sections;
+}
+
+// Helper to create an accordion DOM element
+function createAccordion(id, title, icon, contentMarkdown, defaultOpen) {
+  const container = document.createElement('div');
+  container.className = 'profile-accordion';
+  
+  const isCollapsedKey = `accordion_collapsed_${id}`;
+  let isCollapsed = localStorage.getItem(isCollapsedKey) === 'true';
+  if (localStorage.getItem(isCollapsedKey) === null) {
+    isCollapsed = !defaultOpen;
+  }
+
+  if (isCollapsed) {
+    container.classList.add('collapsed');
+  }
+
+  const header = document.createElement('div');
+  header.className = 'profile-accordion-header';
+  header.innerHTML = `
+    <div class="profile-accordion-title">
+      <span>${icon}</span>
+      <span>${title}</span>
+    </div>
+    <span class="profile-accordion-chevron">▼</span>
+  `;
+
+  const body = document.createElement('div');
+  body.className = 'profile-accordion-body';
+  
+  if (!contentMarkdown || contentMarkdown.trim() === '' || contentMarkdown.trim() === '-') {
+    body.innerHTML = `<p style="color: var(--text-muted); font-style: italic; font-size:11.5px;">Нет данных. Заполните в редакторе.</p>`;
+  } else {
+    body.innerHTML = renderMarkdownHTML(contentMarkdown);
+  }
+
+  header.onclick = () => {
+    const nowCollapsed = container.classList.toggle('collapsed');
+    localStorage.setItem(isCollapsedKey, nowCollapsed);
+  };
+
+  container.appendChild(header);
+  container.appendChild(body);
+  return container;
+}
+
+// Navigate to a contact by name (Wiki link support)
+function navigateToContact(name) {
+  const found = contacts.find(c => c.name.toLowerCase() === name.toLowerCase());
+  if (found) {
+    selectContact(found);
+  }
+}
+window.navigateToContact = navigateToContact;
+
 // Beautiful visualized profile tab renderer
 function renderProfileCard() {
   const content = document.getElementById('markdown-textarea').value;
@@ -431,9 +537,6 @@ function renderProfileCard() {
   
   const gridContainer = document.getElementById('profile-meta-grid');
   const bodyContainer = document.getElementById('profile-body-content');
-  
-  // Clean MD text from AI recommendations if displayed in main profile
-  const mainMarkdown = markdown.split('## План общения (ИИ)')[0].trim();
   
   // Set up frontmatter fields
   const status = frontmatter['статус'] || 'Не указан';
@@ -500,8 +603,27 @@ function renderProfileCard() {
     </div>
   `;
 
-  // Render markdown body
-  bodyContainer.innerHTML = renderMarkdownHTML(mainMarkdown);
+  // Render collapsible accordions instead of single raw markdown
+  const sections = parseProfileSections(markdown);
+  bodyContainer.innerHTML = '';
+
+  const accordionDefinitions = [
+    { id: 'about', title: 'О человеке', icon: '👤', sectionKey: 'о человеке', defaultOpen: true },
+    { id: 'acquaintance', title: 'Знакомство', icon: '🗺️', sectionKey: 'знакомство', defaultOpen: true },
+    { id: 'contacts', title: 'История контактов', icon: '📅', sectionKey: 'контакты', defaultOpen: true },
+    { id: 'relations', title: 'Связи', icon: '🔗', sectionKey: 'связи', defaultOpen: true },
+    { id: 'notes', title: 'Заметки', icon: '📝', sectionKey: 'заметки', defaultOpen: true },
+    { id: 'ai-plan', title: 'Рекомендации ИИ', icon: '🤖', sectionKey: 'план общения (ии)', defaultOpen: false }
+  ];
+
+  accordionDefinitions.forEach(def => {
+    const sectionContent = sections[def.sectionKey] || '';
+    if (def.id === 'ai-plan' && !sectionContent) {
+      return; 
+    }
+    const acc = createAccordion(def.id, def.title, def.icon, sectionContent, def.defaultOpen);
+    bodyContainer.appendChild(acc);
+  });
 }
 
 // Advanced Markdown to HTML parser supporting tables and bullet lists
@@ -517,6 +639,18 @@ function renderMarkdownHTML(md) {
     .replace(/^# (.*$)/gim, '<h1>$1</h1>')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+  // Parse Wiki links: [[Name]] or [[Name|Alias]]
+  html = html.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (match, p1, p2) => {
+    const contactName = p1.trim();
+    const displayName = p2 ? p2.trim() : contactName;
+    
+    const exists = contacts.some(c => c.name.toLowerCase() === contactName.toLowerCase());
+    if (exists) {
+      return `<span class="wiki-link clickable" onclick="navigateToContact('${contactName.replace(/'/g, "\\'")}')">${displayName}</span>`;
+    }
+    return `<span class="wiki-link missing" title="Контакт не найден в картотеке">${displayName}</span>`;
+  });
 
   const lines = html.split('\n');
   let inList = false;
