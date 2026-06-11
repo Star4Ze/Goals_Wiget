@@ -1359,7 +1359,7 @@ window.TradingJournalApp = function() {
                                                             src={t.screenshotEntry} 
                                                             alt="Вход" 
                                                             className="trade-thumbnail-img" 
-                                                            onClick={() => setFullscreenImageUrl(t.screenshotEntry)}
+                                                            onClick={() => setFullscreenTrade(t)}
                                                             title="Кликните для увеличения"
                                                           />
                                                         ) : (
@@ -1370,7 +1370,7 @@ window.TradingJournalApp = function() {
                                                             src={t.screenshotExit} 
                                                             alt="Выход" 
                                                             className="trade-thumbnail-img" 
-                                                            onClick={() => setFullscreenImageUrl(t.screenshotExit)}
+                                                            onClick={() => setFullscreenTrade(t)}
                                                             title="Кликните для увеличения"
                                                           />
                                                         ) : (
@@ -1872,10 +1872,10 @@ window.TradingJournalApp = function() {
       )}
 
       {/* Fullscreen Screenshot Overlay Modal */}
-      {fullscreenImageUrl && (
+      {fullscreenTrade && (
         <ImageFullscreenModal 
-          url={fullscreenImageUrl} 
-          onClose={() => setFullscreenImageUrl(null)} 
+          trade={fullscreenTrade} 
+          onClose={() => setFullscreenTrade(null)} 
         />
       )}
     </div>
