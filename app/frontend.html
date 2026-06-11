@@ -1571,6 +1571,26 @@
   </style>
 </head>
 <body>
+  <script>
+    // Capture errors and console logs to log.txt for debugging
+    window.onerror = function(message, source, lineno, colno, error) {
+      if (window.electronAPI && window.electronAPI.logAction) {
+        window.electronAPI.logAction(`[Renderer Error] ${message} at ${source}:${lineno}:${colno}`);
+      }
+    };
+    window.onunhandledrejection = function(event) {
+      if (window.electronAPI && window.electronAPI.logAction) {
+        window.electronAPI.logAction(`[Renderer Promise Rejection] ${event.reason}`);
+      }
+    };
+    const origError = console.error;
+    console.error = function(...args) {
+      if (window.electronAPI && window.electronAPI.logAction) {
+        window.electronAPI.logAction(`[Renderer Console Error] ${args.join(' ')}`);
+      }
+      origError.apply(console, args);
+    };
+  </script>
   <div id="root"></div>
 
   <!-- React 18 & ReactDOM from CDN -->
