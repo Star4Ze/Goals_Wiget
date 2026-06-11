@@ -530,6 +530,19 @@ window.TradingJournalApp = function() {
     localStorage.setItem('trade_opacity', windowOpacity.toString());
   }, [windowOpacity]);
 
+  // Live calculator helper variables
+  const calculatedRiskAmt = entryPrice && stopLoss ? Math.abs(parseFloat(entryPrice) - parseFloat(stopLoss)) : 0;
+  const maxRiskPerTradeAmount = (data.deposit * data.settings.maxRiskPerTradePercent) / 100;
+  const calculatedMaxLots = calculatedRiskAmt && multiplier 
+    ? Math.floor(maxRiskPerTradeAmount / (calculatedRiskAmt * multiplier)) 
+    : 0;
+
+  const finalLots = parseInt(lotsInput) || calculatedMaxLots || 0;
+
+  const totalPositionCost = entryPrice && finalLots 
+    ? finalLots * multiplier * parseFloat(entryPrice) 
+    : 0;
+
   // Sync recommended lots to lotsInput when calculatedMaxLots changes
   useEffect(() => {
     if (calculatedMaxLots > 0) {
@@ -574,18 +587,7 @@ window.TradingJournalApp = function() {
       window.electronAPI.closeWindow();
     }
   };
-  // Live calculator helper variables
-  const calculatedRiskAmt = entryPrice && stopLoss ? Math.abs(parseFloat(entryPrice) - parseFloat(stopLoss)) : 0;
-  const maxRiskPerTradeAmount = (data.deposit * data.settings.maxRiskPerTradePercent) / 100;
-  const calculatedMaxLots = calculatedRiskAmt && multiplier 
-    ? Math.floor(maxRiskPerTradeAmount / (calculatedRiskAmt * multiplier)) 
-    : 0;
 
-  const finalLots = parseInt(lotsInput) || calculatedMaxLots || 0;
-
-  const totalPositionCost = entryPrice && finalLots 
-    ? finalLots * multiplier * parseFloat(entryPrice) 
-    : 0;
   // Monthly stats calculations
   const today = new Date();
   const currentMonthTrades = data.trades.filter(t => {
