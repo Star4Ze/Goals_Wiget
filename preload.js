@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onBreakWindowClosed: (callback) => ipcRenderer.on('break-window-closed', callback),
   onDayChanged: (callback) => ipcRenderer.on('day-changed', (event, today) => callback(today)),
   onExternalFileChange: (callback) => ipcRenderer.on('external-file-change', (event, filename) => callback(filename)),
+  onTaskAddedExternally: (callback) => ipcRenderer.on('task-added-externally', (event, data) => callback(data)),
   moveTask: (sourceLineIndex, targetLineIndex, position, fileName) => ipcRenderer.invoke('move-task', sourceLineIndex, targetLineIndex, position, fileName),
 
   // Trading Journal additions

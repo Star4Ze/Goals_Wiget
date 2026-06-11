@@ -29,6 +29,10 @@
         <span class="addon-icon">📈</span>
         <span class="addon-name">TradingDiary</span>
       </button>
+      <button id="addon-connections-btn" class="addon-btn" title="Мои связи">
+        <span class="addon-icon">🤝</span>
+        <span class="addon-name">Мои связи</span>
+      </button>
     </div>
     <div class="stats goal-content" id="goal-stats">
       <div class="stat"><span class="label">Осталось</span><span class="value" id="remain">—</span></div>
@@ -231,6 +235,15 @@
             </div>
             <button id="test-break-btn" class="settings-action-btn" style="align-self: flex-start; color: var(--accent-color); padding: 6px 12px; margin-top: 4px;">⚡ Тест сигнала</button>
           </div>
+        </div>
+      </div>
+
+      <!-- Раздел: Настройки ИИ -->
+      <div class="settings-section">
+        <div class="settings-section-title">🤖 Настройки ИИ (Gemini)</div>
+        <div class="setting-row">
+          <label for="gemini-key-input">Ключ API Gemini:</label>
+          <input type="password" id="gemini-key-input" class="settings-input" placeholder="Введите API ключ (AIzaSy...)">
         </div>
       </div>
 

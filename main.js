@@ -484,6 +484,7 @@ function saveDailyTasksHistoryIfNeeded(fileName) {
 function ensureDailyTasksReady() {
   const filePath = getFilePath(DAILY_TASKS_FILE_NAME);
   if (!fs.existsSync(filePath)) {
+    localWrites.set(path.basename(filePath), Date.now());
     fs.writeFileSync(filePath, "- [ ] Утренняя проверка целей\n", "utf-8");
     saveDailyTasksHistory();
     return;
@@ -496,6 +497,7 @@ function ensureDailyTasksReady() {
 
   if (config.lastDailyResetDate !== today) {
     const resetLines = resetDoneTasks(lines);
+    localWrites.set(path.basename(filePath), Date.now());
     fs.writeFileSync(filePath, resetLines.join('\n'), 'utf-8');
     saveConfigValue({ lastDailyResetDate: today });
     saveDailyTasksHistory(); // Save the initial unchecked state of daily tasks for this date
@@ -722,6 +724,7 @@ function setupHandlers() {
         .map(file => path.basename(file, '.md'));
       
       if (files.length === 0) {
+        localWrites.set("Дела.md", Date.now());
         fs.writeFileSync(path.join(TARGET_DIR, "Дела.md"), "- [ ] Моя первая задача\n", "utf-8");
         files.push("Дела");
       }
@@ -737,6 +740,7 @@ function setupHandlers() {
       if (fileName === DAILY_TASKS_FILE_NAME) return false;
       const filePath = getFilePath(fileName);
       if (!fs.existsSync(filePath)) {
+        localWrites.set(path.basename(filePath), Date.now());
         fs.writeFileSync(filePath, "", "utf-8");
         logAction(`📂 Создан новый файл задач: ${fileName}.md`);
         scheduleGitSync();
@@ -760,6 +764,8 @@ function setupHandlers() {
       const newPath = getFilePath(safeNewName);
       if (!fs.existsSync(oldPath)) return { success: false, error: 'missing' };
       if (fs.existsSync(newPath)) return { success: false, error: 'exists' };
+      localWrites.set(path.basename(oldPath), Date.now());
+      localWrites.set(path.basename(newPath), Date.now());
       fs.renameSync(oldPath, newPath);
       logAction(`📂 Файл задач переименован: ${oldName}.md → ${safeNewName}.md`);
       scheduleGitSync();
@@ -775,6 +781,7 @@ function setupHandlers() {
       if (fileName === DAILY_TASKS_FILE_NAME) return false;
       const filePath = getFilePath(fileName);
       if (!fs.existsSync(filePath)) return false;
+      localWrites.set(path.basename(filePath), Date.now());
       fs.unlinkSync(filePath);
       logAction(`🗑️ Удален файл задач: ${fileName}.md`);
       scheduleGitSync();
@@ -806,10 +813,15 @@ function setupHandlers() {
         ? newTask + '\n' + content 
         : newTask + '\n';
         
+      localWrites.set(path.basename(filePath), Date.now());
       fs.writeFileSync(filePath, newContent, 'utf-8');
       saveDailyTasksHistoryIfNeeded(fileName);
       logAction(`📝 Добавлена новая задача в начало ${path.basename(filePath)}: ${taskText}`);
       scheduleGitSync();
+
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('task-added-externally', { taskText, fileName });
+      }
       return true;
     } catch (err) {
       logAction(`Ошибка добавления задачи: ${err.message}`);
@@ -845,6 +857,7 @@ function setupHandlers() {
           }
           lines.push(...taskBlock);
         }
+        localWrites.set(path.basename(filePath), Date.now());
         fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
         saveDailyTasksHistoryIfNeeded(fileName);
         logAction(`✅ Выполнена задача на строке ${lineIndex + 1} в ${path.basename(filePath)}`);
@@ -868,6 +881,7 @@ function setupHandlers() {
         const size = getTaskBlockSize(lines, lineIndex);
         lines.splice(lineIndex, size);
         
+        localWrites.set(path.basename(filePath), Date.now());
         fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
         saveDailyTasksHistoryIfNeeded(fileName);
         logAction(`🗑️ Удалена задача (и её подзадачи, всего строк: ${size}) с индекса ${lineIndex + 1} в ${path.basename(filePath)}`);
@@ -896,6 +910,7 @@ function setupHandlers() {
           const newLine = `${indentStr}- ${checkbox}${newText}`;
           lines[lineIndex] = newLine;
           
+          localWrites.set(path.basename(filePath), Date.now());
           fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
           saveDailyTasksHistoryIfNeeded(fileName);
           logAction(`✏️ Отредактирована задача на строке ${lineIndex + 1}: "${newText}"`);
@@ -933,6 +948,7 @@ function setupHandlers() {
         lines.splice(insertIndex, 0, subtaskLine);
         lines[parentLineIndex] = setTaskDoneState(lines[parentLineIndex], false);
         updateParentCompletion(lines, parentLineIndex);
+        localWrites.set(path.basename(filePath), Date.now());
         fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
         saveDailyTasksHistoryIfNeeded(fileName);
         logAction(`↳ Добавлена подзадача к строке ${parentLineIndex + 1}: "${subtaskText}"`);
@@ -968,6 +984,7 @@ function setupHandlers() {
           logAction(`📌 Подзадача со строки ${lineIndex + 1} закреплена наверху у родителя на строке ${actualParentIndex + 1}`);
         }
         
+        localWrites.set(path.basename(filePath), Date.now());
         fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
         saveDailyTasksHistoryIfNeeded(fileName);
         scheduleGitSync();
@@ -1064,6 +1081,7 @@ function setupHandlers() {
       }
       updateParentCompletion(lines, insertIndex);
       
+      localWrites.set(path.basename(filePath), Date.now());
       fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
       saveDailyTasksHistoryIfNeeded(fileName);
       logAction(`↕ Перемещена задача со строки ${sourceLineIndex + 1} в позицию "${position}" относительно строки ${targetLineIndex + 1}`);
@@ -1098,6 +1116,7 @@ function setupHandlers() {
           }
         }
         
+        localWrites.set(path.basename(sourcePath), Date.now());
         fs.writeFileSync(sourcePath, sourceLines.join('\n'), 'utf-8');
         
         let targetContent = fs.readFileSync(targetPath, 'utf-8');
@@ -1105,6 +1124,7 @@ function setupHandlers() {
           targetContent += '\n';
         }
         targetContent += taskBlock.join('\n') + '\n';
+        localWrites.set(path.basename(targetPath), Date.now());
         fs.writeFileSync(targetPath, targetContent, 'utf-8');
         
         logAction(`📂 Перенесена задача со строки ${lineIndex + 1} из "${sourceFileName}" в "${targetFileName}"`);

@@ -1261,9 +1261,31 @@ async function init() {
   }
   
   if (window.electronAPI && window.electronAPI.onExternalFileChange) {
-    window.electronAPI.onExternalFileChange(() => {
-      loadObsidianTasks();
-      loadDailyTasks();
+    window.electronAPI.onExternalFileChange((filename) => {
+      if (!filename) {
+        loadObsidianTasks();
+        loadDailyTasks();
+        return;
+      }
+      const baseName = filename.replace(/\.md$/, '');
+      if (baseName === activeFileName) {
+        loadObsidianTasks();
+        showToast(`Файл "${activeFileName}" обновлен извне`, '🔄');
+      } else if (baseName === 'Ежедневные задачи') {
+        loadDailyTasks();
+        showToast('Ежедневные задачи обновлены извне', '🔄');
+      }
+    });
+  }
+
+  if (window.electronAPI && window.electronAPI.onTaskAddedExternally) {
+    window.electronAPI.onTaskAddedExternally(({ taskText, fileName }) => {
+      if (fileName === activeFileName) {
+        loadObsidianTasks();
+      } else if (fileName === 'Ежедневные задачи') {
+        loadDailyTasks();
+      }
+      showToast(`Добавлено дело: "${taskText}"`, '📝');
     });
   }
   
@@ -1271,6 +1293,13 @@ async function init() {
   document.getElementById('addon-trading-btn')?.addEventListener('click', () => {
     if (window.electronAPI && window.electronAPI.openTradingJournal) {
       window.electronAPI.openTradingJournal();
+    }
+  });
+
+  // Open connections window
+  document.getElementById('addon-connections-btn')?.addEventListener('click', () => {
+    if (window.electronAPI && window.electronAPI.openConnectionsWindow) {
+      window.electronAPI.openConnectionsWindow();
     }
   });
   
@@ -1377,6 +1406,13 @@ function openSettingsModal() {
       const savedPath = localStorage.getItem('break_media_path') || '';
       mediaInput.value = savedPath ? savedPath.split(/[\\\/]/).pop() : '';
       mediaInput.title = savedPath;
+    }
+
+    const geminiInput = document.getElementById('gemini-key-input');
+    if (geminiInput && window.electronAPI && window.electronAPI.getGeminiKey) {
+      window.electronAPI.getGeminiKey().then(key => {
+        geminiInput.value = key || '';
+      });
     }
 
     modal.classList.remove('hidden');
@@ -1520,6 +1556,16 @@ function initSettingsListeners() {
   // Test alarm
   document.getElementById('test-break-btn')?.addEventListener('click', () => {
     triggerBreakWindow();
+  });
+
+  // Save Gemini Key
+  document.getElementById('gemini-key-input')?.addEventListener('change', async (e) => {
+    if (window.electronAPI && window.electronAPI.saveGeminiKey) {
+      const success = await window.electronAPI.saveGeminiKey(e.target.value.trim());
+      if (success) {
+        showToast('Ключ Gemini API сохранен', '🤖');
+      }
+    }
   });
 
   if (window.electronAPI?.onBreakWindowClosed) {
