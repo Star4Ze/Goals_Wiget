@@ -1305,3 +1305,23 @@ input[type="date"], input[type="number"] {
   font-size: 14px;
 }
 
+/* Drag and Drop Task Highlights */
+.task.dragging {
+  opacity: 0.4;
+  border: 1px dashed var(--accent-color);
+}
+
+.task.drag-over-before {
+  border-top: 2px solid var(--accent-color) !important;
+}
+
+.task.drag-over-after {
+  border-bottom: 2px solid var(--accent-color) !important;
+}
+
+.task.drag-over-inside {
+  background: var(--bg-input-focus) !important;
+  outline: 1px solid var(--accent-color);
+  border-radius: 4px;
+}
+
