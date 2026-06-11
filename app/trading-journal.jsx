@@ -666,6 +666,9 @@ window.TradingJournalApp = function() {
     setNoteEntry('');
     setScreenshotEntry('');
     setLotsInput('');
+    setTempTradeId(Date.now().toString());
+    setIsAddFormOpen(false);
+  };
 
   // Opening the close trade form modal
   const handleOpenCloseTradeModal = (trade) => {
@@ -1468,6 +1471,20 @@ window.TradingJournalApp = function() {
                       </div>
                     </div>
 
+                    <div className="form-row">
+                      <div className="form-group flex-1">
+                        <label>Объем сделки (лотов)</label>
+                        <input 
+                          type="number" 
+                          value={lotsInput} 
+                          onChange={(e) => setLotsInput(e.target.value)} 
+                          placeholder="Рекомендуемый объем" 
+                          className="trade-input"
+                          required
+                        />
+                      </div>
+                    </div>
+
                     {/* Calculator output section */}
                     {entryPrice && stopLoss ? (
                       <div className="calc-summary-box">
@@ -1478,8 +1495,12 @@ window.TradingJournalApp = function() {
                           </span>
                         </div>
                         <div className="calc-summary-row">
-                          <span>Объем входа:</span>
-                          <span className="calc-summary-val highlighted-lots">{calculatedMaxLots} лотов <span className="sub">({calculatedMaxLots * lotSize} ед. актива)</span></span>
+                          <span>Рекомендованный объем:</span>
+                          <span className="calc-summary-val">{calculatedMaxLots} лотов <span className="sub">({calculatedMaxLots * lotSize} ед. актива)</span></span>
+                        </div>
+                        <div className="calc-summary-row">
+                          <span>Фактический объем:</span>
+                          <span className="calc-summary-val highlighted-lots">{finalLots} лотов <span className="sub">({finalLots * lotSize} ед. актива)</span></span>
                         </div>
                         <div className="calc-summary-row">
                           <span>Стоимость позиции:</span>
@@ -1488,8 +1509,8 @@ window.TradingJournalApp = function() {
                         <div className="calc-summary-row">
                           <span>Риск сделки:</span>
                           <span className="calc-summary-val danger-text">
-                            {formatRub(calculatedRiskAmt * calculatedMaxLots * multiplier)} 
-                            &nbsp;({((calculatedRiskAmt * calculatedMaxLots * multiplier) / data.deposit * 100).toFixed(2)}%)
+                            {formatRub(calculatedRiskAmt * finalLots * multiplier)} 
+                            &nbsp;({((calculatedRiskAmt * finalLots * multiplier) / data.deposit * 100).toFixed(2)}%)
                           </span>
                         </div>
                       </div>
@@ -1513,7 +1534,6 @@ window.TradingJournalApp = function() {
                         tempId={tempTradeId}
                       />
                     </div>
-
                     <div className="overlay-footer-buttons">
                       <button type="button" className="cancel-trade-btn" onClick={() => setIsAddFormOpen(false)}>Отмена</button>
                       <button type="submit" className="submit-trade-btn">🚀 Открыть активную сделку</button>
