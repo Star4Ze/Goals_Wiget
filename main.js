@@ -1684,12 +1684,16 @@ id: ${nextId}
     }
   });
 
-  ipcMain.handle('analyze-connection', async (event, filePath) => {
+  ipcMain.handle('analyze-connection', async (event, filePath, userCommand) => {
     try {
       const config = loadConfig();
-      const apiKey = config.geminiKey;
-      if (!apiKey) {
+      const provider = config.llmProvider || 'gemini';
+      
+      if (provider === 'gemini' && !config.geminiKey) {
         return { success: false, error: 'no-key' };
+      }
+      if (provider === 'local' && !config.localLlmUrl) {
+        return { success: false, error: 'no-local-url' };
       }
       
       if (!fs.existsSync(filePath)) {
@@ -1699,9 +1703,26 @@ id: ${nextId}
       const content = fs.readFileSync(filePath, 'utf-8');
       const filename = path.basename(filePath, '.md');
       
-      logAction(`🤖 Запуск ИИ-анализа для связи: ${filename}`);
+      logAction(`🤖 Запуск ИИ-анализа (${provider}) для связи: ${filename}${userCommand ? ' [Команда: ' + userCommand + ']' : ''}`);
       
-      const prompt = `Ты — AI-ассистент по нетворкингу и социальным связям. Проанализируй карточку контакта из Obsidian и предложи конкретные, практические идеи и дела для общения с этим человеком.
+      let prompt = '';
+      if (userCommand) {
+        prompt = `Ты — AI-ассистент по нетворкингу и ведению картотеки контактов в Obsidian.
+Твоя задача — изменить или дополнить карточку контакта в формате Markdown на основе команды/инструкции пользователя.
+
+Текущая карточка:
+"""markdown
+${content}
+"""
+
+Команда пользователя: "${userCommand}"
+
+Правила:
+1. Верни ТОЛЬКО обновленный текст карточки в формате Markdown.
+2. Сохрани оригинальную структуру YAML frontmatter (между ---) и все разделы шаблона.
+3. Не добавляй никаких вступительных или заключительных слов (например, "Вот обновленная карточка:"), не используй обрамление \`\`\`markdown ... \`\`\` в качестве внешнего контейнера для всего ответа — верни только чистый текст файла.`;
+      } else {
+        prompt = `Ты — AI-ассистент по нетворкингу и социальным связям. Проанализируй карточку контакта из Obsidian и предложи конкретные, практические идеи и дела для общения с этим человеком.
       
 Имя контакта: ${filename}
 Содержимое карточки:
@@ -1714,31 +1735,94 @@ ${content}
 2. Темы для разговора и идеи для следующей встречи.
 3. 2-3 конкретных действия/задачи. **ВАЖНО: Каждое действие/задачу начни со строгого префикса "СПИСОК_ДЕЛ: ", чтобы система могла их распознать и предложить добавить в дела.** Например:
 СПИСОК_ДЕЛ: Позвонить ${filename} и узнать как дела с собакой
-СПИСОК_ДЕЛ: Предложить ${filename} попить кофе на выходных
-      `;
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: prompt
-            }]
-          }]
-        })
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Gemini API вернул код ${response.status}`);
+СПИСОК_ДЕЛ: Предложить ${filename} попить кофе на выходных`;
       }
-      
-      const data = await response.json();
-      if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts.length > 0) {
-        const text = data.candidates[0].content.parts[0].text;
+
+      let text = '';
+      if (provider === 'gemini') {
+        const apiKey = config.geminiKey;
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: prompt
+              }]
+            }]
+          })
+        });
         
+        if (!response.ok) {
+          throw new Error(`Gemini API вернул код ${response.status}`);
+        }
+        
+        const data = await response.json();
+        if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts.length > 0) {
+          text = data.candidates[0].content.parts[0].text;
+        } else {
+          throw new Error('Некорректный ответ от API Gemini');
+        }
+      } else {
+        // Local LLM (OpenAI-compatible)
+        const localUrl = config.localLlmUrl || 'http://localhost:11434/v1';
+        const model = config.localLlmModel || 'llama3';
+        const baseUrl = localUrl.endsWith('/') ? localUrl.slice(0, -1) : localUrl;
+        const fullUrl = `${baseUrl}/chat/completions`;
+        
+        logAction(`🤖 Запрос к локальной LLM (${model}) по адресу: ${fullUrl}`);
+        
+        const response = await fetch(fullUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [
+              {
+                role: 'user',
+                content: prompt
+              }
+            ],
+            temperature: 0.7
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Локальный LLM вернул код ${response.status}`);
+        }
+        
+        const data = await response.json();
+        if (data.choices && data.choices.length > 0 && data.choices[0].message && data.choices[0].message.content) {
+          text = data.choices[0].message.content;
+        } else {
+          throw new Error('Некорректный ответ от локального LLM');
+        }
+      }
+
+      const fileBase = path.basename(filePath);
+      localWrites.set(fileBase, Date.now());
+
+      if (userCommand) {
+        // Clean markdown backticks wrapper if any
+        let responseText = text.trim();
+        if (responseText.startsWith('\`\`\`markdown')) {
+          responseText = responseText.substring(11).trim();
+        } else if (responseText.startsWith('\`\`\`')) {
+          responseText = responseText.substring(3).trim();
+        }
+        if (responseText.endsWith('\`\`\`')) {
+          responseText = responseText.substring(0, responseText.length - 3).trim();
+        }
+        
+        fs.writeFileSync(filePath, responseText, 'utf-8');
+        logAction(`🤖 Карточка изменена по ИИ-команде для ${filename}`);
+        scheduleGitSync();
+        return { success: true, text: responseText, isCommand: true };
+      } else {
         let updatedContent = content;
         const sectionHeader = '\n\n## План общения (ИИ)\n';
         const sectionIndex = content.indexOf('## План общения (ИИ)');
@@ -1748,15 +1832,10 @@ ${content}
           updatedContent = content + sectionHeader + text;
         }
         
-        const fileBase = path.basename(filePath);
-        localWrites.set(fileBase, Date.now());
         fs.writeFileSync(filePath, updatedContent, 'utf-8');
         logAction(`🤖 План общения сохранен в карточку для ${filename}`);
         scheduleGitSync();
-        
-        return { success: true, text: text };
-      } else {
-        throw new Error('Некорректный ответ от API Gemini');
+        return { success: true, text: text, isCommand: false };
       }
       
     } catch (e) {

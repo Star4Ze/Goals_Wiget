@@ -759,6 +759,82 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+
+    /* Accordion styles */
+    .profile-accordion {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      transition: all 0.2s ease;
+    }
+
+    .profile-accordion:hover {
+      border-color: var(--accent-color);
+      background: rgba(22, 28, 45, 0.55);
+    }
+
+    .profile-accordion-header {
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      font-weight: 600;
+      font-size: 13.5px;
+      color: var(--accent-color);
+    }
+
+    .profile-accordion-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .profile-accordion-chevron {
+      font-size: 11px;
+      color: var(--text-muted);
+      transition: transform 0.2s ease;
+    }
+
+    .profile-accordion.collapsed .profile-accordion-chevron {
+      transform: rotate(-90deg);
+    }
+
+    .profile-accordion-body {
+      padding: 0 16px 16px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text-main);
+      border-top: 1px solid rgba(255, 255, 255, 0.03);
+      padding-top: 12px;
+    }
+
+    .profile-accordion.collapsed .profile-accordion-body {
+      display: none;
+    }
+
+    /* Wiki links */
+    .wiki-link.clickable {
+      color: var(--accent-color);
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .wiki-link.clickable:hover {
+      color: var(--accent-hover);
+    }
+
+    .wiki-link.missing {
+      color: var(--text-muted);
+      border-bottom: 1px dashed var(--text-muted);
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
@@ -840,12 +916,25 @@
             <div class="tab-content hidden" id="tab-content-ai">
               <!-- AI Trigger Section -->
               <div class="ai-control-box">
+                <div class="form-group" style="width: 100%; margin-bottom: 8px;">
+                  <label>Режим работы ИИ:</label>
+                  <div style="display: flex; gap: 8px; margin-top: 4px;">
+                    <button class="btn primary" id="ai-mode-plan-btn" style="flex: 1; padding: 6px;">📝 План общения</button>
+                    <button class="btn" id="ai-mode-cmd-btn" style="flex: 1; padding: 6px;">⚡ Команда Агенту</button>
+                  </div>
+                </div>
+
+                <div class="form-group" id="ai-command-input-group" style="width: 100%; display: none; margin-bottom: 8px;">
+                  <label for="ai-command-text">Инструкция (что сделать с карточкой?):</label>
+                  <textarea id="ai-command-text" class="form-input" style="height: 60px; resize: none; font-size: 12px; padding: 8px;" placeholder="например: 'Добавь в интересы сноуборд' или 'Замени телефон на +79998887766' или 'Напиши план встречи в Питере'"></textarea>
+                </div>
+
                 <div style="display: flex; align-items: center; gap: 8px; width: 100%;">
-                  <button class="btn" id="run-ai-btn">🤖 Сгенерировать план общения</button>
-                  <div class="ai-status-text" id="ai-status">Свяжитесь с Gemini для выработки рекомендаций.</div>
+                  <button class="btn primary" id="run-ai-btn" style="padding: 8px 16px;">🤖 Запустить ИИ</button>
+                  <div class="ai-status-text" id="ai-status">Готов к работе.</div>
                 </div>
                 <div id="gemini-warning" style="display: none; font-size: 11px; color: var(--danger-color); margin-top: 4px;">
-                  ⚠️ API ключ Gemini не задан в настройках виджета!
+                  ⚠️ Настройки ИИ не заданы в параметрах ⚙️!
                 </div>
               </div>
 

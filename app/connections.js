@@ -28,6 +28,7 @@ applyWindowSettings();
 let contacts = [];
 let selectedContact = null;
 let currentTab = 'profile'; // 'profile', 'editor', or 'ai'
+let aiMode = 'plan'; // 'plan' or 'cmd'
 
 document.addEventListener('DOMContentLoaded', () => {
   initUI();
@@ -223,6 +224,30 @@ function initUI() {
 
   // AI run button
   document.getElementById('run-ai-btn').onclick = () => runAIAnalysis();
+
+  // AI Mode Switchers
+  const planBtn = document.getElementById('ai-mode-plan-btn');
+  const cmdBtn = document.getElementById('ai-mode-cmd-btn');
+  const cmdGroup = document.getElementById('ai-command-input-group');
+  const cmdText = document.getElementById('ai-command-text');
+
+  if (planBtn && cmdBtn && cmdGroup) {
+    planBtn.onclick = () => {
+      aiMode = 'plan';
+      planBtn.classList.add('primary');
+      cmdBtn.classList.remove('primary');
+      cmdGroup.style.display = 'none';
+      if (cmdText) cmdText.value = '';
+    };
+
+    cmdBtn.onclick = () => {
+      aiMode = 'cmd';
+      cmdBtn.classList.add('primary');
+      planBtn.classList.remove('primary');
+      cmdGroup.style.display = 'flex';
+      setTimeout(() => cmdText?.focus(), 50);
+    };
+  }
 
   // Create Modal Actions
   document.getElementById('create-modal-close').onclick = closeCreateModal;
@@ -668,29 +693,60 @@ async function runAIAnalysis() {
   const statusText = document.getElementById('ai-status');
   const runBtn = document.getElementById('run-ai-btn');
   const markdownOutput = document.getElementById('ai-output-markdown');
+  const cmdText = document.getElementById('ai-command-text');
 
-  statusText.innerHTML = '<span class="loader"></span> Анализ карточки и выработка рекомендаций...';
+  let command = null;
+  if (aiMode === 'cmd') {
+    command = cmdText?.value.trim() || '';
+    if (!command) {
+      alert('Пожалуйста, введите команду для ИИ-Агента!');
+      return;
+    }
+    statusText.innerHTML = '<span class="loader"></span> Выполнение команды пользователя...';
+  } else {
+    statusText.innerHTML = '<span class="loader"></span> Анализ карточки и выработка рекомендаций...';
+  }
+  
   runBtn.disabled = true;
 
   if (window.electronAPI && window.electronAPI.analyzeConnection) {
-    const result = await window.electronAPI.analyzeConnection(selectedContact.fullPath);
+    const result = await window.electronAPI.analyzeConnection(selectedContact.fullPath, command);
     runBtn.disabled = false;
     
     if (result.success) {
-      statusText.textContent = 'Анализ успешно завершен!';
+      statusText.textContent = command ? 'Команда успешно выполнена!' : 'Анализ успешно завершен!';
       
       // Reload connection detail into text editor
       const updatedContent = await window.electronAPI.getConnectionDetail(selectedContact.fullPath);
       document.getElementById('markdown-textarea').value = updatedContent;
       
-      // Re-parse and render new plan
-      parseAndRenderAIPlan();
+      if (command) {
+        // Clear command text and switch back to plan mode, then show the Profile view
+        if (cmdText) cmdText.value = '';
+        
+        // Reset mode
+        aiMode = 'plan';
+        const planBtn = document.getElementById('ai-mode-plan-btn');
+        const cmdBtn = document.getElementById('ai-mode-cmd-btn');
+        const cmdGroup = document.getElementById('ai-command-input-group');
+        if (planBtn) planBtn.classList.add('primary');
+        if (cmdBtn) cmdBtn.classList.remove('primary');
+        if (cmdGroup) cmdGroup.style.display = 'none';
+
+        switchTab('profile'); // Switch to Profile to see the visual changes!
+      } else {
+        // Re-parse and render new plan
+        parseAndRenderAIPlan();
+      }
     } else {
       if (result.error === 'no-key') {
-        statusText.textContent = 'Ошибка: не задан API ключ!';
-        markdownOutput.innerHTML = '<p style="color: var(--danger-color); font-weight: 600;">Укажите валидный API ключ Gemini в настройках основного виджета (иконка шестерёнки ⚙️).</p>';
+        statusText.textContent = 'Ошибка: не заданы настройки ИИ!';
+        markdownOutput.innerHTML = '<p style="color: var(--danger-color); font-weight: 600;">Укажите валидный API ключ Gemini в настройках (⚙️).</p>';
+      } else if (result.error === 'no-local-url') {
+        statusText.textContent = 'Ошибка: не задан URL локального LLM!';
+        markdownOutput.innerHTML = '<p style="color: var(--danger-color); font-weight: 600;">Укажите URL локального LLM в настройках (⚙️).</p>';
       } else {
-        statusText.textContent = 'Произошла ошибка при анализе.';
+        statusText.textContent = 'Произошла ошибка при работе ИИ.';
         markdownOutput.innerHTML = `<p style="color: var(--danger-color);">Детали ошибки: ${result.error}</p>`;
       }
     }
