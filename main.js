@@ -9,8 +9,10 @@ let mainWindow;
 let breakWindow = null;
 let analyticsWindow = null;
 let tradingJournalWindow = null;
+let connectionsWindow = null;
 
 const TARGET_DIR = "C:\\Users\\HomePC\\Documents\\Obsidian\\Progects\\MyLife";
+const CONNECTIONS_DIR = "C:\\Users\\HomePC\\Documents\\Obsidian\\Progects\\MyLife\\Моя картотека";
 const DAILY_TASKS_FILE_NAME = "Ежедневные задачи";
 
 async function runGitCommand(args) {
@@ -1435,6 +1437,240 @@ function setupHandlers() {
     tradingJournalWindow.on('closed', () => {
       tradingJournalWindow = null;
     });
+  });
+
+  // ==========================================
+  // Connections Widget (Мои связи) Handlers
+  // ==========================================
+  ipcMain.handle('get-gemini-key', async () => {
+    const config = loadConfig();
+    return config.geminiKey || '';
+  });
+
+  ipcMain.handle('save-gemini-key', async (event, key) => {
+    try {
+      saveConfigValue({ geminiKey: key });
+      return true;
+    } catch (e) {
+      logAction(`Ошибка сохранения ключа Gemini: ${e.message}`);
+      return false;
+    }
+  });
+
+  ipcMain.handle('open-connections-window', (event) => {
+    if (connectionsWindow) {
+      connectionsWindow.focus();
+      return;
+    }
+    
+    connectionsWindow = new BrowserWindow({
+      width: 980,
+      height: 680,
+      frame: false,
+      transparent: true,
+      backgroundColor: '#00000000',
+      resizable: true,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, 'preload.js'),
+        webSecurity: false
+      }
+    });
+    
+    connectionsWindow.loadFile(path.join(__dirname, 'app', 'connections.html'));
+    
+    connectionsWindow.on('closed', () => {
+      connectionsWindow = null;
+    });
+  });
+
+  ipcMain.handle('get-connections', async () => {
+    try {
+      if (!fs.existsSync(CONNECTIONS_DIR)) {
+        fs.mkdirSync(CONNECTIONS_DIR, { recursive: true });
+      }
+      
+      const getMDs = (dir) => {
+        let results = [];
+        if (!fs.existsSync(dir)) return results;
+        const list = fs.readdirSync(dir);
+        list.forEach(file => {
+          const fullPath = path.join(dir, file);
+          const stat = fs.statSync(fullPath);
+          if (stat && stat.isDirectory()) {
+            results = results.concat(getMDs(fullPath));
+          } else if (file.endsWith('.md')) {
+            const relPath = path.relative(CONNECTIONS_DIR, fullPath);
+            const parentDir = path.dirname(relPath);
+            const groupName = parentDir === '.' ? 'Общие' : parentDir;
+            results.push({
+              name: path.basename(file, '.md'),
+              relativePath: relPath,
+              fullPath: fullPath,
+              group: groupName
+            });
+          }
+        });
+        return results;
+      };
+      
+      return getMDs(CONNECTIONS_DIR);
+    } catch (e) {
+      logAction(`Ошибка получения связей: ${e.message}`);
+      return [];
+    }
+  });
+
+  ipcMain.handle('get-connection-detail', async (event, filePath) => {
+    try {
+      if (fs.existsSync(filePath)) {
+        return fs.readFileSync(filePath, 'utf-8');
+      }
+      return '';
+    } catch (e) {
+      logAction(`Ошибка чтения карточки связи: ${e.message}`);
+      return '';
+    }
+  });
+
+  ipcMain.handle('save-connection-detail', async (event, filePath, content) => {
+    try {
+      const filename = path.basename(filePath);
+      localWrites.set(filename, Date.now());
+      fs.writeFileSync(filePath, content, 'utf-8');
+      logAction(`💾 Сохранена карточка связи: ${filename}`);
+      scheduleGitSync();
+      return true;
+    } catch (e) {
+      logAction(`Ошибка сохранения карточки связи: ${e.message}`);
+      return false;
+    }
+  });
+
+  ipcMain.handle('create-connection', async (event, fileName, parentDir) => {
+    try {
+      const safeName = fileName.replace(/[\/\\:\*\?"<>\|]/g, '').trim();
+      if (!safeName) return false;
+      
+      const dirPath = parentDir ? path.join(CONNECTIONS_DIR, parentDir) : CONNECTIONS_DIR;
+      if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
+      }
+      
+      const filePath = path.join(dirPath, `${safeName}.md`);
+      if (fs.existsSync(filePath)) return false;
+      
+      const defaultTemplate = `# [[${safeName}]]\n\n### Основная информация\n- **Статус:** \n- **Дата добавления:** \n- **Последнее обновление:** \n\n---\n\n## Контакты\n- **Телефон:** \n- **Telegram:** \n\n---\n\n## Личные интересы\n- **Увлечения:** \n- **Что обсуждаем:** \n\n---\n\n## Взаимодействия\n**Последние контакты:**\n- \n\n---\n\n## Пометки на будущее\n- [ ] \n`;
+      
+      const filename = path.basename(filePath);
+      localWrites.set(filename, Date.now());
+      fs.writeFileSync(filePath, defaultTemplate, 'utf-8');
+      logAction(`🤝 Создана новая карточка связи: ${safeName}.md`);
+      scheduleGitSync();
+      return true;
+    } catch (e) {
+      logAction(`Ошибка создания связи: ${e.message}`);
+      return false;
+    }
+  });
+
+  ipcMain.handle('delete-connection', async (event, filePath) => {
+    try {
+      if (fs.existsSync(filePath)) {
+        const filename = path.basename(filePath);
+        localWrites.set(filename, Date.now());
+        fs.unlinkSync(filePath);
+        logAction(`🗑️ Удалена карточка связи: ${filename}`);
+        scheduleGitSync();
+        return true;
+      }
+      return false;
+    } catch (e) {
+      logAction(`Ошибка удаления связи: ${e.message}`);
+      return false;
+    }
+  });
+
+  ipcMain.handle('analyze-connection', async (event, filePath) => {
+    try {
+      const config = loadConfig();
+      const apiKey = config.geminiKey;
+      if (!apiKey) {
+        return { success: false, error: 'no-key' };
+      }
+      
+      if (!fs.existsSync(filePath)) {
+        return { success: false, error: 'Файл не найден' };
+      }
+      
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const filename = path.basename(filePath, '.md');
+      
+      logAction(`🤖 Запуск ИИ-анализа для связи: ${filename}`);
+      
+      const prompt = `Ты — AI-ассистент по нетворкингу и социальным связям. Проанализируй карточку контакта из Obsidian и предложи конкретные, практические идеи и дела для общения с этим человеком.
+      
+Имя контакта: ${filename}
+Содержимое карточки:
+\`\`\`markdown
+${content}
+\`\`\`
+
+Твоя задача — составить план общения на русском языке. Ответ должен быть в красивом формате Markdown:
+1. Краткий анализ отношений и интересов.
+2. Темы для разговора и идеи для следующей встречи.
+3. 2-3 конкретных действия/задачи. **ВАЖНО: Каждое действие/задачу начни со строгого префикса "СПИСОК_ДЕЛ: ", чтобы система могла их распознать и предложить добавить в дела.** Например:
+СПИСОК_ДЕЛ: Позвонить ${filename} и узнать как дела с собакой
+СПИСОК_ДЕЛ: Предложить ${filename} попить кофе на выходных
+      `;
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: prompt
+            }]
+          }]
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Gemini API вернул код ${response.status}`);
+      }
+      
+      const data = await response.json();
+      if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts.length > 0) {
+        const text = data.candidates[0].content.parts[0].text;
+        
+        let updatedContent = content;
+        const sectionHeader = '\n\n## План общения (ИИ)\n';
+        const sectionIndex = content.indexOf('## План общения (ИИ)');
+        if (sectionIndex !== -1) {
+          updatedContent = content.substring(0, sectionIndex) + '## План общения (ИИ)\n' + text;
+        } else {
+          updatedContent = content + sectionHeader + text;
+        }
+        
+        const fileBase = path.basename(filePath);
+        localWrites.set(fileBase, Date.now());
+        fs.writeFileSync(filePath, updatedContent, 'utf-8');
+        logAction(`🤖 План общения сохранен в карточку для ${filename}`);
+        scheduleGitSync();
+        
+        return { success: true, text: text };
+      } else {
+        throw new Error('Некорректный ответ от API Gemini');
+      }
+      
+    } catch (e) {
+      logAction(`Ошибка ИИ-анализа: ${e.message}`);
+      return { success: false, error: e.message };
+    }
   });
 }
 

@@ -39,5 +39,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveTBankToken: (token) => ipcRenderer.invoke('save-tbank-token', token),
   syncTBankTickers: () => ipcRenderer.invoke('sync-tbank-tickers'),
   getSyncedTickers: () => ipcRenderer.invoke('get-synced-tickers'),
-  getTickerPrice: (ticker) => ipcRenderer.invoke('get-ticker-price', ticker)
+  getTickerPrice: (ticker) => ipcRenderer.invoke('get-ticker-price', ticker),
+
+  // Connections widget additions
+  openConnectionsWindow: () => ipcRenderer.invoke('open-connections-window'),
+  getConnections: () => ipcRenderer.invoke('get-connections'),
+  getConnectionDetail: (filePath) => ipcRenderer.invoke('get-connection-detail', filePath),
+  saveConnectionDetail: (filePath, content) => ipcRenderer.invoke('save-connection-detail', filePath, content),
+  analyzeConnection: (filePath) => ipcRenderer.invoke('analyze-connection', filePath),
+  getGeminiKey: () => ipcRenderer.invoke('get-gemini-key'),
+  saveGeminiKey: (key) => ipcRenderer.invoke('save-gemini-key', key),
+  createConnection: (fileName, parentDir) => ipcRenderer.invoke('create-connection', fileName, parentDir),
+  deleteConnection: (filePath) => ipcRenderer.invoke('delete-connection', filePath)
 });
