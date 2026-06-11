@@ -1248,7 +1248,6 @@ function setupHandlers() {
     });
     
     tradingJournalWindow.loadFile(path.join(__dirname, 'app', 'frontend.html'));
-    tradingJournalWindow.webContents.openDevTools();
     
     tradingJournalWindow.on('closed', () => {
       tradingJournalWindow = null;

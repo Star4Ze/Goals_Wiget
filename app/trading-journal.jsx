@@ -1781,7 +1781,10 @@ window.TradingJournalApp = function() {
                     required
                   />
                 </div>
-                <div className="form-group">
+              </div>
+
+              <div className="form-row">
+                <div className="form-group flex-1">
                   <label>Кол-во лотов</label>
                   <input 
                     type="number" 
