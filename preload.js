@@ -46,9 +46,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getConnections: () => ipcRenderer.invoke('get-connections'),
   getConnectionDetail: (filePath) => ipcRenderer.invoke('get-connection-detail', filePath),
   saveConnectionDetail: (filePath, content) => ipcRenderer.invoke('save-connection-detail', filePath, content),
-  analyzeConnection: (filePath) => ipcRenderer.invoke('analyze-connection', filePath),
+  analyzeConnection: (filePath, userCommand) => ipcRenderer.invoke('analyze-connection', filePath, userCommand),
   getGeminiKey: () => ipcRenderer.invoke('get-gemini-key'),
   saveGeminiKey: (key) => ipcRenderer.invoke('save-gemini-key', key),
+  getLLMConfig: () => ipcRenderer.invoke('get-llm-config'),
+  saveLLMConfig: (data) => ipcRenderer.invoke('save-llm-config', data),
   createConnection: (fileName, parentDir) => ipcRenderer.invoke('create-connection', fileName, parentDir),
   deleteConnection: (filePath) => ipcRenderer.invoke('delete-connection', filePath)
 });

@@ -1457,6 +1457,31 @@ function setupHandlers() {
     }
   });
 
+  ipcMain.handle('get-llm-config', async () => {
+    const config = loadConfig();
+    return {
+      provider: config.llmProvider || 'gemini',
+      geminiKey: config.geminiKey || '',
+      localUrl: config.localLlmUrl || 'http://localhost:11434/v1',
+      localModel: config.localLlmModel || 'llama3'
+    };
+  });
+
+  ipcMain.handle('save-llm-config', async (event, data) => {
+    try {
+      saveConfigValue({
+        llmProvider: data.provider,
+        geminiKey: data.geminiKey,
+        localLlmUrl: data.localUrl,
+        localLlmModel: data.localModel
+      });
+      return true;
+    } catch (e) {
+      logAction(`Ошибка сохранения настроек ИИ: ${e.message}`);
+      return false;
+    }
+  });
+
   ipcMain.handle('open-connections-window', (event) => {
     if (connectionsWindow) {
       connectionsWindow.focus();
@@ -1713,6 +1738,20 @@ ${content}
 
 // Global context menu for text fields (Cut, Copy, Paste, Select All)
 app.on('web-contents-created', (event, contents) => {
+  // Global developer shortcuts (Ctrl+R to reload, Ctrl+Shift+I to toggle DevTools)
+  contents.on('before-input-event', (e, input) => {
+    if (input.type === 'keyDown') {
+      if (input.control && input.key.toLowerCase() === 'r') {
+        contents.reload();
+        e.preventDefault();
+      }
+      if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+        contents.toggleDevTools();
+        e.preventDefault();
+      }
+    }
+  });
+
   contents.on('context-menu', (e, params) => {
     const menu = new Menu();
 

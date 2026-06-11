@@ -893,9 +893,9 @@
 
   <!-- Connections Window Settings Modal Overlay -->
   <div class="modal-overlay hidden" id="connections-settings-modal">
-    <div class="modal-content" style="width: 290px;">
+    <div class="modal-content" style="width: 320px;">
       <div class="modal-header-row">
-        <h3>⚙️ Настройки окна</h3>
+        <h3>⚙️ Настройки</h3>
         <button class="modal-close-btn" id="connections-settings-close">✕</button>
       </div>
       <div class="form-group">
@@ -910,6 +910,29 @@
         <label>Цветовой оттенок:</label>
         <div class="color-palette" id="connections-color-palette" style="display:flex; flex-wrap:wrap; gap:8px; padding:4px 0;">
           <!-- Will be rendered dynamically via JS -->
+        </div>
+      </div>
+      
+      <!-- LLM Integration Section -->
+      <div class="form-group" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 10px;">
+        <label>🤖 Настройки ИИ:</label>
+        <select id="connections-llm-provider" class="form-input">
+          <option value="gemini">Gemini API (Внешний)</option>
+          <option value="local">Локальный LLM (Ollama/LM Studio)</option>
+        </select>
+      </div>
+      <div class="form-group" id="connections-gemini-group">
+        <label for="connections-gemini-key">Ключ API Gemini:</label>
+        <input type="password" id="connections-gemini-key" class="form-input" placeholder="Введите API ключ (AIzaSy...)">
+      </div>
+      <div class="form-group" id="connections-local-group" style="display: none; gap: 6px;">
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <label for="connections-local-url">URL Локального LLM:</label>
+          <input type="text" id="connections-local-url" class="form-input" placeholder="http://localhost:11434/v1">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
+          <label for="connections-local-model">Название модели:</label>
+          <input type="text" id="connections-local-model" class="form-input" placeholder="например, llama3">
         </div>
       </div>
     </div>
