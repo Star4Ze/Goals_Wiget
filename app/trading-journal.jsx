@@ -301,18 +301,39 @@ function ImageZone({ label, imageUrl, onImageUploaded, tempId }) {
     </div>
   );
 }
+// Fullscreen Modal for Screenshots (Side-by-Side Comparison)
+function ImageFullscreenModal({ trade, onClose }) {
+  if (!trade) return null;
+  const showEntry = !!trade.screenshotEntry;
+  const showExit = !!trade.screenshotExit;
 
-// Fullscreen Modal for Screenshots
-function ImageFullscreenModal({ url, onClose }) {
-  if (!url) return null;
   return (
     <div className="fullscreen-overlay" onClick={onClose}>
       <button className="fullscreen-close" onClick={onClose}>✕</button>
-      <img src={url} alt="Скриншот сделки" className="fullscreen-img" onClick={(e) => e.stopPropagation()} />
+      {showEntry && showExit ? (
+        <div className="fullscreen-double-wrapper" onClick={(e) => e.stopPropagation()}>
+          <div className="fullscreen-double-box">
+            <div className="fullscreen-double-label">Вход (цена: {trade.entryPrice} ₽)</div>
+            <img src={trade.screenshotEntry} alt="Вход" className="fullscreen-double-img" />
+          </div>
+          <div className="fullscreen-double-box">
+            <div className="fullscreen-double-label">Выход (цена: {trade.exitPrice} ₽)</div>
+            <img src={trade.screenshotExit} alt="Выход" className="fullscreen-double-img" />
+          </div>
+        </div>
+      ) : (
+        <div className="fullscreen-single-container" onClick={(e) => e.stopPropagation()}>
+          <div className="fullscreen-double-box">
+            <div className="fullscreen-double-label">
+              {showEntry ? `Вход (цена: ${trade.entryPrice} ₽)` : `Выход (цена: ${trade.exitPrice} ₽)`}
+            </div>
+            <img src={trade.screenshotEntry || trade.screenshotExit} alt="Скриншот сделки" className="fullscreen-img" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
 window.TradingJournalApp = function() {
   const [data, setData] = useState({ deposit: 100000, settings: { maxRiskPerTradePercent: 2, maxRiskPerMonthPercent: 6 }, trades: [] });
   
@@ -582,7 +603,7 @@ window.TradingJournalApp = function() {
     return sum;
   }, 0);
 
-  const monthlyActiveRisk = data.trades
+  const monthlyActiveRisk = currentMonthTrades
     .filter(t => t.status === 'active')
     .reduce((sum, t) => {
       const riskPerShare = Math.abs(t.entryPrice - t.stopLoss);
@@ -1209,10 +1230,7 @@ window.TradingJournalApp = function() {
                               {t.screenshotEntry ? (
                                 <img 
                                   src={t.screenshotEntry} 
-                                  alt="Вход" 
-                                  className="trade-thumbnail-img" 
-                                  onClick={() => setFullscreenImageUrl(t.screenshotEntry)}
-                                  title="Кликните для увеличения"
+
                                 />
                               ) : (
                                 <div className="empty-thumb-placeholder">Без скрина</div>
