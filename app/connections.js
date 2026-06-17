@@ -334,6 +334,7 @@ function renderContactsList(filterText = '') {
     groups[groupName].sort((a, b) => a.name.localeCompare(b.name)).forEach(contact => {
       const item = document.createElement('div');
       item.className = 'contact-item';
+      item.dataset.path = contact.fullPath;
       if (selectedContact && selectedContact.fullPath === contact.fullPath) {
         item.classList.add('active');
       }
@@ -353,7 +354,7 @@ async function selectContact(contact) {
   // Highlight active element in list
   document.querySelectorAll('.contact-item').forEach(el => {
     el.classList.remove('active');
-    if (el.textContent === contact.name) {
+    if (el.dataset.path === contact.fullPath) {
       el.classList.add('active');
     }
   });

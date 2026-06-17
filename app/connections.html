@@ -6,17 +6,17 @@
   <title>Мои связи — Картотека</title>
   <style>
     :root {
-      --bg-dark: #080a10;
-      --bg-card: rgba(22, 28, 45, 0.45);
-      --bg-input: #101524;
-      --bg-input-focus: #161e33;
-      --border-color: rgba(255, 255, 255, 0.08);
-      --border-color-hover: rgba(255, 255, 255, 0.16);
+      --bg-dark: #121212;
+      --bg-card: #252525;
+      --bg-input: #1e1e1e;
+      --bg-input-focus: #2a2a2a;
+      --border-color: #333333;
+      --border-color-hover: #444444;
       --accent-color: #a186f1;
       --accent-hover: #b399ff;
-      --accent-dark: #2a1b5c;
-      --text-main: #f1f5f9;
-      --text-muted: #94a3b8;
+      --accent-dark: #1e1e1e;
+      --text-main: #e0e0e0;
+      --text-muted: #888888;
       --danger-color: #ff5370;
       --success-color: #3ddc84;
       --font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
@@ -41,7 +41,7 @@
     .window-container {
       width: 100%;
       height: 100%;
-      background: rgba(8, 10, 16, var(--window-opacity, 0.92));
+      background: rgba(30, 30, 30, var(--window-opacity, 0.92));
       backdrop-filter: blur(var(--window-blur, 25px));
       -webkit-backdrop-filter: blur(var(--window-blur, 25px));
       border: 1px solid var(--border-color);
@@ -56,7 +56,7 @@
     /* Window Header - Drag Region */
     .window-header {
       padding: 12px 20px;
-      background: rgba(16, 21, 36, 0.5);
+      background: rgba(42, 42, 42, 0.5);
       border-bottom: 1px solid var(--border-color);
       display: flex;
       justify-content: space-between;
@@ -126,7 +126,7 @@
     .sidebar {
       width: 300px;
       border-right: 1px solid var(--border-color);
-      background: rgba(10, 14, 26, 0.3);
+      background: rgba(18, 18, 18, 0.3);
       display: flex;
       flex-direction: column;
       flex-shrink: 0;
@@ -266,7 +266,7 @@
       display: flex;
       flex-direction: column;
       min-width: 0;
-      background: rgba(8, 10, 16, 0.2);
+      background: rgba(18, 18, 18, 0.2);
     }
 
     .placeholder-view {
@@ -309,7 +309,7 @@
       gap: 8px;
       border-bottom: 1px solid var(--border-color);
       padding: 0 20px;
-      background: rgba(16, 21, 36, 0.2);
+      background: rgba(30, 30, 30, 0.2);
       flex-shrink: 0;
     }
 
@@ -369,6 +369,10 @@
     }
 
     .tab-content.hidden {
+      display: none !important;
+    }
+
+    .hidden {
       display: none !important;
     }
 
@@ -488,7 +492,7 @@
     }
 
     .profile-rendered-body th {
-      background: rgba(22, 28, 45, 0.6);
+      background: rgba(37, 37, 37, 0.6);
       color: var(--accent-color);
       font-weight: 600;
     }
@@ -552,7 +556,7 @@
 
     .ai-results-markdown {
       flex: 1;
-      background: rgba(16, 21, 36, 0.4);
+      background: rgba(30, 30, 30, 0.4);
       border: 1px solid var(--border-color);
       border-radius: 8px;
       padding: 16px;
@@ -603,7 +607,7 @@
     }
 
     .ai-task-card {
-      background: rgba(22, 28, 45, 0.6);
+      background: rgba(37, 37, 37, 0.6);
       border: 1px solid var(--border-color);
       border-radius: 8px;
       padding: 10px 14px;
@@ -647,7 +651,7 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(8, 10, 16, 0.6);
+      background: rgba(18, 18, 18, 0.6);
       backdrop-filter: blur(5px);
       -webkit-backdrop-filter: blur(5px);
       z-index: 9999;
@@ -665,7 +669,7 @@
     }
 
     .modal-content {
-      background: #111524;
+      background: #252525;
       border: 1px solid var(--border-color-hover);
       border-radius: 12px;
       padding: 18px 22px;
@@ -772,7 +776,7 @@
 
     .profile-accordion:hover {
       border-color: var(--accent-color);
-      background: rgba(22, 28, 45, 0.55);
+      background: rgba(37, 37, 37, 0.55);
     }
 
     .profile-accordion-header {
