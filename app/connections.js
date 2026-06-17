@@ -604,27 +604,8 @@ function renderProfileCard() {
     </div>
   `;
 
-  // Render collapsible accordions instead of single raw markdown
-  const sections = parseProfileSections(markdown);
-  bodyContainer.innerHTML = '';
-
-  const accordionDefinitions = [
-    { id: 'about', title: 'О человеке', icon: '👤', sectionKey: 'о человеке', defaultOpen: true },
-    { id: 'acquaintance', title: 'Знакомство', icon: '🗺️', sectionKey: 'знакомство', defaultOpen: true },
-    { id: 'contacts', title: 'История контактов', icon: '📅', sectionKey: 'контакты', defaultOpen: true },
-    { id: 'relations', title: 'Связи', icon: '🔗', sectionKey: 'связи', defaultOpen: true },
-    { id: 'notes', title: 'Заметки', icon: '📝', sectionKey: 'заметки', defaultOpen: true },
-    { id: 'ai-plan', title: 'Рекомендации ИИ', icon: '🤖', sectionKey: 'план общения (ии)', defaultOpen: false }
-  ];
-
-  accordionDefinitions.forEach(def => {
-    const sectionContent = sections[def.sectionKey] || '';
-    if (def.id === 'ai-plan' && !sectionContent) {
-      return; 
-    }
-    const acc = createAccordion(def.id, def.title, def.icon, sectionContent, def.defaultOpen);
-    bodyContainer.appendChild(acc);
-  });
+  // Render full markdown content directly
+  bodyContainer.innerHTML = renderMarkdownHTML(markdown);
 }
 
 // Advanced Markdown to HTML parser supporting tables and bullet lists
@@ -681,7 +662,12 @@ function renderMarkdownHTML(md) {
       
       // Process unordered lists
       if (line.startsWith('- ') || line.startsWith('* ')) {
-        const content = line.substring(2).trim();
+        let content = line.substring(2).trim();
+        if (content.startsWith('[ ]')) {
+          content = `<input type="checkbox" disabled style="margin-right: 6px; cursor: default;" />` + content.substring(3).trim();
+        } else if (content.startsWith('[x]') || content.startsWith('[X]')) {
+          content = `<input type="checkbox" checked disabled style="margin-right: 6px; cursor: default;" />` + content.substring(3).trim();
+        }
         lines[i] = (inList ? '' : '<ul>') + `<li>${content}</li>`;
         inList = true;
       } else if (inList) {
