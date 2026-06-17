@@ -1488,16 +1488,12 @@ function setupHandlers() {
       return;
     }
     
-    const os = require('os');
-    const isWin11 = process.platform === 'win32' && parseInt(os.release().split('.')[2]) >= 22000;
-
     connectionsWindow = new BrowserWindow({
       width: 980,
       height: 680,
       frame: false,
-      transparent: !isWin11,
-      backgroundColor: isWin11 ? undefined : '#00000000',
-      backgroundMaterial: isWin11 ? 'acrylic' : undefined,
+      transparent: true,
+      backgroundColor: '#00000000',
       resizable: true,
       webPreferences: {
         nodeIntegration: false,
