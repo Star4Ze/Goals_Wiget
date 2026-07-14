@@ -8,6 +8,36 @@ let currentBoard = null;
 let boardList = [];
 let selectedNodeId = null;
 
+// Design system colors (resolved from CSS variables dynamically)
+const colors = {
+  bg: '#121316',
+  onSurface: '#e3e2e5',
+  onSurfaceVar: '#c3c7ce',
+  outline: '#8d9198',
+  outlineVar: '#43474e',
+  primary: '#aac9f0',
+  secondary: '#ffb956',
+  tertiary: '#00dbe7',
+  error: '#ffb4ab'
+};
+
+function updateColorsFromCSS() {
+  try {
+    const style = getComputedStyle(document.documentElement);
+    colors.bg = style.getPropertyValue('--bg').trim() || colors.bg;
+    colors.onSurface = style.getPropertyValue('--on-surface').trim() || colors.onSurface;
+    colors.onSurfaceVar = style.getPropertyValue('--on-surface-var').trim() || colors.onSurfaceVar;
+    colors.outline = style.getPropertyValue('--outline').trim() || colors.outline;
+    colors.outlineVar = style.getPropertyValue('--outline-var').trim() || colors.outlineVar;
+    colors.primary = style.getPropertyValue('--primary').trim() || colors.primary;
+    colors.secondary = style.getPropertyValue('--secondary').trim() || colors.secondary;
+    colors.tertiary = style.getPropertyValue('--tertiary').trim() || colors.tertiary;
+    colors.error = style.getPropertyValue('--error').trim() || colors.error;
+  } catch (e) {
+    console.error('Error reading CSS color variables:', e);
+  }
+}
+
 // Camera & Coordinate Zoom System
 let camCenterMs = Date.now(); // World X center (milliseconds timestamp)
 let camCenterY = 0;          // World Y center
@@ -105,6 +135,9 @@ function isOverAnchor(sx, sy, node) {
 
 // Setup and Event Binding
 window.addEventListener('DOMContentLoaded', async () => {
+  // Resolve CSS color variables before rendering
+  updateColorsFromCSS();
+
   // DOM Elements initialization
   canvas = document.getElementById('fc-canvas');
   ctx = canvas.getContext('2d');
@@ -308,9 +341,9 @@ function drawCanvas() {
   // 3. Draw Now Line
   const nowMs = Date.now();
   const nowX = (nowMs - camCenterMs) / msPerPixel + canvas.width / 2;
-  ctx.strokeStyle = 'var(--tertiary)';
+  ctx.strokeStyle = colors.tertiary;
   ctx.lineWidth = 1;
-  ctx.shadowColor = 'var(--tertiary)';
+  ctx.shadowColor = colors.tertiary;
   ctx.shadowBlur = 10;
   ctx.beginPath();
   ctx.moveTo(nowX, 0);
@@ -319,8 +352,8 @@ function drawCanvas() {
   ctx.shadowBlur = 0; // reset
 
   // Label "СЕЙЧАС"
-  ctx.fillStyle = 'var(--tertiary)';
-  ctx.font = '700 9px var(--font-mono)';
+  ctx.fillStyle = colors.tertiary;
+  ctx.font = '700 9px "JetBrains Mono", monospace';
   ctx.textAlign = 'center';
   ctx.fillText('СЕЙЧАС', nowX, 15);
 
@@ -395,7 +428,7 @@ function drawCanvas() {
       if (isSelected) {
         ctx.shadowBlur = 0;
         ctx.globalAlpha = 1.0;
-        ctx.fillStyle = 'var(--tertiary)';
+        ctx.fillStyle = colors.tertiary;
         ctx.beginPath();
         ctx.arc(pos.x + radius, pos.y, 4, 0, Math.PI * 2);
         ctx.fill();
@@ -403,8 +436,8 @@ function drawCanvas() {
 
       // Label below node
       ctx.shadowBlur = 0;
-      ctx.fillStyle = isSelected ? 'var(--on-surface)' : 'var(--on-surface-var)';
-      ctx.font = isSelected ? '600 11px var(--font-mono)' : '500 11px var(--font-mono)';
+      ctx.fillStyle = isSelected ? colors.onSurface : colors.onSurfaceVar;
+      ctx.font = isSelected ? '600 11px "JetBrains Mono", monospace' : '500 11px "JetBrains Mono", monospace';
       ctx.textAlign = 'center';
       
       let titleText = node.title || 'Без названия';
@@ -422,7 +455,7 @@ function drawCanvas() {
     const fromMs = new Date(connectSourceNode.date).getTime();
     const pStart = worldToScreen(fromMs, connectSourceNode.y);
     ctx.lineWidth = 1.5;
-    ctx.strokeStyle = 'var(--tertiary)';
+    ctx.strokeStyle = colors.tertiary;
     ctx.setLineDash([4, 4]);
     ctx.beginPath();
     ctx.moveTo(pStart.x, pStart.y);
@@ -507,7 +540,7 @@ function drawTimeline() {
   }
 
   // Draw ticks
-  timelineCtx.font = '500 10px var(--font-mono)';
+  timelineCtx.font = '500 10px "JetBrains Mono", monospace';
   timelineCtx.textAlign = 'center';
   timelineCtx.textBaseline = 'top';
 
@@ -520,7 +553,7 @@ function drawTimeline() {
     timelineCtx.lineTo(sx, timelineCanvas.height / 2 + 4);
     timelineCtx.stroke();
 
-    timelineCtx.fillStyle = 'var(--on-surface-var)';
+    timelineCtx.fillStyle = colors.onSurfaceVar;
     timelineCtx.fillText(formatLabel(t), sx, timelineCanvas.height / 2 + 10);
   });
 
@@ -528,16 +561,16 @@ function drawTimeline() {
   const nowMs = Date.now();
   const nowX = (nowMs - camCenterMs) / msPerPixel + timelineCanvas.width / 2;
   if (nowX >= 0 && nowX <= timelineCanvas.width) {
-    timelineCtx.fillStyle = 'var(--tertiary)';
-    timelineCtx.shadowColor = 'var(--tertiary)';
+    timelineCtx.fillStyle = colors.tertiary;
+    timelineCtx.shadowColor = colors.tertiary;
     timelineCtx.shadowBlur = 8;
     timelineCtx.beginPath();
     timelineCtx.arc(nowX, timelineCanvas.height / 2, 4, 0, Math.PI * 2);
     timelineCtx.fill();
     timelineCtx.shadowBlur = 0;
 
-    timelineCtx.fillStyle = 'var(--tertiary)';
-    timelineCtx.font = '700 9px var(--font-mono)';
+    timelineCtx.fillStyle = colors.tertiary;
+    timelineCtx.font = '700 9px "JetBrains Mono", monospace';
     timelineCtx.fillText(new Date().getFullYear().toString(), nowX, timelineCanvas.height / 2 - 14);
   }
 }
