@@ -1,0 +1,53 @@
+{
+  "id": "111",
+  "name": "111",
+  "createdAt": "2026-07-14T15:59:42.323Z",
+  "nodes": [
+    {
+      "id": "528e4edb-fc01-45d2-9763-5374b29f792e",
+      "type": "decision",
+      "title": "Без названия",
+      "description": "",
+      "date": "2026-06-30",
+      "probability": 50,
+      "sphere": "work",
+      "status": "hypothetical",
+      "importance": 5,
+      "y": 98.3203111064396,
+      "imageUrl": "",
+      "hoverFactor": 0.7683830537167969
+    }
+  ],
+  "connections": [],
+  "spheres": [
+    {
+      "id": "work",
+      "name": "Работа",
+      "color": "#5B7A9D",
+      "visible": true
+    },
+    {
+      "id": "trading",
+      "name": "Трейдинг",
+      "color": "#00dbe7",
+      "visible": true
+    },
+    {
+      "id": "health",
+      "name": "Здоровье",
+      "color": "#00e676",
+      "visible": true
+    },
+    {
+      "id": "lumifi",
+      "name": "LumiFi",
+      "color": "#a186f1",
+      "visible": true
+    }
+  ],
+  "viewport": {
+    "panX": 1784245498018.2021,
+    "panY": 99.965996283162,
+    "scale": 15241644.130727267
+  }
+}

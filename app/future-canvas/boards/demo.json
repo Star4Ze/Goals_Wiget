@@ -80,7 +80,7 @@
       "status": "discarded",
       "importance": 5,
       "y": 200,
-      "hoverFactor": 0
+      "hoverFactor": 0.993513854344429
     },
     {
       "id": "node-7",
@@ -351,7 +351,7 @@
   ],
   "viewport": {
     "panX": 1798101200720.8962,
-    "panY": -66.42487803651545,
+    "panY": -63.086293125441436,
     "scale": 150005568.05234513
   }
 }
