@@ -713,30 +713,67 @@ input[type="date"], input[type="number"] {
 .task {
   position: relative;
 }
-.task-options-btn {
+.task-hover-zone {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 75px;
+  z-index: 2;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+
+.task-actions {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(to left, var(--bg-card) 65%, transparent);
+  padding-left: 20px;
+  padding-right: 6px;
   opacity: 0;
   pointer-events: none;
+  transition: opacity 0.15s ease-in-out;
+  z-index: 3;
+}
+
+/* Show actions only when hovering the hover zone or the actions themselves */
+.task-hover-zone:hover ~ .task-actions,
+.task-actions:hover {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.task-action-btn {
   background: none;
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: bold;
-  padding: 2px 6px;
-  margin-left: 6px;
+  padding: 4px 6px;
   transition: all 0.2s ease;
   border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   align-self: center;
   -webkit-app-region: no-drag;
 }
-.task:hover .task-options-btn {
-  opacity: 1;
-  pointer-events: auto;
-}
-.task-options-btn:hover {
+
+.task-action-btn:hover {
   color: var(--accent-color);
   background: var(--bg-input-focus);
+}
+
+.task-add-subtask-btn {
+  font-size: 13.5px;
+  padding-bottom: 5px; /* slight adjustment for arrow alignment */
 }
 
 /* Модальное окно действий */
@@ -1116,6 +1153,81 @@ input[type="date"], input[type="number"] {
 /* Настройки модальное окно */
 .settings-modal-content {
   width: 330px;
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) scale(1) !important;
+}
+.modal-overlay.hidden .settings-modal-content {
+  transform: translate(-50%, -50%) scale(0.95) !important;
+}
+
+/* Toggle Switch Styles */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  -webkit-app-region: no-drag;
+}
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  transition: .2s;
+  border-radius: 20px;
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 12px;
+  width: 12px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #dddddd; /* bright grey knob when OFF */
+  transition: .2s;
+  border-radius: 50%;
+}
+.switch:hover .slider {
+  border-color: var(--accent-color);
+}
+input:checked + .slider {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+input:checked + .slider:before {
+  transform: translateX(16px);
+  background-color: #ffffff; /* pure white knob when ON */
+}
+
+/* File Selector List Styling */
+#file-selector-list {
+  max-height: 450px;
+  overflow-y: auto;
+}
+#file-selector-list::-webkit-scrollbar {
+  display: block;
+  width: 4px;
+}
+#file-selector-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+#file-selector-list::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 10px;
+}
+#file-selector-list::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-color);
 }
 
 .settings-section {

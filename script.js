@@ -270,11 +270,39 @@ async function markTaskDone(task, fileName = activeFileName) {
 function autoResizeWindow() {
   if (window.electronAPI && window.electronAPI.resizeWindow) {
     const container = document.querySelector('.container');
+    const settingsModal = document.getElementById('settings-modal');
+    const settingsContent = settingsModal?.querySelector('.settings-modal-content');
+    const fileModal = document.getElementById('file-selector-modal');
+    const fileModalContent = fileModal?.querySelector('.modal-content');
+    
+    let baseHeight = 0;
     if (container) {
-      const width = 520;
-      const height = Math.min(1024, Math.ceil(container.getBoundingClientRect().height) + 38);
-      window.electronAPI.resizeWindow(width, height);
+      baseHeight = Math.ceil(container.getBoundingClientRect().height) + 38;
     }
+    
+    if (settingsModal && !settingsModal.classList.contains('hidden') && settingsContent) {
+      const settingsHeight = Math.ceil(settingsContent.getBoundingClientRect().height) + 40;
+      baseHeight = Math.max(baseHeight, settingsHeight);
+    }
+    
+    if (fileModal && !fileModal.classList.contains('hidden') && fileModalContent) {
+      const fileBtn = document.getElementById('active-file-btn');
+      if (fileBtn) {
+        const btnRect = fileBtn.getBoundingClientRect();
+        // Temporarily clear any maxHeight restrictions to measure natural height
+        const originalMaxHeight = fileModalContent.style.maxHeight;
+        fileModalContent.style.maxHeight = 'none';
+        const modalHeight = fileModalContent.scrollHeight || fileModalContent.getBoundingClientRect().height || 250;
+        fileModalContent.style.maxHeight = originalMaxHeight;
+        
+        const requiredHeight = btnRect.bottom + modalHeight + 25;
+        baseHeight = Math.max(baseHeight, requiredHeight);
+      }
+    }
+    
+    const width = 520;
+    const height = Math.min(1024, baseHeight);
+    window.electronAPI.resizeWindow(width, height);
   }
 }
 
@@ -305,16 +333,52 @@ function setupCapitalToggle() {
   });
 }
 
-function openTaskModal(task, event) {
+function openTaskModal(task, event, isRightClick = false) {
   selectedTask = task;
   selectedTaskFileName = event?.currentTarget?.dataset?.fileName || activeFileName;
   const modal = document.getElementById('task-modal');
   const modalContent = modal.querySelector('.modal-content');
   if (modal && modalContent && event) {
-    const rect = event.currentTarget.getBoundingClientRect();
+    let rect;
+    if (isRightClick) {
+      rect = {
+        left: event.clientX,
+        right: event.clientX,
+        top: event.clientY,
+        bottom: event.clientY,
+        width: 0,
+        height: 0
+      };
+    } else {
+      rect = event.currentTarget.getBoundingClientRect();
+    }
     activeTriggerBtnRect = rect;
+
+    const pinBtn = document.getElementById('modal-pin-btn');
+    const editBtn = document.getElementById('modal-edit-btn');
+    const copyBtn = document.getElementById('modal-copy-btn');
+    const addSubtaskBtn = document.getElementById('modal-add-subtask-btn');
     const moveBtn = document.getElementById('modal-move-btn');
-    if (moveBtn) moveBtn.classList.toggle('hidden', selectedTaskFileName === 'Ежедневные задачи');
+    const deleteBtn = document.getElementById('modal-delete-btn');
+
+    if (isRightClick) {
+      if (pinBtn) pinBtn.style.display = 'none';
+      if (editBtn) editBtn.style.display = 'none';
+      if (addSubtaskBtn) addSubtaskBtn.style.display = 'none';
+      if (moveBtn) moveBtn.style.display = 'none';
+    } else {
+      if (pinBtn) pinBtn.style.display = '';
+      if (editBtn) editBtn.style.display = '';
+      if (addSubtaskBtn) addSubtaskBtn.style.display = '';
+      if (moveBtn) {
+        if (selectedTaskFileName === 'Ежедневные задачи') {
+          moveBtn.style.display = 'none';
+        } else {
+          moveBtn.style.display = '';
+        }
+      }
+    }
+
     modal.classList.remove('hidden');
     positionFloatingModal(modalContent, rect);
   }
@@ -401,20 +465,24 @@ function closeTaskModal() {
   }
 }
 
-function openFileSelectorModal(event) {
+async function openFileSelectorModal(event) {
   const modal = document.getElementById('file-selector-modal');
-  const modalContent = modal.querySelector('.modal-content');
+  const modalContent = modal?.querySelector('.modal-content');
   if (modal && modalContent && event) {
     const rect = event.currentTarget.getBoundingClientRect();
     modal.classList.remove('hidden');
+    await renderFileList();
+    autoResizeWindow();
     positionDropdownBelow(modalContent, rect);
-    renderFileList();
   }
 }
 
 function closeFileSelectorModal() {
   const modal = document.getElementById('file-selector-modal');
-  if (modal) modal.classList.add('hidden');
+  if (modal) {
+    modal.classList.add('hidden');
+    autoResizeWindow();
+  }
 }
 
 function openFileActionModal(fileName, event) {
@@ -765,8 +833,41 @@ function renderTaskNode(task, options, depth = 0, indexLabel = '') {
     div.appendChild(cb);
     div.appendChild(span);
 
+    // Set file name as data attribute for right click retrieval
+    div.dataset.fileName = fileName;
+
+    // Right click context menu handler
+    div.oncontextmenu = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openTaskModal(task, e, true);
+    };
+
+    // Hover zone to trigger buttons appearance
+    const hoverZone = document.createElement('div');
+    hoverZone.className = 'task-hover-zone';
+    div.appendChild(hoverZone);
+
+    // Action buttons container
+    const actionsContainer = document.createElement('div');
+    actionsContainer.className = 'task-actions';
+
+    // Enter-like button for immediate subtask addition
+    const addSubtaskBtn = document.createElement('button');
+    addSubtaskBtn.className = 'task-action-btn task-add-subtask-btn';
+    addSubtaskBtn.innerHTML = '↳';
+    addSubtaskBtn.title = 'Добавить подзадачу';
+    addSubtaskBtn.onclick = (e) => {
+      e.stopPropagation();
+      activeSubtaskInputTaskId = key;
+      renderTasks();
+      renderDailyTasks();
+    };
+    actionsContainer.appendChild(addSubtaskBtn);
+
+    // Three dots options button
     const optBtn = document.createElement('button');
-    optBtn.className = 'task-options-btn';
+    optBtn.className = 'task-action-btn task-options-btn';
     optBtn.textContent = '•••';
     optBtn.title = 'Опции';
     optBtn.dataset.fileName = fileName;
@@ -774,7 +875,9 @@ function renderTaskNode(task, options, depth = 0, indexLabel = '') {
       e.stopPropagation();
       openTaskModal(task, e);
     };
-    div.appendChild(optBtn);
+    actionsContainer.appendChild(optBtn);
+
+    div.appendChild(actionsContainer);
 
     // Make the task draggable and add event handlers for drag & drop
     div.draggable = true;
@@ -1429,19 +1532,52 @@ function openSettingsModal() {
       });
     }
 
+    // Load break enabled status
+    updateBreakSettingsState();
+
     modal.classList.remove('hidden');
+    autoResizeWindow();
     updateBreakCountdownStatus();
-    
-    // Position modal centered since it's a primary system setting
-    modalContent.style.position = 'absolute';
-    modalContent.style.left = `${(window.innerWidth - 330) / 2}px`;
-    modalContent.style.top = `${Math.max(20, (window.innerHeight - 380) / 2)}px`;
   }
 }
 
 function closeSettingsModal() {
   const modal = document.getElementById('settings-modal');
-  if (modal) modal.classList.add('hidden');
+  if (modal) {
+    modal.classList.add('hidden');
+    autoResizeWindow();
+  }
+}
+
+function updateBreakSettingsState() {
+  const enabled = localStorage.getItem('break_enabled') !== 'false';
+  const toggle = document.getElementById('break-enabled-toggle');
+  if (toggle) toggle.checked = enabled;
+
+  const intervalSelect = document.getElementById('break-interval-select');
+  const soundSelect = document.getElementById('break-sound-select');
+  const mediaBtn = document.getElementById('select-media-btn');
+  const testBtn = document.getElementById('test-break-btn');
+
+  const rowsToDim = [
+    intervalSelect?.closest('.setting-row'),
+    soundSelect?.closest('.setting-row'),
+    mediaBtn?.closest('.setting-row')
+  ].filter(Boolean);
+
+  if (enabled) {
+    if (intervalSelect) intervalSelect.removeAttribute('disabled');
+    if (soundSelect) soundSelect.removeAttribute('disabled');
+    if (mediaBtn) mediaBtn.removeAttribute('disabled');
+    if (testBtn) testBtn.removeAttribute('disabled');
+    rowsToDim.forEach(row => row.style.opacity = '1');
+  } else {
+    if (intervalSelect) intervalSelect.setAttribute('disabled', 'true');
+    if (soundSelect) soundSelect.setAttribute('disabled', 'true');
+    if (mediaBtn) mediaBtn.setAttribute('disabled', 'true');
+    if (testBtn) testBtn.setAttribute('disabled', 'true');
+    rowsToDim.forEach(row => row.style.opacity = '0.5');
+  }
 }
 
 function initBreakTimer() {
@@ -1455,7 +1591,8 @@ function initBreakTimer() {
     breakCountdownTimer = null;
   }
   
-  const interval = parseInt(localStorage.getItem('break_interval') || '0');
+  const enabled = localStorage.getItem('break_enabled') !== 'false';
+  const interval = enabled ? parseInt(localStorage.getItem('break_interval') || '0') : 0;
   if (interval > 0) {
     const ms = interval * 60 * 1000;
     nextBreakAt = Date.now() + ms;
@@ -1501,7 +1638,8 @@ function updateBreakCountdownStatus() {
   const status = document.getElementById('break-countdown-status');
   if (!status) return;
 
-  const interval = parseInt(localStorage.getItem('break_interval') || '0');
+  const enabled = localStorage.getItem('break_enabled') !== 'false';
+  const interval = enabled ? parseInt(localStorage.getItem('break_interval') || '0') : 0;
   if (interval <= 0) {
     status.textContent = 'Уведомления выключены';
     return;
@@ -1542,6 +1680,13 @@ function initSettingsListeners() {
     localStorage.setItem('widget_theme', 'light');
   });
   
+  // Break Enabled change
+  document.getElementById('break-enabled-toggle')?.addEventListener('change', (e) => {
+    localStorage.setItem('break_enabled', e.target.checked ? 'true' : 'false');
+    updateBreakSettingsState();
+    initBreakTimer();
+  });
+
   // Break Interval change
   document.getElementById('break-interval-select')?.addEventListener('change', (e) => {
     localStorage.setItem('break_interval', e.target.value);

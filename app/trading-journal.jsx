@@ -221,6 +221,7 @@ function TickerAutocomplete({ value, onChange, onSelectLot, tickersList }) {
 function ImageZone({ label, imageUrl, onImageUploaded, tempId }) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const fileInputRef = useRef(null);
 
   const processImageBase64 = async (base64) => {
     setIsLoading(true);
@@ -272,6 +273,23 @@ function ImageZone({ label, imageUrl, onImageUploaded, tempId }) {
     }
   };
 
+  const handleClick = (e) => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const files = e.target.files;
+    if (files && files.length > 0 && files[0].type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        processImageBase64(event.target.result);
+      };
+      reader.readAsDataURL(files[0]);
+    }
+  };
+
   return (
     <div 
       className={`image-zone ${isDragOver ? 'dragover' : ''} ${imageUrl ? 'has-image' : ''}`}
@@ -279,23 +297,31 @@ function ImageZone({ label, imageUrl, onImageUploaded, tempId }) {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       onPaste={handlePaste}
+      onClick={handleClick}
       tabIndex={0}
-      title="Кликните и нажмите Ctrl+V для вставки из буфера или перетащите файл сюда"
+      title="Кликните для выбора, Ctrl+V для вставки из буфера или перетащите файл сюда"
     >
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept="image/*"
+        style={{ display: 'none' }}
+      />
       {isLoading ? (
         <div className="loader">Сохранение...</div>
       ) : imageUrl ? (
         <div className="preview-container">
           <img src={imageUrl} alt={label} className="preview-img" />
           <div className="preview-overlay">
-            <span>Изменить (Ctrl+V / Перетащить)</span>
+            <span>Изменить (Клик / Ctrl+V / Перетащить)</span>
           </div>
         </div>
       ) : (
         <div className="empty-zone-content">
           <span className="zone-icon">📷</span>
           <span className="zone-label">{label}</span>
-          <span className="zone-sub">Перетащите или Ctrl+V</span>
+          <span className="zone-sub">Кликните, перетащите или Ctrl+V</span>
         </div>
       )}
     </div>

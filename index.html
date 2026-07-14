@@ -123,7 +123,6 @@
       <button class="modal-action-btn" id="modal-pin-btn">📌 Сделать приоритетной</button>
       <button class="modal-action-btn" id="modal-edit-btn">✏️ Редактировать</button>
       <button class="modal-action-btn" id="modal-copy-btn">📋 Копировать текст</button>
-      <button class="modal-action-btn" id="modal-add-subtask-btn">↳ Добавить подзадачу</button>
       <button class="modal-action-btn" id="modal-move-btn">📂 Переместить задачу...</button>
       <button class="modal-action-btn delete" id="modal-delete-btn">🗑️ Удалить задачу</button>
     </div>
@@ -137,7 +136,7 @@
       <div class="modal-title">Выберите файл задач</div>
       <button class="modal-close" onclick="closeFileSelectorModal()">✕</button>
     </div>
-    <div class="modal-body" id="file-selector-list" style="max-height: 200px; overflow-y: auto;">
+    <div class="modal-body" id="file-selector-list">
       <!-- Динамический список файлов -->
     </div>
   </div>
@@ -201,6 +200,14 @@
       <!-- Раздел: Перерывы -->
       <div class="settings-section">
         <div class="settings-section-title">⏳ Напоминание о перерыве</div>
+        
+        <div class="setting-row" style="flex-direction: row; justify-content: space-between; align-items: center; -webkit-app-region: no-drag;">
+          <label for="break-enabled-toggle" style="margin-bottom: 0;">Включить напоминания:</label>
+          <label class="switch">
+            <input type="checkbox" id="break-enabled-toggle">
+            <span class="slider"></span>
+          </label>
+        </div>
         
         <div class="setting-row">
           <label for="break-interval-select">Период уведомлений:</label>
