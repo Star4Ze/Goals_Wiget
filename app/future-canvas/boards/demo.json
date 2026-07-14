@@ -8,26 +8,26 @@
       "type": "event",
       "title": "Первичные исследования",
       "description": "Сбор требований, анализ конкурентов и составление спецификации концепта.",
-      "date": "2024-11-11",
+      "date": "2038-09-21",
       "probability": 100,
       "sphere": "work",
       "status": "realized",
       "importance": 4,
-      "y": -86.66667175292969,
-      "hoverFactor": 0
+      "y": -400,
+      "hoverFactor": 0.8387446467559783
     },
     {
       "id": "node-2",
       "type": "event",
       "title": "Создание прототипа",
       "description": "Сборка первой рабочей версии на Electron и проверка базового интерфейса.",
-      "date": "2025-02-10",
+      "date": "1995-01-01",
       "probability": 100,
       "sphere": "work",
       "status": "realized",
       "importance": 5,
-      "y": -90,
-      "hoverFactor": 0
+      "y": 400,
+      "hoverFactor": 0.15
     },
     {
       "id": "node-3",
@@ -224,7 +224,7 @@
       "sphere": "work",
       "status": "hypothetical",
       "importance": 10,
-      "y": 0,
+      "y": 400,
       "hoverFactor": 0
     },
     {
@@ -233,13 +233,13 @@
       "title": "32423",
       "description": "234234",
       "date": "2030-05-17",
-      "probability": 50,
+      "probability": 71,
       "sphere": "health",
       "status": "hypothetical",
-      "importance": 5,
+      "importance": 10,
       "y": -22.457815995478075,
       "imageUrl": "C:\\Users\\HomePC\\Pictures\\Обои\\13660.jpg",
-      "hoverFactor": 0.5562946875
+      "hoverFactor": 0
     }
   ],
   "connections": [
@@ -355,24 +355,24 @@
       "id": "trading",
       "name": "Трейдинг",
       "color": "#00dbe7",
-      "visible": true
+      "visible": false
     },
     {
       "id": "health",
       "name": "Здоровье",
       "color": "#00e676",
-      "visible": true
+      "visible": false
     },
     {
       "id": "lumifi",
       "name": "LumiFi",
       "color": "#a186f1",
-      "visible": true
+      "visible": false
     }
   ],
   "viewport": {
-    "panX": 1904381301636.135,
-    "panY": -58.05799339606495,
-    "scale": 78043369.74071781
+    "panX": 1911169293439.9177,
+    "panY": 148.38486081557426,
+    "scale": 417551547.18679905
   }
 }

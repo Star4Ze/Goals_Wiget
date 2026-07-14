@@ -8,6 +8,7 @@ let currentBoard = null;
 let boardList = [];
 let selectedNodeId = null;
 let hoveredNodeId = null;
+let isMouseOverTooltip = false;
 
 // Undo/Redo history stacks
 const undoStack = [];
@@ -313,9 +314,9 @@ function getProjectedPosition(node, ignoreHover = false) {
   // 1. Calculate X position on the baseline (linear timeline)
   const sxOnBaseline = (nodeMs - camCenterMs) / msPerPixel + W / 2;
   
-  // 2. Probability (0-100%) maps to depth Z (0.0 to 1.0) - INVERTED: 100% at top, 0% at bottom
+  // 2. Probability (0-100%) maps to depth Z (0.0 to 1.0) - INVERTED: 100% at top, 0% at bottom (clamped to prevent division by zero)
   const z = (node.probability !== undefined ? node.probability : 50) / 100;
-  const depth = Math.pow(1.0 - z, 0.75);             // non-linear perspective mapping
+  const depth = Math.max(0.02, Math.pow(1.0 - z, 0.75));             // non-linear perspective mapping
   
   // 3. Project baseline to vanishing point VP
   const px = VP_X + (sxOnBaseline - VP_X) * depth;
@@ -1099,9 +1100,6 @@ function drawSmartLabels() {
     if (sphere && !sphere.visible) return;
 
     let titleText = node.title || 'Без названия';
-    if (node.probability !== undefined && node.type !== 'goal') {
-      titleText += ` (${node.probability}%)`;
-    }
 
     ctx.font = (node.id === selectedNodeId) ? '600 11px "JetBrains Mono", monospace' : '500 11px "JetBrains Mono", monospace';
     const textWidth = ctx.measureText(titleText).width;
@@ -1160,11 +1158,7 @@ function showDOMTooltip(node) {
   if (!tooltipEl) return;
 
   // Set title
-  let titleText = node.title || 'Без названия';
-  if (node.probability !== undefined && node.type !== 'goal') {
-    titleText += ` (${node.probability}%)`;
-  }
-  document.getElementById('fc-tt-title').textContent = titleText;
+  document.getElementById('fc-tt-title').textContent = node.title || 'Без названия';
 
   // Set meta info
   const sphere = (currentBoard?.spheres || []).find(s => s.id === node.sphere);
@@ -1252,6 +1246,7 @@ function showDOMTooltip(node) {
 }
 
 function hideDOMTooltip() {
+  isMouseOverTooltip = false; // Safe reset
   const tooltipEl = document.getElementById('fc-hover-tooltip');
   if (tooltipEl) {
     tooltipEl.classList.remove('visible');
@@ -1276,6 +1271,7 @@ function setupDOMTooltipEvents() {
   const tooltipEl = document.getElementById('fc-hover-tooltip');
   if (tooltipEl) {
     tooltipEl.addEventListener('mouseenter', () => {
+      isMouseOverTooltip = true;
       if (tooltipHideTimeout) {
         clearTimeout(tooltipHideTimeout);
         tooltipHideTimeout = null;
@@ -1283,6 +1279,7 @@ function setupDOMTooltipEvents() {
     });
 
     tooltipEl.addEventListener('mouseleave', () => {
+      isMouseOverTooltip = false;
       startTooltipHideTimeout();
     });
   }
@@ -1772,6 +1769,8 @@ function setupCanvasEvents() {
   // Mouse Move
   window.addEventListener('mousemove', (e) => {
     if (!canvas) return;
+    if (isMouseOverTooltip) return; // Keep tooltip open, ignore canvas hover detection
+
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
@@ -1787,7 +1786,7 @@ function setupCanvasEvents() {
     } else if (isDraggingNode && draggedNode) {
       // Dragging node in 3D space
       const z = (draggedNode.probability !== undefined ? draggedNode.probability : 50) / 100;
-      const depth = Math.pow(1.0 - z, 0.75);
+      const depth = Math.max(0.02, Math.pow(1.0 - z, 0.75));
       
       const sxOnBaseline = (mx - VP_X) / depth + VP_X;
       const targetMs = (sxOnBaseline - canvas.width / 2) * msPerPixel + camCenterMs;
