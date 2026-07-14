@@ -10,6 +10,12 @@ let selectedNodeId = null;
 let hoveredNodeId = null;
 let isMouseOverTooltip = false;
 
+// Node drag axis lock state
+let dragStartMouseX = 0;
+let dragStartMouseY = 0;
+let dragStartNodeDateMs = 0;
+let isDraggingNodeHorizontalActive = false;
+
 // Undo/Redo history stacks
 const undoStack = [];
 const redoStack = [];
@@ -314,9 +320,10 @@ function getProjectedPosition(node, ignoreHover = false) {
   // 1. Calculate X position on the baseline (linear timeline)
   const sxOnBaseline = (nodeMs - camCenterMs) / msPerPixel + W / 2;
   
-  // 2. Probability (0-100%) maps to depth Z (0.0 to 1.0) - INVERTED: 100% at top, 0% at bottom (clamped to prevent division by zero)
+  // 2. Probability (0-100%) maps to depth Z (0.0 to 1.0) - INVERTED: 100% at 55% depth (0.45), 0% at bottom (1.0)
   const z = (node.probability !== undefined ? node.probability : 50) / 100;
-  const depth = Math.max(0.02, Math.pow(1.0 - z, 0.75));             // non-linear perspective mapping
+  const minDepth = 0.45;
+  const depth = minDepth + (1.0 - minDepth) * Math.pow(1.0 - z, 0.75);             // non-linear perspective mapping
   
   // 3. Project baseline to vanishing point VP
   const px = VP_X + (sxOnBaseline - VP_X) * depth;
@@ -821,7 +828,8 @@ function drawCanvas() {
   const probLevels = [0, 25, 50, 75, 100];
   probLevels.forEach(prob => {
     const z = prob / 100;
-    const depth = Math.pow(1.0 - z, 0.75);
+    const minDepth = 0.45;
+    const depth = minDepth + (1.0 - minDepth) * Math.pow(1.0 - z, 0.75);
     
     const lx = VP_X + (sx1995 - VP_X) * depth;
     const rx = VP_X + (sx2100 - VP_X) * depth;
@@ -1753,6 +1761,12 @@ function setupCanvasEvents() {
           dragOffsetMs = w.wms - new Date(node.date).getTime();
           dragOffsetY = w.wy - node.y;
           selectedNodeId = node.id;
+          
+          // Axis lock variables
+          dragStartMouseX = e.clientX;
+          dragStartMouseY = e.clientY;
+          dragStartNodeDateMs = new Date(node.date).getTime();
+          isDraggingNodeHorizontalActive = false;
         }
       } else {
         isPanning = true;
@@ -1786,17 +1800,30 @@ function setupCanvasEvents() {
     } else if (isDraggingNode && draggedNode) {
       // Dragging node in 3D space
       const z = (draggedNode.probability !== undefined ? draggedNode.probability : 50) / 100;
-      const depth = Math.max(0.02, Math.pow(1.0 - z, 0.75));
+      const minDepth = 0.45;
+      const depth = minDepth + (1.0 - minDepth) * Math.pow(1.0 - z, 0.75);
       
-      const sxOnBaseline = (mx - VP_X) / depth + VP_X;
-      const targetMs = (sxOnBaseline - canvas.width / 2) * msPerPixel + camCenterMs;
-      const constrainedMs = Math.max(START_MS, Math.min(END_MS, targetMs));
-      draggedNode.date = new Date(constrainedMs).toISOString().slice(0, 10);
-      
+      // Vertical position (node.y) is always updated instantly
       const py = VP_Y + (baselineY - VP_Y) * depth;
       const visualHeight = py - my;
       const heightOffset = visualHeight / depth;
       draggedNode.y = -Math.max(-400, Math.min(400, heightOffset));
+
+      // Horizontal position (node.date) is locked until drag exceeds 40px threshold
+      const deltaX = Math.abs(e.clientX - dragStartMouseX);
+      if (!isDraggingNodeHorizontalActive && deltaX > 40) {
+        isDraggingNodeHorizontalActive = true;
+      }
+
+      if (isDraggingNodeHorizontalActive) {
+        const sxOnBaseline = (mx - VP_X) / depth + VP_X;
+        const targetMs = (sxOnBaseline - canvas.width / 2) * msPerPixel + camCenterMs;
+        const constrainedMs = Math.max(START_MS, Math.min(END_MS, targetMs));
+        draggedNode.date = new Date(constrainedMs).toISOString().slice(0, 10);
+      } else {
+        // Keep initial date
+        draggedNode.date = new Date(dragStartNodeDateMs).toISOString().slice(0, 10);
+      }
       
       triggerRender();
     } else if (isConnecting) {
