@@ -132,7 +132,7 @@
       "status": "hypothetical",
       "importance": 6,
       "y": 400,
-      "hoverFactor": 0,
+      "hoverFactor": 1,
       "imageUrl": ""
     },
     {
@@ -350,8 +350,8 @@
     }
   ],
   "viewport": {
-    "panX": 2522536375219.909,
-    "panY": -51.37806285451957,
-    "scale": 2151386673.527142
+    "panX": 1780352462627.3657,
+    "panY": -62.634536734366634,
+    "scale": 47167276.61958903
   }
 }
