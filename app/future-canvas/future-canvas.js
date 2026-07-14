@@ -105,15 +105,38 @@ function generateUUID() {
   return typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
 }
 
+// Safe event listener binder to prevent registration failures if some elements are missing
+function addSafeListener(id, event, callback) {
+  const el = document.getElementById(id);
+  if (el) {
+    el.addEventListener(event, callback);
+  }
+}
+
+// Helper to convert absolute Windows paths to valid file:// URL schemas
+function toFileUrl(pathStr) {
+  if (!pathStr) return '';
+  if (pathStr.startsWith('http://') || pathStr.startsWith('https://') || pathStr.startsWith('file://')) {
+    return pathStr;
+  }
+  let cleanPath = pathStr.replace(/\\/g, '/');
+  // Check if it's an absolute Windows drive path (e.g. "D:/path")
+  if (/^[A-Za-z]:\//.test(cleanPath)) {
+    return 'file:///' + cleanPath;
+  }
+  return cleanPath; // Let relative paths resolve normally
+}
+
 // Helper to load and cache local or remote images
 function getCachedImage(url) {
   if (!url) return null;
-  if (imageCache[url]) {
-    return imageCache[url].complete && imageCache[url].naturalWidth !== 0 ? imageCache[url] : null;
+  const resolvedUrl = toFileUrl(url);
+  if (imageCache[resolvedUrl]) {
+    return imageCache[resolvedUrl].complete && imageCache[resolvedUrl].naturalWidth !== 0 ? imageCache[resolvedUrl] : null;
   }
   const img = new Image();
-  img.src = url;
-  imageCache[url] = img;
+  img.src = resolvedUrl;
+  imageCache[resolvedUrl] = img;
   img.onload = () => {
     triggerRender();
   };
@@ -357,7 +380,8 @@ function updateModalPreview() {
   }
   
   if (hasImage) {
-    // Draw clipped image inside shape
+    // When there is an image, DO NOT draw standard sphere color fill inside it!
+    // Just clip the image to shape and draw it clean.
     pCtx.beginPath();
     if (type === 'decision') {
       pCtx.moveTo(cx, cy - radius * 1.25);
@@ -372,7 +396,7 @@ function updateModalPreview() {
     pCtx.drawImage(img, cx - radius * 1.25, cy - radius * 1.25, radius * 2.5, radius * 2.5);
     pCtx.restore();
     
-    // Draw outline stroke on top
+    // Draw outline stroke on top of the image
     pCtx.save();
     pCtx.globalAlpha = baseOpacity;
     pCtx.strokeStyle = color;
@@ -390,7 +414,7 @@ function updateModalPreview() {
     pCtx.stroke();
     pCtx.restore();
   } else {
-    // Standard drawing
+    // Standard drawing (no image present - filled with sphere color or default background)
     pCtx.strokeStyle = color;
     pCtx.fillStyle = status === 'realized' ? color : 'rgba(30, 32, 34, 0.8)';
     pCtx.lineWidth = 2.0;
@@ -478,33 +502,36 @@ function handleResize() {
 }
 
 function setupWindowControls() {
-  document.getElementById('fc-btn-reload')?.addEventListener('click', () => {
+  addSafeListener('fc-btn-reload', 'click', () => {
     window.location.reload();
   });
-  document.getElementById('fc-btn-min').addEventListener('click', () => {
+  addSafeListener('fc-btn-min', 'click', () => {
     window.electronAPI?.minimizeWindow();
   });
-  document.getElementById('fc-btn-max').addEventListener('click', () => {
+  addSafeListener('fc-btn-max', 'click', () => {
     window.electronAPI?.toggleMaximizeWindow();
   });
-  document.getElementById('fc-btn-close').addEventListener('click', () => {
+  addSafeListener('fc-btn-close', 'click', () => {
     window.electronAPI?.closeWindow();
   });
 
-  document.getElementById('fc-titlebar').addEventListener('dblclick', (e) => {
-    if (e.target.closest('.fc-win-btn')) return;
-    window.electronAPI?.toggleMaximizeWindow();
-  });
+  const titlebar = document.getElementById('fc-titlebar');
+  if (titlebar) {
+    titlebar.addEventListener('dblclick', (e) => {
+      if (e.target.closest('.fc-win-btn')) return;
+      window.electronAPI?.toggleMaximizeWindow();
+    });
+  }
 
   window.electronAPI?.onWindowStateChange((isMaximized) => {
     const win = document.getElementById('fc-window');
     const maxIcon = document.getElementById('fc-max-icon');
     if (isMaximized) {
-      win.classList.add('is-maximized');
-      maxIcon.textContent = 'filter_none';
+      if (win) win.classList.add('is-maximized');
+      if (maxIcon) maxIcon.textContent = 'filter_none';
     } else {
-      win.classList.remove('is-maximized');
-      maxIcon.textContent = 'crop_square';
+      if (win) win.classList.remove('is-maximized');
+      if (maxIcon) maxIcon.textContent = 'crop_square';
     }
   });
 }
@@ -512,15 +539,19 @@ function setupWindowControls() {
 function setupModalSliders() {
   const probSlider = document.getElementById('fc-nm-prob');
   const probVal = document.getElementById('fc-nm-prob-val');
-  probSlider.addEventListener('input', () => {
-    probVal.textContent = probSlider.value + '%';
-  });
+  if (probSlider && probVal) {
+    probSlider.addEventListener('input', () => {
+      probVal.textContent = probSlider.value + '%';
+    });
+  }
 
   const impSlider = document.getElementById('fc-nm-importance');
   const impVal = document.getElementById('fc-nm-importance-val');
-  impSlider.addEventListener('input', () => {
-    impVal.textContent = impSlider.value;
-  });
+  if (impSlider && impVal) {
+    impSlider.addEventListener('input', () => {
+      impVal.textContent = impSlider.value;
+    });
+  }
 
   // Modal input changes trigger live preview updates
   const previewTriggers = ['fc-nm-type', 'fc-nm-sphere', 'fc-nm-status', 'fc-nm-importance', 'fc-nm-image'];
@@ -857,7 +888,7 @@ function drawCanvas() {
       const hasImage = !!img;
 
       if (hasImage) {
-        // Draw Clipped Image
+        // Draw Clipped Image - DO NOT fill it with category color first (it is kept clean!)
         ctx.save();
         ctx.beginPath();
         if (node.type === 'decision') {
@@ -875,7 +906,7 @@ function drawCanvas() {
         ctx.drawImage(img, pos.x - pos.radius * 1.25, pos.y - pos.radius * 1.25, pos.radius * 2.5, pos.radius * 2.5);
         ctx.restore();
 
-        // Stroke Border on top of clipped image
+        // Stroke Border on top of clipped image (colored category outline frame)
         ctx.strokeStyle = color;
         ctx.beginPath();
         if (node.type === 'decision') {
@@ -889,7 +920,7 @@ function drawCanvas() {
         }
         ctx.stroke();
       } else {
-        // Standard draw (filled shape)
+        // Standard draw (filled shape - only used if no image is present)
         if (node.type === 'decision') {
           // Draw Diamond
           ctx.strokeStyle = color;
@@ -1260,11 +1291,11 @@ function updateBlurButtonUI() {
   if (!blurBtn) return;
   const icon = blurBtn.querySelector('.material-symbols-outlined');
   if (isBlurEnabled) {
-    icon.textContent = 'blur_on';
+    if (icon) icon.textContent = 'blur_on';
     blurBtn.title = 'Выключить размытие фона';
     blurBtn.style.color = 'var(--tertiary)';
   } else {
-    icon.textContent = 'blur_off';
+    if (icon) icon.textContent = 'blur_off';
     blurBtn.title = 'Включить размытие фона';
     blurBtn.style.color = 'var(--on-surface-var)';
   }
@@ -1386,12 +1417,6 @@ function buildSpheresManagerList() {
     delBtn.style.height = '28px';
     delBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 16px;">delete</span>';
     delBtn.addEventListener('click', () => {
-      const hasNodes = currentBoard.nodes.some(n => n.sphere === sphere.id);
-      if (hasNodes) {
-        if (!confirm(`К направлению "${sphere.name}" привязаны узлы на карте. Всё равно удалить его?`)) {
-          return;
-        }
-      }
       tempSpheres.splice(index, 1);
       buildSpheresManagerList();
     });
@@ -1407,20 +1432,23 @@ function buildSpheresManagerList() {
 // CANVAS INTERACTION EVENTS
 function setupCanvasEvents() {
   // Image chooser dialog triggers
-  document.getElementById('fc-btn-choose-image').addEventListener('click', () => {
-    document.getElementById('fc-nm-image-file').click();
+  addSafeListener('fc-btn-choose-image', 'click', () => {
+    document.getElementById('fc-nm-image-file')?.click();
   });
   
-  document.getElementById('fc-nm-image-file').addEventListener('change', (e) => {
+  addSafeListener('fc-nm-image-file', 'change', (e) => {
     if (e.target.files.length > 0) {
       // In Electron, File.path holds the absolute native filesystem path!
-      document.getElementById('fc-nm-image').value = e.target.files[0].path;
+      const imgPath = document.getElementById('fc-nm-image');
+      if (imgPath) {
+        imgPath.value = e.target.files[0].path;
+      }
       updateModalPreview(); // update preview instantly
     }
   });
 
   // Blur toggle button click
-  document.getElementById('fc-btn-blur').addEventListener('click', () => {
+  addSafeListener('fc-btn-blur', 'click', () => {
     isBlurEnabled = !isBlurEnabled;
     localStorage.setItem('fc_blur_enabled', isBlurEnabled);
     updateBlurButtonUI();
@@ -1428,18 +1456,18 @@ function setupCanvasEvents() {
   });
 
   // Undo/Redo button clicks
-  document.getElementById('fc-btn-undo').addEventListener('click', undo);
-  document.getElementById('fc-btn-redo').addEventListener('click', redo);
+  addSafeListener('fc-btn-undo', 'click', undo);
+  addSafeListener('fc-btn-redo', 'click', redo);
 
   // Category Manager modal triggers
-  document.getElementById('fc-btn-manage-spheres').addEventListener('click', () => {
+  addSafeListener('fc-btn-manage-spheres', 'click', () => {
     if (!currentBoard) return;
     tempSpheres = JSON.parse(JSON.stringify(currentBoard.spheres));
     buildSpheresManagerList();
-    spheresModal.classList.add('visible');
+    if (spheresModal) spheresModal.classList.add('visible');
   });
 
-  document.getElementById('fc-sm-add-btn').addEventListener('click', () => {
+  addSafeListener('fc-sm-add-btn', 'click', () => {
     const newId = 'sphere_' + Date.now();
     tempSpheres.push({
       id: newId,
@@ -1451,7 +1479,7 @@ function setupCanvasEvents() {
     buildSpheresManagerList();
   });
 
-  document.getElementById('fc-sm-save').addEventListener('click', async () => {
+  addSafeListener('fc-sm-save', 'click', async () => {
     if (!currentBoard) return;
 
     const hasEmptyName = tempSpheres.some(s => !s.name.trim());
@@ -1460,9 +1488,41 @@ function setupCanvasEvents() {
       return;
     }
 
+    // Nodes migration logic: If any nodes belonged to a deleted sphere, move them to "Другое"
+    const remainingSphereIds = tempSpheres.map(s => s.id);
+    let migratedCount = 0;
+
+    currentBoard.nodes.forEach(node => {
+      if (!remainingSphereIds.includes(node.sphere)) {
+        node.sphere = 'other';
+        migratedCount++;
+      }
+    });
+
+    // If nodes were migrated, ensure "Другое" exists in spheres
+    if (migratedCount > 0) {
+      let otherExists = tempSpheres.some(s => s.id === 'other');
+      if (!otherExists) {
+        tempSpheres.push({
+          id: 'other',
+          name: 'Другое',
+          color: '#8d9198',
+          icon: '🎯',
+          visible: true
+        });
+      }
+      
+      // Remap nodes just to make sure they match
+      currentBoard.nodes.forEach(node => {
+        if (!tempSpheres.some(s => s.id === node.sphere)) {
+          node.sphere = 'other';
+        }
+      });
+    }
+
     currentBoard.spheres = JSON.parse(JSON.stringify(tempSpheres));
     pushState(); // Save state
-    spheresModal.classList.remove('visible');
+    if (spheresModal) spheresModal.classList.remove('visible');
 
     buildSpheresPills();
     buildFilterPanel(); // keep filter panel in sync
@@ -1470,12 +1530,12 @@ function setupCanvasEvents() {
     await saveBoardImmediate();
   });
 
-  document.getElementById('fc-sm-cancel').addEventListener('click', () => {
-    spheresModal.classList.remove('visible');
+  addSafeListener('fc-sm-cancel', 'click', () => {
+    if (spheresModal) spheresModal.classList.remove('visible');
   });
 
   // Reality Button (smooth easing back to now)
-  document.getElementById('fc-btn-reality').addEventListener('click', () => {
+  addSafeListener('fc-btn-reality', 'click', () => {
     const startMs = camCenterMs;
     const targetMs = Date.now();
     const startTime = Date.now();
@@ -1503,7 +1563,7 @@ function setupCanvasEvents() {
   });
 
   // Yandex Calendar import trigger
-  document.getElementById('fc-btn-calendar').addEventListener('click', async () => {
+  addSafeListener('fc-btn-calendar', 'click', async () => {
     if (!currentBoard) return;
     const url = prompt('Введите приватный iCal (.ics) адрес Яндекс.Календаря:', currentBoard.yandexCalendarUrl || '');
     if (url !== null) {
@@ -1764,7 +1824,7 @@ function setupCanvasEvents() {
   });
 
   // Toolbar events
-  document.getElementById('fc-btn-add').addEventListener('click', () => {
+  addSafeListener('fc-btn-add', 'click', () => {
     const tempNode = {
       id: '',
       type: 'event',
@@ -1780,7 +1840,7 @@ function setupCanvasEvents() {
     showNodeModal(tempNode, true);
   });
 
-  document.getElementById('fc-btn-now').addEventListener('click', () => {
+  addSafeListener('fc-btn-now', 'click', () => {
     camCenterMs = Date.now();
     // Center Y on nodes
     if (currentBoard && currentBoard.nodes.length > 0) {
@@ -1794,22 +1854,25 @@ function setupCanvasEvents() {
     saveBoardDebounced();
   });
 
-  document.getElementById('fc-btn-filter').addEventListener('click', () => {
+  addSafeListener('fc-btn-filter', 'click', () => {
     filterPanel.classList.toggle('visible');
   });
 
-  document.getElementById('fc-btn-export').addEventListener('click', () => {
+  addSafeListener('fc-btn-export', 'click', () => {
     showExportModal();
   });
 
-  document.getElementById('fc-btn-settings').addEventListener('click', () => {
+  addSafeListener('fc-btn-settings', 'click', () => {
     alert('Future Canvas Terminal v1.0.0\nТема: Void (#0A0E14)\nСохранение: автоматическое в папку boards внутри проекта.');
   });
 
-  document.getElementById('fc-btn-new-board').addEventListener('click', () => {
+  addSafeListener('fc-btn-new-board', 'click', () => {
     boardModal.classList.add('visible');
-    document.getElementById('fc-bm-name').value = '';
-    document.getElementById('fc-bm-name').focus();
+    const bName = document.getElementById('fc-bm-name');
+    if (bName) {
+      bName.value = '';
+      bName.focus();
+    }
   });
 }
 
@@ -1877,7 +1940,7 @@ document.getElementById('fc-board-select').addEventListener('change', async (e) 
   await loadBoard(e.target.value);
 });
 
-document.getElementById('fc-bm-save').addEventListener('click', async () => {
+addSafeListener('fc-bm-save', 'click', async () => {
   const name = document.getElementById('fc-bm-name').value.trim();
   if (!name) return;
 
@@ -1892,7 +1955,7 @@ document.getElementById('fc-bm-save').addEventListener('click', async () => {
   }
 });
 
-document.getElementById('fc-bm-cancel').addEventListener('click', () => {
+addSafeListener('fc-bm-cancel', 'click', () => {
   boardModal.classList.remove('visible');
 });
 
@@ -1976,13 +2039,13 @@ function hideContextMenu() {
   ctxMenu.style.display = 'none';
 }
 
-document.getElementById('fc-ctx-edit').addEventListener('click', () => {
+addSafeListener('fc-ctx-edit', 'click', () => {
   const node = currentBoard.nodes.find(n => n.id === selectedNodeId);
   if (node) showNodeModal(node);
   hideContextMenu();
 });
 
-document.getElementById('fc-ctx-connect').addEventListener('click', () => {
+addSafeListener('fc-ctx-connect', 'click', () => {
   const node = currentBoard.nodes.find(n => n.id === selectedNodeId);
   if (node) {
     isConnecting = true;
@@ -1995,7 +2058,7 @@ document.getElementById('fc-ctx-connect').addEventListener('click', () => {
   hideContextMenu();
 });
 
-document.getElementById('fc-ctx-realized').addEventListener('click', () => {
+addSafeListener('fc-ctx-realized', 'click', () => {
   const node = currentBoard.nodes.find(n => n.id === selectedNodeId);
   if (node) {
     node.status = 'realized';
@@ -2006,7 +2069,7 @@ document.getElementById('fc-ctx-realized').addEventListener('click', () => {
   hideContextMenu();
 });
 
-document.getElementById('fc-ctx-discarded').addEventListener('click', () => {
+addSafeListener('fc-ctx-discarded', 'click', () => {
   const node = currentBoard.nodes.find(n => n.id === selectedNodeId);
   if (node) {
     node.status = 'discarded';
@@ -2017,7 +2080,7 @@ document.getElementById('fc-ctx-discarded').addEventListener('click', () => {
   hideContextMenu();
 });
 
-document.getElementById('fc-ctx-delete').addEventListener('click', () => {
+addSafeListener('fc-ctx-delete', 'click', () => {
   if (selectedNodeId) {
     deleteNode(selectedNodeId);
     selectedNodeId = null;
@@ -2027,19 +2090,19 @@ document.getElementById('fc-ctx-delete').addEventListener('click', () => {
 });
 
 // Empty space right click actions
-document.getElementById('fc-ctx-add-goal').addEventListener('click', () => {
+addSafeListener('fc-ctx-add-goal', 'click', () => {
   const tempNode = createTempNodeAtClick('goal');
   showNodeModal(tempNode, true);
   hideContextMenu();
 });
 
-document.getElementById('fc-ctx-add-event').addEventListener('click', () => {
+addSafeListener('fc-ctx-add-event', 'click', () => {
   const tempNode = createTempNodeAtClick('event');
   showNodeModal(tempNode, true);
   hideContextMenu();
 });
 
-document.getElementById('fc-ctx-add-decision').addEventListener('click', () => {
+addSafeListener('fc-ctx-add-decision', 'click', () => {
   const tempNode = createTempNodeAtClick('decision');
   showNodeModal(tempNode, true);
   hideContextMenu();
@@ -2079,37 +2142,59 @@ function showNodeModal(node, isNew = false) {
   // Dynamically populate Category dropdown in Modal from spheres array
   populateSphereSelect();
 
-  document.getElementById('fc-nm-heading').textContent = isNew ? 'Новый узел' : 'Редактировать узел';
-  document.getElementById('fc-nm-type').value = node.type;
-  document.getElementById('fc-nm-title').value = node.title || '';
-  document.getElementById('fc-nm-desc').value = node.description || '';
-  document.getElementById('fc-nm-date').value = node.date || new Date().toISOString().slice(0, 10);
+  const heading = document.getElementById('fc-nm-heading');
+  if (heading) heading.textContent = isNew ? 'Новый узел' : 'Редактировать узел';
+
+  const nType = document.getElementById('fc-nm-type');
+  if (nType) nType.value = node.type;
+
+  const nTitle = document.getElementById('fc-nm-title');
+  if (nTitle) nTitle.value = node.title || '';
+
+  const nDesc = document.getElementById('fc-nm-desc');
+  if (nDesc) nDesc.value = node.description || '';
+
+  const nDate = document.getElementById('fc-nm-date');
+  if (nDate) nDate.value = node.date || new Date().toISOString().slice(0, 10);
   
   const prob = node.probability !== undefined ? node.probability : 50;
-  document.getElementById('fc-nm-prob').value = prob;
-  document.getElementById('fc-nm-prob-val').textContent = prob + '%';
+  const nProb = document.getElementById('fc-nm-prob');
+  if (nProb) nProb.value = prob;
 
-  document.getElementById('fc-nm-sphere').value = node.sphere || 'work';
-  document.getElementById('fc-nm-status').value = node.status || 'hypothetical';
+  const nProbVal = document.getElementById('fc-nm-prob-val');
+  if (nProbVal) nProbVal.textContent = prob + '%';
+
+  const nSphere = document.getElementById('fc-nm-sphere');
+  if (nSphere) nSphere.value = node.sphere || 'work';
+
+  const nStatus = document.getElementById('fc-nm-status');
+  if (nStatus) nStatus.value = node.status || 'hypothetical';
   
   const importance = node.importance !== undefined ? node.importance : 5;
-  document.getElementById('fc-nm-importance').value = importance;
-  document.getElementById('fc-nm-importance-val').textContent = importance;
+  const nImportance = document.getElementById('fc-nm-importance');
+  if (nImportance) nImportance.value = importance;
+
+  const nImportanceVal = document.getElementById('fc-nm-importance-val');
+  if (nImportanceVal) nImportanceVal.textContent = importance;
 
   // Add Image path field value
-  document.getElementById('fc-nm-image').value = node.imageUrl || '';
-  document.getElementById('fc-nm-image-file').value = ''; // reset file input
+  const nImage = document.getElementById('fc-nm-image');
+  if (nImage) nImage.value = node.imageUrl || '';
 
-  document.getElementById('fc-nm-delete').style.display = isNew ? 'none' : 'block';
+  const nImageFile = document.getElementById('fc-nm-image-file');
+  if (nImageFile) nImageFile.value = ''; // reset file input
 
-  nodeModal.classList.add('visible');
-  document.getElementById('fc-nm-title').focus();
+  const nDelete = document.getElementById('fc-nm-delete');
+  if (nDelete) nDelete.style.display = isNew ? 'none' : 'block';
+
+  if (nodeModal) nodeModal.classList.add('visible');
+  if (nTitle) nTitle.focus();
   
   // Render live preview on modal open
   setTimeout(updateModalPreview, 10);
 }
 
-document.getElementById('fc-nm-save').addEventListener('click', () => {
+addSafeListener('fc-nm-save', 'click', () => {
   if (!currentBoard || !modalTargetNode) return;
 
   const title = document.getElementById('fc-nm-title').value.trim();
@@ -2131,30 +2216,30 @@ document.getElementById('fc-nm-save').addEventListener('click', () => {
   }
 
   pushState(); // Save state to history stack
-  nodeModal.classList.remove('visible');
+  if (nodeModal) nodeModal.classList.remove('visible');
   saveBoardImmediate();
   triggerRender();
 });
 
-document.getElementById('fc-nm-cancel').addEventListener('click', () => {
-  nodeModal.classList.remove('visible');
+addSafeListener('fc-nm-cancel', 'click', () => {
+  if (nodeModal) nodeModal.classList.remove('visible');
 });
 
-document.getElementById('fc-nm-delete').addEventListener('click', () => {
+addSafeListener('fc-nm-delete', 'click', () => {
   if (modalTargetNode && !isNewNodeModal) {
     deleteNode(modalTargetNode.id);
     selectedNodeId = null;
-    nodeModal.classList.remove('visible');
+    if (nodeModal) nodeModal.classList.remove('visible');
     triggerRender();
   }
 });
 
 function closeAllModals() {
-  nodeModal.classList.remove('visible');
-  boardModal.classList.remove('visible');
-  exportModal.classList.remove('visible');
-  filterPanel.classList.remove('visible');
-  spheresModal.classList.remove('visible');
+  if (nodeModal) nodeModal.classList.remove('visible');
+  if (boardModal) boardModal.classList.remove('visible');
+  if (exportModal) exportModal.classList.remove('visible');
+  if (filterPanel) filterPanel.classList.remove('visible');
+  if (spheresModal) spheresModal.classList.remove('visible');
 }
 
 // EXPORT TO AI
@@ -2179,23 +2264,28 @@ function showExportModal() {
     }
   });
 
-  document.getElementById('fc-export-text').value = output;
-  exportModal.classList.add('visible');
+  const text = document.getElementById('fc-export-text');
+  if (text) text.value = output;
+  if (exportModal) exportModal.classList.add('visible');
 }
 
-document.getElementById('fc-export-copy').addEventListener('click', () => {
+addSafeListener('fc-export-copy', 'click', () => {
   const text = document.getElementById('fc-export-text');
-  text.select();
-  document.execCommand('copy');
+  if (text) {
+    text.select();
+    document.execCommand('copy');
+  }
   
   const copyBtn = document.getElementById('fc-export-copy');
-  const prevText = copyBtn.textContent;
-  copyBtn.textContent = 'Скопировано!';
-  setTimeout(() => {
-    copyBtn.textContent = prevText;
-  }, 1500);
+  if (copyBtn) {
+    const prevText = copyBtn.textContent;
+    copyBtn.textContent = 'Скопировано!';
+    setTimeout(() => {
+      copyBtn.textContent = prevText;
+    }, 1500);
+  }
 });
 
-document.getElementById('fc-export-close').addEventListener('click', () => {
-  exportModal.classList.remove('visible');
+addSafeListener('fc-export-close', 'click', () => {
+  if (exportModal) exportModal.classList.remove('visible');
 });
