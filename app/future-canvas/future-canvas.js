@@ -313,9 +313,9 @@ function getProjectedPosition(node, ignoreHover = false) {
   // 1. Calculate X position on the baseline (linear timeline)
   const sxOnBaseline = (nodeMs - camCenterMs) / msPerPixel + W / 2;
   
-  // 2. Probability (0-100%) maps to depth Z (0.0 to 1.0)
+  // 2. Probability (0-100%) maps to depth Z (0.0 to 1.0) - INVERTED: 100% at top, 0% at bottom
   const z = (node.probability !== undefined ? node.probability : 50) / 100;
-  const depth = Math.pow(z, 0.75);             // non-linear perspective mapping
+  const depth = Math.pow(1.0 - z, 0.75);             // non-linear perspective mapping
   
   // 3. Project baseline to vanishing point VP
   const px = VP_X + (sxOnBaseline - VP_X) * depth;
@@ -820,7 +820,7 @@ function drawCanvas() {
   const probLevels = [0, 25, 50, 75, 100];
   probLevels.forEach(prob => {
     const z = prob / 100;
-    const depth = Math.pow(z, 0.75);
+    const depth = Math.pow(1.0 - z, 0.75);
     
     const lx = VP_X + (sx1995 - VP_X) * depth;
     const rx = VP_X + (sx2100 - VP_X) * depth;
@@ -1787,7 +1787,7 @@ function setupCanvasEvents() {
     } else if (isDraggingNode && draggedNode) {
       // Dragging node in 3D space
       const z = (draggedNode.probability !== undefined ? draggedNode.probability : 50) / 100;
-      const depth = Math.pow(z, 0.75);
+      const depth = Math.pow(1.0 - z, 0.75);
       
       const sxOnBaseline = (mx - VP_X) / depth + VP_X;
       const targetMs = (sxOnBaseline - canvas.width / 2) * msPerPixel + camCenterMs;
