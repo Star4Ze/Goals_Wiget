@@ -10,6 +10,7 @@ let breakWindow = null;
 let analyticsWindow = null;
 let tradingJournalWindow = null;
 let connectionsWindow = null;
+let futureCanvasWindow = null;
 
 const TARGET_DIR = "C:\\Users\\HomePC\\Documents\\Obsidian\\Progects\\MyLife";
 const CONNECTIONS_DIR = "C:\\Users\\HomePC\\Documents\\Obsidian\\Progects\\MyLife\\Моя картотека";
@@ -598,6 +599,8 @@ const TRADING_DB_PATH = path.join(TRADING_DIR, "trades.json");
 const TRADING_DATA_DIR = path.join(TRADING_DIR, "data");
 const TRADING_TICKERS_PATH = path.join(TRADING_DATA_DIR, "tickers.json");
 
+const CANVAS_DIR = "D:\\GoogleDisk\\Docs\\FutureCanvas";
+
 function ensureTradingDir() {
   try {
     if (!fs.existsSync(TRADING_DIR)) {
@@ -611,6 +614,16 @@ function ensureTradingDir() {
     }
   } catch (e) {
     logAction(`Ошибка создания папок трейдинга: ${e.message}`);
+  }
+}
+
+function ensureCanvasDir() {
+  try {
+    if (!fs.existsSync(CANVAS_DIR)) {
+      fs.mkdirSync(CANVAS_DIR, { recursive: true });
+    }
+  } catch (e) {
+    logAction(`Ошибка создания папки Future Canvas: ${e.message}`);
   }
 }
 
@@ -1841,6 +1854,197 @@ ${content}
     } catch (e) {
       logAction(`Ошибка ИИ-анализа: ${e.message}`);
       return { success: false, error: e.message };
+    }
+  });
+
+  // ==========================================
+  // Future Canvas Handlers
+  // ==========================================
+
+  ipcMain.handle('open-future-canvas', (event) => {
+    if (futureCanvasWindow) {
+      futureCanvasWindow.focus();
+      return;
+    }
+
+    futureCanvasWindow = new BrowserWindow({
+      width: 1280,
+      height: 800,
+      minWidth: 900,
+      minHeight: 600,
+      frame: false,
+      transparent: true,
+      backgroundColor: '#00000000',
+      resizable: true,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, 'preload.js')
+      }
+    });
+
+    futureCanvasWindow.loadFile(path.join(__dirname, 'app', 'future-canvas.html'));
+
+    futureCanvasWindow.on('maximize', () => {
+      if (futureCanvasWindow && !futureCanvasWindow.isDestroyed()) {
+        futureCanvasWindow.webContents.send('window-state-change', true);
+      }
+    });
+    futureCanvasWindow.on('unmaximize', () => {
+      if (futureCanvasWindow && !futureCanvasWindow.isDestroyed()) {
+        futureCanvasWindow.webContents.send('window-state-change', false);
+      }
+    });
+
+    futureCanvasWindow.on('closed', () => {
+      futureCanvasWindow = null;
+    });
+  });
+
+  ipcMain.handle('minimize-window', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) win.minimize();
+  });
+
+  ipcMain.handle('toggle-maximize-window', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) {
+      if (win.isMaximized()) {
+        win.unmaximize();
+      } else {
+        win.maximize();
+      }
+    }
+  });
+
+  ipcMain.handle('get-canvas-boards', async () => {
+    ensureCanvasDir();
+    try {
+      const files = fs.readdirSync(CANVAS_DIR)
+        .filter(f => f.endsWith('.json'))
+        .map(f => {
+          const filePath = path.join(CANVAS_DIR, f);
+          try {
+            const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+            return { id: path.basename(f, '.json'), name: data.name || path.basename(f, '.json'), createdAt: data.createdAt || null };
+          } catch (e) {
+            return { id: path.basename(f, '.json'), name: path.basename(f, '.json'), createdAt: null };
+          }
+        });
+
+      if (files.length === 0) {
+        const defaultBoard = {
+          id: 'personal',
+          name: 'Личная доска',
+          createdAt: new Date().toISOString(),
+          nodes: [],
+          connections: [],
+          spheres: [
+            { id: 'work', name: 'Работа', color: '#5B7A9D', visible: true },
+            { id: 'trading', name: 'Трейдинг', color: '#00dbe7', visible: true },
+            { id: 'health', name: 'Здоровье', color: '#00e676', visible: true },
+            { id: 'lumifi', name: 'LumiFi', color: '#a186f1', visible: true }
+          ],
+          viewport: { panX: 0, panY: 0, scale: 1 }
+        };
+        fs.writeFileSync(path.join(CANVAS_DIR, 'personal.json'), JSON.stringify(defaultBoard, null, 2), 'utf-8');
+        logAction('📐 Создана доска Future Canvas по умолчанию: personal');
+        return [{ id: 'personal', name: 'Личная доска', createdAt: defaultBoard.createdAt }];
+      }
+
+      return files;
+    } catch (e) {
+      logAction(`Ошибка чтения досок Future Canvas: ${e.message}`);
+      return [];
+    }
+  });
+
+  ipcMain.handle('get-canvas-board-data', async (event, boardId) => {
+    ensureCanvasDir();
+    try {
+      const filePath = path.join(CANVAS_DIR, `${boardId}.json`);
+      if (fs.existsSync(filePath)) {
+        return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      }
+      return null;
+    } catch (e) {
+      logAction(`Ошибка чтения доски ${boardId}: ${e.message}`);
+      return null;
+    }
+  });
+
+  ipcMain.handle('save-canvas-board-data', async (event, boardId, data) => {
+    ensureCanvasDir();
+    try {
+      const filePath = path.join(CANVAS_DIR, `${boardId}.json`);
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+      return true;
+    } catch (e) {
+      logAction(`Ошибка сохранения доски ${boardId}: ${e.message}`);
+      return false;
+    }
+  });
+
+  ipcMain.handle('create-canvas-board', async (event, name) => {
+    ensureCanvasDir();
+    try {
+      const id = name.toLowerCase().replace(/[^a-zа-яё0-9]/gi, '_').replace(/_+/g, '_').substring(0, 50) || 'board';
+      let finalId = id;
+      let counter = 1;
+      while (fs.existsSync(path.join(CANVAS_DIR, `${finalId}.json`))) {
+        finalId = `${id}_${counter}`;
+        counter++;
+      }
+      const board = {
+        id: finalId,
+        name: name,
+        createdAt: new Date().toISOString(),
+        nodes: [],
+        connections: [],
+        spheres: [
+          { id: 'work', name: 'Работа', color: '#5B7A9D', visible: true },
+          { id: 'trading', name: 'Трейдинг', color: '#00dbe7', visible: true },
+          { id: 'health', name: 'Здоровье', color: '#00e676', visible: true },
+          { id: 'lumifi', name: 'LumiFi', color: '#a186f1', visible: true }
+        ],
+        viewport: { panX: 0, panY: 0, scale: 1 }
+      };
+      fs.writeFileSync(path.join(CANVAS_DIR, `${finalId}.json`), JSON.stringify(board, null, 2), 'utf-8');
+      logAction(`📐 Создана новая доска Future Canvas: ${name} (${finalId})`);
+      return { id: finalId, name: name };
+    } catch (e) {
+      logAction(`Ошибка создания доски: ${e.message}`);
+      return null;
+    }
+  });
+
+  ipcMain.handle('rename-canvas-board', async (event, boardId, newName) => {
+    ensureCanvasDir();
+    try {
+      const filePath = path.join(CANVAS_DIR, `${boardId}.json`);
+      if (!fs.existsSync(filePath)) return false;
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+      data.name = newName;
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+      logAction(`📐 Доска переименована: ${boardId} → ${newName}`);
+      return true;
+    } catch (e) {
+      logAction(`Ошибка переименования доски: ${e.message}`);
+      return false;
+    }
+  });
+
+  ipcMain.handle('delete-canvas-board', async (event, boardId) => {
+    ensureCanvasDir();
+    try {
+      const filePath = path.join(CANVAS_DIR, `${boardId}.json`);
+      if (!fs.existsSync(filePath)) return false;
+      fs.unlinkSync(filePath);
+      logAction(`🗑️ Удалена доска Future Canvas: ${boardId}`);
+      return true;
+    } catch (e) {
+      logAction(`Ошибка удаления доски: ${e.message}`);
+      return false;
     }
   });
 }

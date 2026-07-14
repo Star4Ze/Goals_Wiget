@@ -52,5 +52,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getLLMConfig: () => ipcRenderer.invoke('get-llm-config'),
   saveLLMConfig: (data) => ipcRenderer.invoke('save-llm-config', data),
   createConnection: (fileName, parentDir) => ipcRenderer.invoke('create-connection', fileName, parentDir),
-  deleteConnection: (filePath) => ipcRenderer.invoke('delete-connection', filePath)
+  deleteConnection: (filePath) => ipcRenderer.invoke('delete-connection', filePath),
+
+  // Future Canvas additions
+  openFutureCanvas: () => ipcRenderer.invoke('open-future-canvas'),
+  minimizeWindow: () => ipcRenderer.invoke('minimize-window'),
+  toggleMaximizeWindow: () => ipcRenderer.invoke('toggle-maximize-window'),
+  onWindowStateChange: (callback) => ipcRenderer.on('window-state-change', (event, isMaximized) => callback(isMaximized)),
+  getCanvasBoards: () => ipcRenderer.invoke('get-canvas-boards'),
+  getCanvasBoardData: (boardId) => ipcRenderer.invoke('get-canvas-board-data', boardId),
+  saveCanvasBoardData: (boardId, data) => ipcRenderer.invoke('save-canvas-board-data', boardId, data),
+  createCanvasBoard: (name) => ipcRenderer.invoke('create-canvas-board', name),
+  renameCanvasBoard: (boardId, newName) => ipcRenderer.invoke('rename-canvas-board', boardId, newName),
+  deleteCanvasBoard: (boardId) => ipcRenderer.invoke('delete-canvas-board', boardId)
 });
