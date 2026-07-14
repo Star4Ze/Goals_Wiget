@@ -315,6 +315,105 @@ function getAnchorScreenPos(node) {
   return { x: pos.x + pos.radius, y: pos.y };
 }
 
+// Draw a node preview in the edit modal in real-time
+function updateModalPreview() {
+  const previewCanvas = document.getElementById('fc-nm-preview-canvas');
+  if (!previewCanvas) return;
+  const pCtx = previewCanvas.getContext('2d');
+  pCtx.clearRect(0, 0, 50, 50);
+  
+  const type = document.getElementById('fc-nm-type').value;
+  const sphereId = document.getElementById('fc-nm-sphere').value;
+  const status = document.getElementById('fc-nm-status').value;
+  const importance = parseInt(document.getElementById('fc-nm-importance').value) || 5;
+  const imageUrl = document.getElementById('fc-nm-image').value.trim();
+  
+  const sphere = currentBoard?.spheres.find(s => s.id === sphereId) || { color: '#aac9f0' };
+  const color = sphere.color;
+  
+  const baseRadius = 8;
+  const radius = Math.min(18, baseRadius * (importance / 5) * 1.1); // Scaled for preview frame
+  
+  const cx = 25;
+  const cy = 25;
+  
+  const img = getCachedImage(imageUrl);
+  const hasImage = !!img;
+  
+  pCtx.save();
+  
+  const baseOpacity = status === 'discarded' ? 0.25 : (status === 'hypothetical' ? 0.65 : 1.0);
+  pCtx.globalAlpha = baseOpacity;
+  
+  // Glowing effect
+  if (type === 'goal') {
+    pCtx.shadowColor = color;
+    pCtx.shadowBlur = 10;
+  }
+  
+  if (hasImage) {
+    // Draw clipped image inside shape
+    pCtx.beginPath();
+    if (type === 'decision') {
+      pCtx.moveTo(cx, cy - radius * 1.25);
+      pCtx.lineTo(cx + radius * 1.25, cy);
+      pCtx.lineTo(cx, cy + radius * 1.25);
+      pCtx.lineTo(cx - radius * 1.25, cy);
+      pCtx.closePath();
+    } else {
+      pCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+    }
+    pCtx.clip();
+    pCtx.drawImage(img, cx - radius * 1.25, cy - radius * 1.25, radius * 2.5, radius * 2.5);
+    pCtx.restore();
+    
+    // Draw outline stroke on top
+    pCtx.save();
+    pCtx.globalAlpha = baseOpacity;
+    pCtx.strokeStyle = color;
+    pCtx.lineWidth = 2.0;
+    pCtx.beginPath();
+    if (type === 'decision') {
+      pCtx.moveTo(cx, cy - radius * 1.25);
+      pCtx.lineTo(cx + radius * 1.25, cy);
+      pCtx.lineTo(cx, cy + radius * 1.25);
+      pCtx.lineTo(cx - radius * 1.25, cy);
+      pCtx.closePath();
+    } else {
+      pCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+    }
+    pCtx.stroke();
+    pCtx.restore();
+  } else {
+    // Standard drawing
+    pCtx.strokeStyle = color;
+    pCtx.fillStyle = status === 'realized' ? color : 'rgba(30, 32, 34, 0.8)';
+    pCtx.lineWidth = 2.0;
+    
+    pCtx.beginPath();
+    if (type === 'decision') {
+      pCtx.moveTo(cx, cy - radius * 1.25);
+      pCtx.lineTo(cx + radius * 1.25, cy);
+      pCtx.lineTo(cx, cy + radius * 1.25);
+      pCtx.lineTo(cx - radius * 1.25, cy);
+      pCtx.closePath();
+    } else {
+      pCtx.arc(cx, cy, radius, 0, Math.PI * 2);
+    }
+    pCtx.fill();
+    pCtx.stroke();
+    
+    // Inner dot
+    if (type === 'event' && status !== 'realized') {
+      pCtx.fillStyle = color;
+      pCtx.beginPath();
+      pCtx.arc(cx, cy, radius * 0.4, 0, Math.PI * 2);
+      pCtx.fill();
+    }
+    pCtx.restore();
+  }
+}
+
 function isOverAnchor(sx, sy, node) {
   const anchor = getAnchorScreenPos(node);
   const dist = Math.hypot(sx - anchor.x, sy - anchor.y);
@@ -415,6 +514,14 @@ function setupModalSliders() {
   const impVal = document.getElementById('fc-nm-importance-val');
   impSlider.addEventListener('input', () => {
     impVal.textContent = impSlider.value;
+  });
+
+  // Modal input changes trigger live preview updates
+  const previewTriggers = ['fc-nm-type', 'fc-nm-sphere', 'fc-nm-status', 'fc-nm-importance', 'fc-nm-image'];
+  previewTriggers.forEach(id => {
+    const el = document.getElementById(id);
+    el?.addEventListener('change', updateModalPreview);
+    el?.addEventListener('input', updateModalPreview);
   });
 }
 
@@ -739,33 +846,72 @@ function drawCanvas() {
 
       ctx.lineWidth = isSelected ? 3.0 : 1.5;
 
-      if (node.type === 'decision') {
-        // Draw Diamond
-        ctx.strokeStyle = color;
-        ctx.fillStyle = isSelected ? color : 'rgba(30, 32, 34, 0.8)';
+      // Image Check - if there is an image, we clip and draw it inside the node!
+      const img = getCachedImage(node.imageUrl);
+      const hasImage = !!img;
+
+      if (hasImage) {
+        // Draw Clipped Image
+        ctx.save();
         ctx.beginPath();
-        ctx.moveTo(pos.x, pos.y - pos.radius * 1.25);
-        ctx.lineTo(pos.x + pos.radius * 1.25, pos.y);
-        ctx.lineTo(pos.x, pos.y + pos.radius * 1.25);
-        ctx.lineTo(pos.x - pos.radius * 1.25, pos.y);
-        ctx.closePath();
-        ctx.fill();
+        if (node.type === 'decision') {
+          // Diamond Clip Path
+          ctx.moveTo(pos.x, pos.y - pos.radius * 1.25);
+          ctx.lineTo(pos.x + pos.radius * 1.25, pos.y);
+          ctx.lineTo(pos.x, pos.y + pos.radius * 1.25);
+          ctx.lineTo(pos.x - pos.radius * 1.25, pos.y);
+          ctx.closePath();
+        } else {
+          // Circle Clip Path
+          ctx.arc(pos.x, pos.y, pos.radius, 0, Math.PI * 2);
+        }
+        ctx.clip();
+        ctx.drawImage(img, pos.x - pos.radius * 1.25, pos.y - pos.radius * 1.25, pos.radius * 2.5, pos.radius * 2.5);
+        ctx.restore();
+
+        // Stroke Border on top of clipped image
+        ctx.strokeStyle = color;
+        ctx.beginPath();
+        if (node.type === 'decision') {
+          ctx.moveTo(pos.x, pos.y - pos.radius * 1.25);
+          ctx.lineTo(pos.x + pos.radius * 1.25, pos.y);
+          ctx.lineTo(pos.x, pos.y + pos.radius * 1.25);
+          ctx.lineTo(pos.x - pos.radius * 1.25, pos.y);
+          ctx.closePath();
+        } else {
+          ctx.arc(pos.x, pos.y, pos.radius, 0, Math.PI * 2);
+        }
         ctx.stroke();
       } else {
-        // Draw Circle
-        ctx.strokeStyle = color;
-        ctx.fillStyle = (node.status === 'realized' || isSelected) ? color : 'rgba(30, 32, 34, 0.8)';
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, pos.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-
-        // Inner dot
-        if (node.type === 'event' && node.status !== 'realized' && !isSelected) {
-          ctx.fillStyle = color;
+        // Standard draw (filled shape)
+        if (node.type === 'decision') {
+          // Draw Diamond
+          ctx.strokeStyle = color;
+          ctx.fillStyle = isSelected ? color : 'rgba(30, 32, 34, 0.8)';
           ctx.beginPath();
-          ctx.arc(pos.x, pos.y, pos.radius * 0.4, 0, Math.PI * 2);
+          ctx.moveTo(pos.x, pos.y - pos.radius * 1.25);
+          ctx.lineTo(pos.x + pos.radius * 1.25, pos.y);
+          ctx.lineTo(pos.x, pos.y + pos.radius * 1.25);
+          ctx.lineTo(pos.x - pos.radius * 1.25, pos.y);
+          ctx.closePath();
           ctx.fill();
+          ctx.stroke();
+        } else {
+          // Draw Circle
+          ctx.strokeStyle = color;
+          ctx.fillStyle = (node.status === 'realized' || isSelected) ? color : 'rgba(30, 32, 34, 0.8)';
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, pos.radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+
+          // Inner dot
+          if (node.type === 'event' && node.status !== 'realized' && !isSelected) {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, pos.radius * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
       }
 
@@ -778,18 +924,6 @@ function drawCanvas() {
         ctx.arc(pos.x + pos.radius, pos.y, 4, 0, Math.PI * 2);
         ctx.fill();
       }
-
-      // Label below node
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = isSelected ? 'var(--on-surface)' : 'var(--on-surface-var)';
-      ctx.font = isSelected ? '600 11px "JetBrains Mono", monospace' : '500 11px "JetBrains Mono", monospace';
-      ctx.textAlign = 'center';
-      
-      let titleText = node.title || 'Без названия';
-      if (node.probability !== undefined && node.type !== 'goal') {
-        titleText += ` (${node.probability}%)`;
-      }
-      ctx.fillText(titleText, pos.x, pos.y + pos.radius + 15);
 
       ctx.restore();
     });
@@ -811,7 +945,12 @@ function drawCanvas() {
   // 6. Draw 3D Timeline Axis along baseline
   drawTimelineOnMainCanvas(visibleTicks);
 
-  // 7. Draw Tooltip description card if hovered
+  // 7. Draw Labels - using smart collision detection (O(N) layout check)
+  if (currentBoard) {
+    drawSmartLabels();
+  }
+
+  // 8. Draw Tooltip description card if hovered
   if (hoveredNode) {
     drawNodeTooltip(hoveredNode);
   }
@@ -841,6 +980,78 @@ function drawTimelineOnMainCanvas(visibleTicks) {
     // Draw Year/Date Label
     ctx.fillStyle = colors.onSurfaceVar;
     ctx.fillText(t.label, sx, baselineY + 10);
+  });
+}
+
+// SMART LABEL COLLISION HIDING ALGORITHM
+function drawSmartLabels() {
+  const occupiedLabels = [];
+
+  // Sort nodes: Selected/Hovered have maximum priority, followed by Importance, then Depth
+  const labelNodes = [...currentBoard.nodes].map(node => {
+    return { node, pos: getProjectedPosition(node) };
+  }).sort((a, b) => {
+    const aPriority = (a.node.id === hoveredNodeId || a.node.id === selectedNodeId) ? 2 : 0;
+    const bPriority = (b.node.id === hoveredNodeId || b.node.id === selectedNodeId) ? 2 : 0;
+    if (aPriority !== bPriority) return bPriority - aPriority;
+    
+    if ((a.node.importance || 5) !== (b.node.importance || 5)) {
+      return (b.node.importance || 5) - (a.node.importance || 5);
+    }
+    return b.pos.depth - a.pos.depth;
+  });
+
+  labelNodes.forEach(({ node, pos }) => {
+    const sphere = currentBoard.spheres.find(s => s.id === node.sphere);
+    if (sphere && !sphere.visible) return;
+
+    let titleText = node.title || 'Без названия';
+    if (node.probability !== undefined && node.type !== 'goal') {
+      titleText += ` (${node.probability}%)`;
+    }
+
+    ctx.font = (node.id === selectedNodeId) ? '600 11px "JetBrains Mono", monospace' : '500 11px "JetBrains Mono", monospace';
+    const textWidth = ctx.measureText(titleText).width;
+    const textHeight = 11;
+
+    // Label rectangle bounds with padding (horizontal 5px, vertical 2px)
+    const rectX = pos.x - textWidth / 2 - 5;
+    const rectY = pos.y + pos.radius + 15 - 9;
+    const rectW = textWidth + 10;
+    const rectH = textHeight + 4;
+
+    const isSpecial = (node.id === hoveredNodeId || node.id === selectedNodeId);
+    let collides = false;
+
+    if (!isSpecial) {
+      for (const rect of occupiedLabels) {
+        if (rectX < rect.x + rect.w && rectX + rectW > rect.x &&
+            rectY < rect.y + rect.h && rectY + rectH > rect.y) {
+          collides = true;
+          break;
+        }
+      }
+    }
+
+    // Draw label only if it doesn't collide, or is hover/selected priority
+    if (!collides) {
+      ctx.save();
+      ctx.shadowBlur = 0;
+      
+      const z = (node.probability !== undefined ? node.probability : 50) / 100;
+      const hoverFactor = node.hoverFactor || 0;
+      const opacity = (node.status === 'discarded' ? 0.25 : (node.status === 'hypothetical' ? 0.65 : 1.0)) * (0.3 + 0.7 * pos.depth);
+      ctx.globalAlpha = isSpecial ? 1.0 : opacity;
+
+      ctx.fillStyle = (node.id === selectedNodeId) ? 'var(--on-surface)' : 'var(--on-surface-var)';
+      ctx.textAlign = 'center';
+      ctx.fillText(titleText, pos.x, pos.y + pos.radius + 15);
+      
+      ctx.restore();
+
+      // Register occupied space
+      occupiedLabels.push({ x: rectX, y: rectY, w: rectW, h: rectH });
+    }
   });
 }
 
@@ -1020,7 +1231,7 @@ async function syncYandexCalendar() {
     currentBoard.nodes = currentBoard.nodes.filter(n => !n.id.startsWith('yandex-'));
     currentBoard.nodes.push(...events);
     
-    pushState(); // Push state to undo stack
+    pushState(); // Save state to undo stack
     alert(`Яндекс.Календарь успешно синхронизирован! Импортировано событий: ${events.length}`);
     await saveBoardImmediate();
     triggerRender();
@@ -1065,6 +1276,7 @@ function setupCanvasEvents() {
     if (e.target.files.length > 0) {
       // In Electron, File.path holds the absolute native filesystem path!
       document.getElementById('fc-nm-image').value = e.target.files[0].path;
+      updateModalPreview(); // update preview instantly
     }
   });
 
@@ -1705,6 +1917,9 @@ function showNodeModal(node, isNew = false) {
 
   nodeModal.classList.add('visible');
   document.getElementById('fc-nm-title').focus();
+  
+  // Render live preview on modal open
+  setTimeout(updateModalPreview, 10);
 }
 
 document.getElementById('fc-nm-save').addEventListener('click', () => {

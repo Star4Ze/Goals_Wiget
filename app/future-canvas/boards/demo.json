@@ -47,13 +47,14 @@
       "type": "decision",
       "title": "Смена архитектуры LumiFi Engine",
       "description": "Выбор: переписать на чистый Canvas с ручным управлением рендерингом или использовать WebGL/ThreeJS.",
-      "date": "2026-05-09",
+      "date": "2026-05-05",
       "probability": 100,
-      "sphere": "lumifi",
-      "status": "active",
+      "sphere": "health",
+      "status": "hypothetical",
       "importance": 8,
-      "y": -171.6666717529297,
-      "hoverFactor": 0.7224999999999999
+      "y": -162.6666717529297,
+      "hoverFactor": 0,
+      "imageUrl": ""
     },
     {
       "id": "node-5",
@@ -349,8 +350,8 @@
     }
   ],
   "viewport": {
-    "panX": 1798472812405.667,
-    "panY": -65.84727599505516,
-    "scale": 86430723.0124091
+    "panX": 1851258757645.0427,
+    "panY": -65.34585667797236,
+    "scale": 114304631.18391109
   }
 }
