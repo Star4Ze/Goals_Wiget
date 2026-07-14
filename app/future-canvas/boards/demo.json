@@ -13,8 +13,8 @@
       "sphere": "work",
       "status": "realized",
       "importance": 4,
-      "y": -394.0370483398437,
-      "hoverFactor": 1
+      "y": 137.07406277126742,
+      "hoverFactor": 0
     },
     {
       "id": "node-2",
@@ -355,24 +355,24 @@
       "id": "trading",
       "name": "Трейдинг",
       "color": "#00dbe7",
-      "visible": false
+      "visible": true
     },
     {
       "id": "health",
       "name": "Здоровье",
       "color": "#00e676",
-      "visible": false
+      "visible": true
     },
     {
       "id": "lumifi",
       "name": "LumiFi",
       "color": "#a186f1",
-      "visible": false
+      "visible": true
     }
   ],
   "viewport": {
-    "panX": 2046548406562.853,
-    "panY": 135.56700099163578,
-    "scale": 839845305.5859127
+    "panX": 1696254363790.2065,
+    "panY": -43.15159302853064,
+    "scale": 315728958.17527324
   }
 }
