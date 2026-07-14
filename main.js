@@ -1885,6 +1885,7 @@ ${content}
     });
 
     futureCanvasWindow.loadFile(path.join(__dirname, 'app', 'future-canvas', 'future-canvas.html'));
+    futureCanvasWindow.webContents.openDevTools();
 
     futureCanvasWindow.on('maximize', () => {
       if (futureCanvasWindow && !futureCanvasWindow.isDestroyed()) {
