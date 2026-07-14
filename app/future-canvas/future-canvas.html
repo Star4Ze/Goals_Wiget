@@ -580,6 +580,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
       <button class="fc-tool-btn" id="fc-btn-now" title="Перейти к сейчас">
         <span class="material-symbols-outlined">my_location</span>
       </button>
+      <button class="fc-tool-btn" id="fc-btn-calendar" title="Импорт Яндекс.Календаря">
+        <span class="material-symbols-outlined">calendar_month</span>
+      </button>
       <button class="fc-tool-btn" id="fc-btn-export" title="Экспорт для ИИ">
         <span class="material-symbols-outlined">smart_toy</span>
       </button>
@@ -678,6 +681,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         <input type="range" id="fc-nm-importance" min="1" max="10" value="5">
         <span class="fc-slider-val" id="fc-nm-importance-val">5</span>
       </div>
+    <div class="fc-field">
+      <label class="fc-field-label">Изображение</label>
+      <div style="display: flex; gap: 8px;">
+        <input class="fc-field-input" id="fc-nm-image" type="text" placeholder="Локальный путь к картинке...">
+        <button class="fc-btn" id="fc-btn-choose-image" style="padding: 0 10px; flex-shrink: 0;">Обзор</button>
+      </div>
+      <input type="file" id="fc-nm-image-file" accept="image/*" style="display:none;">
     </div>
 
     <div class="fc-modal-btns">

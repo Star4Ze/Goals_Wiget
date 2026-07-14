@@ -13,8 +13,7 @@
       "sphere": "work",
       "status": "realized",
       "importance": 4,
-      "y": -120,
-      "hoverFactor": 0
+      "y": -120
     },
     {
       "id": "node-2",
@@ -26,34 +25,31 @@
       "sphere": "work",
       "status": "realized",
       "importance": 5,
-      "y": -90,
-      "hoverFactor": 0
+      "y": -90
     },
     {
       "id": "node-3",
       "type": "event",
       "title": "Неудача бета-теста Engine V1",
       "description": "Тестирование выявило утечки памяти и сильные лаги при масштабировании.",
-      "date": "2025-07-20",
+      "date": "2025-08-20",
       "probability": 100,
       "sphere": "work",
       "status": "realized",
       "importance": 6,
-      "y": -274.6666717529297,
-      "hoverFactor": 0
+      "y": -60
     },
     {
       "id": "node-4",
       "type": "decision",
       "title": "Смена архитектуры LumiFi Engine",
       "description": "Выбор: переписать на чистый Canvas с ручным управлением рендерингом или использовать WebGL/ThreeJS.",
-      "date": "2026-02-02",
+      "date": "2026-02-01",
       "probability": 100,
       "sphere": "lumifi",
       "status": "active",
       "importance": 8,
-      "y": -366.6666717529297,
-      "hoverFactor": 0
+      "y": 0
     },
     {
       "id": "node-5",
@@ -65,8 +61,7 @@
       "sphere": "trading",
       "status": "hypothetical",
       "importance": 7,
-      "y": 120,
-      "hoverFactor": 0.08215726113014737
+      "y": 120
     },
     {
       "id": "node-6",
@@ -78,8 +73,7 @@
       "sphere": "trading",
       "status": "discarded",
       "importance": 5,
-      "y": 200,
-      "hoverFactor": 0
+      "y": 200
     },
     {
       "id": "node-7",
@@ -91,8 +85,7 @@
       "sphere": "lumifi",
       "status": "hypothetical",
       "importance": 9,
-      "y": -40,
-      "hoverFactor": 0
+      "y": -40
     },
     {
       "id": "node-8",
@@ -104,21 +97,19 @@
       "sphere": "trading",
       "status": "hypothetical",
       "importance": 10,
-      "y": 140,
-      "hoverFactor": 0
+      "y": 140
     },
     {
       "id": "node-9",
       "type": "goal",
       "title": "Пробежать марафон (42.2 км)",
       "description": "Регулярные кардио-тренировки, бег по пересеченной местности, подготовка к забегу.",
-      "date": "2028-08-17",
+      "date": "2028-10-10",
       "probability": 75,
       "sphere": "health",
       "status": "hypothetical",
       "importance": 7,
-      "y": -238,
-      "hoverFactor": 0
+      "y": -200
     },
     {
       "id": "node-10",
@@ -130,8 +121,91 @@
       "sphere": "work",
       "status": "hypothetical",
       "importance": 6,
-      "y": -140,
-      "hoverFactor": 0
+      "y": -140
+    },
+    {
+      "id": "node-11",
+      "type": "event",
+      "title": "Создание AGI (Искусственного Интеллекта)",
+      "description": "Выход первых полностью автономных моделей с самообучением.",
+      "date": "2035-08-12",
+      "probability": 80,
+      "sphere": "work",
+      "status": "hypothetical",
+      "importance": 8,
+      "y": -100
+    },
+    {
+      "id": "node-12",
+      "type": "goal",
+      "title": "LumiFi Global IPO",
+      "description": "Выход компании на публичную биржу с оценкой более 1 млрд долларов.",
+      "date": "2040-04-15",
+      "probability": 65,
+      "sphere": "lumifi",
+      "status": "hypothetical",
+      "importance": 9,
+      "y": -40
+    },
+    {
+      "id": "node-13",
+      "type": "event",
+      "title": "Терапия продления жизни",
+      "description": "Прохождение первого курса генетической модификации клеток для замедления старения.",
+      "date": "2050-10-20",
+      "probability": 55,
+      "sphere": "health",
+      "status": "hypothetical",
+      "importance": 10,
+      "y": -180
+    },
+    {
+      "id": "node-14",
+      "type": "event",
+      "title": "Первая база на Луне",
+      "description": "Запуск коммерческих рейсов и проживание первых колонистов.",
+      "date": "2065-06-01",
+      "probability": 40,
+      "sphere": "work",
+      "status": "hypothetical",
+      "importance": 7,
+      "y": -120
+    },
+    {
+      "id": "node-15",
+      "type": "goal",
+      "title": "Квантовый алготрейдинг",
+      "description": "Запуск полностью квантовых советников, прогнозирующих микросекундные колебания.",
+      "date": "2080-01-01",
+      "probability": 90,
+      "sphere": "trading",
+      "status": "hypothetical",
+      "importance": 8,
+      "y": 100
+    },
+    {
+      "id": "node-16",
+      "type": "goal",
+      "title": "100-летний юбилей в кибер-теле",
+      "description": "Интеграция нейроинтерфейсов и замена изношенных органов на бионические.",
+      "date": "2095-11-20",
+      "probability": 75,
+      "sphere": "health",
+      "status": "hypothetical",
+      "importance": 9,
+      "y": -160
+    },
+    {
+      "id": "node-17",
+      "type": "goal",
+      "title": "Новое столетие 2100",
+      "description": "Переход человечества в 22-й век с технологическим сингулярным статусом.",
+      "date": "2100-12-31",
+      "probability": 95,
+      "sphere": "work",
+      "status": "hypothetical",
+      "importance": 10,
+      "y": 0
     }
   ],
   "connections": [
@@ -169,6 +243,41 @@
       "id": "conn-7",
       "fromNodeId": "node-6",
       "toNodeId": "node-8"
+    },
+    {
+      "id": "conn-8",
+      "fromNodeId": "node-7",
+      "toNodeId": "node-12"
+    },
+    {
+      "id": "conn-9",
+      "fromNodeId": "node-11",
+      "toNodeId": "node-12"
+    },
+    {
+      "id": "conn-10",
+      "fromNodeId": "node-9",
+      "toNodeId": "node-13"
+    },
+    {
+      "id": "conn-11",
+      "fromNodeId": "node-13",
+      "toNodeId": "node-16"
+    },
+    {
+      "id": "conn-12",
+      "fromNodeId": "node-8",
+      "toNodeId": "node-15"
+    },
+    {
+      "id": "conn-13",
+      "fromNodeId": "node-15",
+      "toNodeId": "node-17"
+    },
+    {
+      "id": "conn-14",
+      "fromNodeId": "node-16",
+      "toNodeId": "node-17"
     }
   ],
   "spheres": [
@@ -198,8 +307,8 @@
     }
   ],
   "viewport": {
-    "panX": 1804264463604.6882,
-    "panY": 9.166098872626009,
-    "scale": 114143309.48754881
+    "panX": 2351232000000,
+    "panY": 0,
+    "scale": 115000000
   }
 }

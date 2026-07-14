@@ -64,5 +64,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveCanvasBoardData: (boardId, data) => ipcRenderer.invoke('save-canvas-board-data', boardId, data),
   createCanvasBoard: (name) => ipcRenderer.invoke('create-canvas-board', name),
   renameCanvasBoard: (boardId, newName) => ipcRenderer.invoke('rename-canvas-board', boardId, newName),
-  deleteCanvasBoard: (boardId) => ipcRenderer.invoke('delete-canvas-board', boardId)
+  deleteCanvasBoard: (boardId) => ipcRenderer.invoke('delete-canvas-board', boardId),
+  fetchUrl: (url) => ipcRenderer.invoke('fetch-url', url)
 });

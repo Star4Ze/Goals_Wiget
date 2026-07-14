@@ -2047,6 +2047,16 @@ ${content}
       return false;
     }
   });
+
+  ipcMain.handle('fetch-url', async (event, url) => {
+    try {
+      const response = await fetch(url);
+      return await response.text();
+    } catch (e) {
+      logAction(`Ошибка fetch-url: ${e.message}`);
+      throw e;
+    }
+  });
 }
 
 // Global context menu for text fields (Cut, Copy, Paste, Select All)

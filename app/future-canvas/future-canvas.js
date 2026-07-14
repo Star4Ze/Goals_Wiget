@@ -9,6 +9,9 @@ let boardList = [];
 let selectedNodeId = null;
 let hoveredNodeId = null;
 
+// Image caching
+const imageCache = {};
+
 // Time range constants (1995 to 2100 locked)
 const START_MS = new Date('1995-01-01').getTime();
 const END_MS = new Date('2100-12-31').getTime();
@@ -87,6 +90,21 @@ function generateUUID() {
   return typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
 }
 
+// Helper to load and cache local or remote images
+function getCachedImage(url) {
+  if (!url) return null;
+  if (imageCache[url]) {
+    return imageCache[url].complete && imageCache[url].naturalWidth !== 0 ? imageCache[url] : null;
+  }
+  const img = new Image();
+  img.src = url;
+  imageCache[url] = img;
+  img.onload = () => {
+    triggerRender();
+  };
+  return null;
+}
+
 // Calculate viewport zoom/pan bounds to lock edges at 1995 and 2100
 function applyViewportConstraints() {
   if (!canvas) return;
@@ -98,8 +116,8 @@ function applyViewportConstraints() {
     msPerPixel = maxMsPerPixel;
   }
   
-  // Min scale: zoomed in to see about 2 years
-  const minMsPerPixel = (2.0 * 365.25 * 24 * 60 * 60 * 1000) / W;
+  // Min scale: zoomed in to see about 3 days across screen width (allows days view)
+  const minMsPerPixel = (3.0 * 24 * 60 * 60 * 1000) / W;
   if (msPerPixel < minMsPerPixel) {
     msPerPixel = minMsPerPixel;
   }
@@ -117,7 +135,8 @@ function applyViewportConstraints() {
 }
 
 // Get 3D perspective projected position for a node
-function getProjectedPosition(node) {
+// ignoreHover=true is used for hover hit collider calculations to prevent feedback loops
+function getProjectedPosition(node, ignoreHover = false) {
   const nodeMs = new Date(node.date).getTime();
   const W = canvas.width;
   
@@ -127,7 +146,7 @@ function getProjectedPosition(node) {
   // 2. Probability (0-100%) maps to depth Z (0.0 to 1.0)
   // Hover makes node fly forward towards user (Z -> 1.0)
   const z = (node.probability !== undefined ? node.probability : 50) / 100;
-  const hoverFactor = node.hoverFactor || 0;
+  const hoverFactor = ignoreHover ? 0 : (node.hoverFactor || 0);
   const visualZ = z + (1.0 - z) * hoverFactor * 0.6; // fly forward
   const depth = Math.pow(visualZ, 0.75);             // non-linear perspective mapping
   
@@ -169,7 +188,8 @@ function getNodeRadius(node) {
   return baseRadius * (importance / 5);
 }
 
-// Find node under screen mouse coordinates using projected 3D positions
+// Find node under screen mouse coordinates using unhovered projected positions
+// (prevents collision shifting out from under the cursor)
 function findNodeAt(sx, sy) {
   if (!currentBoard) return null;
   // Search in reverse order to select top-most nodes first
@@ -178,9 +198,10 @@ function findNodeAt(sx, sy) {
     const sphere = currentBoard.spheres.find(s => s.id === node.sphere);
     if (sphere && !sphere.visible) continue;
 
-    const pos = getProjectedPosition(node);
+    // Use ignoreHover = true to prevent the node from running away from the cursor!
+    const pos = getProjectedPosition(node, true);
     const dist = Math.hypot(sx - pos.x, sy - pos.y);
-    if (dist <= pos.radius + 6) {
+    if (dist <= pos.radius + 7) {
       return node;
     }
   }
@@ -708,7 +729,7 @@ function drawTimelineOnMainCanvas(visibleTicks) {
     if (sx < baselineMargin - 10 || sx > W - baselineMargin + 10) return;
     
     // Draw tick mark
-    ctx.strokeStyle = 'rgba(141, 145, 152, 0.5)';
+    ctx.strokeStyle = 'rgba(141, 145, 152, 0.4)';
     ctx.beginPath();
     ctx.moveTo(sx, baselineY);
     ctx.lineTo(sx, baselineY + 6);
@@ -736,6 +757,10 @@ function drawNodeTooltip(node) {
   const sphere = currentBoard.spheres.find(s => s.id === node.sphere);
   const color = sphere ? sphere.color : 'var(--tertiary)';
   
+  // Image cache check
+  const img = getCachedImage(node.imageUrl);
+  const hasImage = !!img;
+
   // Draw card frame
   ctx.fillStyle = 'rgba(18, 19, 22, 0.95)';
   ctx.strokeStyle = color;
@@ -747,13 +772,22 @@ function drawNodeTooltip(node) {
   
   ctx.shadowBlur = 0;
   
-  // Title
+  // Draw image if loaded
+  if (hasImage) {
+    ctx.drawImage(img, cardX + cardW - 72, cardY + 12, 60, 60);
+    ctx.strokeStyle = 'rgba(141, 145, 152, 0.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cardX + cardW - 72, cardY + 12, 60, 60);
+  }
+
+  // Title (wrap narrower if image present)
   ctx.fillStyle = 'var(--on-surface)';
   ctx.font = 'bold 12px "JetBrains Mono", monospace';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   const title = node.title || 'Без названия';
-  ctx.fillText(truncateText(title, 26), cardX + 12, cardY + 12);
+  const maxTitleChars = hasImage ? 18 : 26;
+  ctx.fillText(truncateText(title, maxTitleChars), cardX + 12, cardY + 12);
   
   // Type metadata
   const typeMap = { 'event': 'Событие', 'decision': 'Решение', 'goal': 'Цель' };
@@ -764,12 +798,14 @@ function drawNodeTooltip(node) {
   
   ctx.fillStyle = 'var(--on-surface-var)';
   ctx.font = '500 10px "JetBrains Mono", monospace';
-  ctx.fillText(`Дата: ${node.date}`, cardX + 110, cardY + 30);
+  ctx.fillText(`Дата: ${node.date}`, cardX + (hasImage ? 90 : 110), cardY + 30);
   
   // Stats
   ctx.fillStyle = 'var(--on-surface-var)';
   ctx.fillText(`Вероятность: ${node.probability}%`, cardX + 12, cardY + 45);
-  ctx.fillText(`Важность: ${node.importance}/10`, cardX + 130, cardY + 45);
+  if (!hasImage) {
+    ctx.fillText(`Важность: ${node.importance}/10`, cardX + 130, cardY + 45);
+  }
   
   // Line separator
   ctx.strokeStyle = 'rgba(67, 71, 78, 0.3)';
@@ -783,7 +819,7 @@ function drawNodeTooltip(node) {
   ctx.fillStyle = 'rgba(227, 226, 229, 0.85)';
   ctx.font = '11px "Inter", sans-serif';
   const desc = node.description || 'Описание отсутствует';
-  wrapText(ctx, desc, cardX + 12, cardY + 68, cardW - 24, 14, 2);
+  wrapText(ctx, desc, cardX + 12, cardY + 68, hasImage ? cardW - 90 : cardW - 24, 14, 2);
   
   ctx.restore();
 }
@@ -822,8 +858,101 @@ function drawTimeline() {
   // Timeline features are integrated in main canvas rendering loop
 }
 
+// ICS Parsing helper (zero dependencies VEVENT splitter)
+function parseICS(icsText) {
+  const events = [];
+  const parts = icsText.split('BEGIN:VEVENT');
+  for (let i = 1; i < parts.length; i++) {
+    const part = parts[i].split('END:VEVENT')[0];
+    
+    const summaryMatch = part.match(/SUMMARY:(.*)/);
+    if (!summaryMatch) continue;
+    let summary = summaryMatch[1].trim();
+    summary = summary.replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\n/g, '\n');
+    
+    const descMatch = part.match(/DESCRIPTION:(.*)/);
+    let description = descMatch ? descMatch[1].trim().replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\n/g, '\n') : '';
+    
+    const dtStartMatch = part.match(/DTSTART(?:;VALUE=DATE|;TZID=[^:]+)?:(.*)/);
+    if (!dtStartMatch) continue;
+    
+    const rawDate = dtStartMatch[1].trim();
+    if (rawDate.length >= 8) {
+      const yr = rawDate.substring(0, 4);
+      const mo = rawDate.substring(4, 6);
+      const dy = rawDate.substring(6, 8);
+      const dateStr = `${yr}-${mo}-${dy}`;
+      
+      events.push({
+        id: 'yandex-' + generateUUID(),
+        type: 'event',
+        title: `[Яндекс] ${summary}`,
+        description: description,
+        date: dateStr,
+        probability: 100,
+        sphere: 'work',
+        status: 'active',
+        importance: 5,
+        y: -60
+      });
+    }
+  }
+  return events;
+}
+
+// Sync Yandex Calendar XML/ICS export feed using CORS-free main net.fetch handler
+async function syncYandexCalendar() {
+  if (!currentBoard || !currentBoard.yandexCalendarUrl) return;
+  try {
+    document.body.style.cursor = 'wait';
+    const icsText = await window.electronAPI.fetchUrl(currentBoard.yandexCalendarUrl);
+    const events = parseICS(icsText);
+    
+    if (events.length === 0) {
+      alert('Не найдено событий в календаре. Проверьте правильность iCal (.ics) ссылки.');
+      return;
+    }
+    
+    // Filter out old Yandex import nodes and merge new ones
+    currentBoard.nodes = currentBoard.nodes.filter(n => !n.id.startsWith('yandex-'));
+    currentBoard.nodes.push(...events);
+    
+    alert(`Яндекс.Календарь успешно синхронизирован! Импортировано событий: ${events.length}`);
+    await saveBoardImmediate();
+    triggerRender();
+  } catch (e) {
+    alert(`Ошибка синхронизации Яндекс.Календаря: ${e.message}`);
+  } finally {
+    document.body.style.cursor = 'default';
+  }
+}
+
 // CANVAS INTERACTION EVENTS
 function setupCanvasEvents() {
+  // Image chooser dialog triggers
+  document.getElementById('fc-btn-choose-image').addEventListener('click', () => {
+    document.getElementById('fc-nm-image-file').click();
+  });
+  
+  document.getElementById('fc-nm-image-file').addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+      // In Electron, File.path holds the absolute native filesystem path!
+      document.getElementById('fc-nm-image').value = e.target.files[0].path;
+    }
+  });
+
+  // Yandex Calendar import trigger
+  document.getElementById('fc-btn-calendar').addEventListener('click', async () => {
+    if (!currentBoard) return;
+    const url = prompt('Введите приватный iCal (.ics) адрес Яндекс.Календаря:', currentBoard.yandexCalendarUrl || '');
+    if (url !== null) {
+      currentBoard.yandexCalendarUrl = url.trim();
+      if (currentBoard.yandexCalendarUrl) {
+        await syncYandexCalendar();
+      }
+    }
+  });
+
   // Zoom (X-axis timeline only, centering year under the mouse using perspective projection)
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
@@ -928,7 +1057,7 @@ function setupCanvasEvents() {
       connectMouseY = my;
       triggerRender();
     } else {
-      // Hover hit detection
+      // Hover hit detection using ignoreHover = true to prevent hover feedback loops
       const node = findNodeAt(mx, my);
       if (node) {
         if (hoveredNodeId !== node.id) {
@@ -1195,6 +1324,13 @@ async function saveBoardImmediate() {
   updateStatusBar();
 }
 
+// Update Yandex Calendar from the configured iCal address
+async function autoSyncCalendarOnLoad() {
+  if (currentBoard && currentBoard.yandexCalendarUrl) {
+    await syncYandexCalendar();
+  }
+}
+
 function updateStatusBar() {
   if (!currentBoard) return;
   document.getElementById('fc-status-nodes').textContent = `Узлов: ${currentBoard.nodes.length}`;
@@ -1324,6 +1460,10 @@ function showNodeModal(node, isNew = false) {
   document.getElementById('fc-nm-importance').value = importance;
   document.getElementById('fc-nm-importance-val').textContent = importance;
 
+  // Add Image path field value
+  document.getElementById('fc-nm-image').value = node.imageUrl || '';
+  document.getElementById('fc-nm-image-file').value = ''; // reset file input
+
   document.getElementById('fc-nm-delete').style.display = isNew ? 'none' : 'block';
 
   nodeModal.classList.add('visible');
@@ -1342,6 +1482,9 @@ document.getElementById('fc-nm-save').addEventListener('click', () => {
   modalTargetNode.sphere = document.getElementById('fc-nm-sphere').value;
   modalTargetNode.status = document.getElementById('fc-nm-status').value;
   modalTargetNode.importance = parseInt(document.getElementById('fc-nm-importance').value);
+
+  // Save image path
+  modalTargetNode.imageUrl = document.getElementById('fc-nm-image').value.trim();
 
   if (isNewNodeModal) {
     modalTargetNode.id = generateUUID();
