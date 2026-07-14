@@ -13,7 +13,7 @@
       "sphere": "work",
       "status": "realized",
       "importance": 4,
-      "y": 137.07406277126742,
+      "y": 62.22222222222222,
       "hoverFactor": 0
     },
     {
@@ -26,7 +26,7 @@
       "sphere": "work",
       "status": "realized",
       "importance": 5,
-      "y": 400,
+      "y": 62.22222222222222,
       "hoverFactor": 0
     },
     {
@@ -39,7 +39,7 @@
       "sphere": "work",
       "status": "realized",
       "importance": 6,
-      "y": 400,
+      "y": 62.22222222222222,
       "hoverFactor": 0
     },
     {
@@ -52,8 +52,8 @@
       "sphere": "health",
       "status": "realized",
       "importance": 8,
-      "y": -400,
-      "hoverFactor": 1,
+      "y": -36.73565456658801,
+      "hoverFactor": 0,
       "imageUrl": ""
     },
     {
@@ -66,7 +66,7 @@
       "sphere": "trading",
       "status": "active",
       "importance": 7,
-      "y": 400,
+      "y": 41.607968130079854,
       "hoverFactor": 0,
       "imageUrl": ""
     },
@@ -80,7 +80,7 @@
       "sphere": "trading",
       "status": "discarded",
       "importance": 5,
-      "y": 200,
+      "y": 32.1503877980513,
       "hoverFactor": 0
     },
     {
@@ -93,7 +93,7 @@
       "sphere": "lumifi",
       "status": "hypothetical",
       "importance": 9,
-      "y": -400,
+      "y": -48.063249385684976,
       "hoverFactor": 0
     },
     {
@@ -106,7 +106,7 @@
       "sphere": "trading",
       "status": "hypothetical",
       "importance": 10,
-      "y": -69.51850744931109,
+      "y": -38.533770515613575,
       "hoverFactor": 0
     },
     {
@@ -119,7 +119,7 @@
       "sphere": "health",
       "status": "discarded",
       "importance": 7,
-      "y": -252.1820275880305,
+      "y": -43.44760704281493,
       "hoverFactor": 0
     },
     {
@@ -132,7 +132,7 @@
       "sphere": "work",
       "status": "hypothetical",
       "importance": 6,
-      "y": 400,
+      "y": 30.448079399646065,
       "hoverFactor": 0,
       "imageUrl": ""
     },
@@ -146,7 +146,7 @@
       "sphere": "work",
       "status": "hypothetical",
       "importance": 8,
-      "y": -100,
+      "y": -45.566363095297646,
       "hoverFactor": 0
     },
     {
@@ -159,8 +159,8 @@
       "sphere": "lumifi",
       "status": "hypothetical",
       "importance": 9,
-      "y": -40,
-      "hoverFactor": 0
+      "y": -9.563531867892841,
+      "hoverFactor": 0.032945601421837195
     },
     {
       "id": "node-13",
@@ -172,7 +172,7 @@
       "sphere": "health",
       "status": "hypothetical",
       "importance": 10,
-      "y": -180,
+      "y": -37.224913347509855,
       "hoverFactor": 0
     },
     {
@@ -185,7 +185,7 @@
       "sphere": "work",
       "status": "hypothetical",
       "importance": 7,
-      "y": -120,
+      "y": -33.94135262556115,
       "hoverFactor": 0
     },
     {
@@ -198,7 +198,7 @@
       "sphere": "trading",
       "status": "hypothetical",
       "importance": 8,
-      "y": -175.44706774871221,
+      "y": -51.11304426445753,
       "hoverFactor": 0
     },
     {
@@ -211,7 +211,7 @@
       "sphere": "health",
       "status": "hypothetical",
       "importance": 9,
-      "y": -160,
+      "y": -43.44760704281493,
       "hoverFactor": 0
     },
     {
@@ -224,7 +224,7 @@
       "sphere": "work",
       "status": "hypothetical",
       "importance": 10,
-      "y": 400,
+      "y": 55.10125234548125,
       "hoverFactor": 0
     }
   ],
@@ -318,6 +318,11 @@
       "id": "9ae0b426-8da6-4022-8a22-7db77026a870",
       "fromNodeId": "node-5",
       "toNodeId": "node-4"
+    },
+    {
+      "id": "fc8e03ef-24fd-42e3-b0a9-d8089e988934",
+      "fromNodeId": "node-4",
+      "toNodeId": "node-13"
     }
   ],
   "spheres": [
@@ -347,8 +352,8 @@
     }
   ],
   "viewport": {
-    "panX": 2247710117158.266,
-    "panY": 26.375559115928844,
-    "scale": 2227162926.959185
+    "panX": 2461406400000,
+    "panY": 0,
+    "scale": 2561237366.0030627
   }
 }
