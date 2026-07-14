@@ -1405,6 +1405,13 @@ async function init() {
       window.electronAPI.openConnectionsWindow();
     }
   });
+
+  // Open Future Canvas
+  document.getElementById('addon-canvas-btn')?.addEventListener('click', () => {
+    if (window.electronAPI && window.electronAPI.openFutureCanvas) {
+      window.electronAPI.openFutureCanvas();
+    }
+  });
   
   await loadObsidianTasks();
   await loadDailyTasks();
