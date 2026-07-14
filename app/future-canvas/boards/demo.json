@@ -53,7 +53,7 @@
       "status": "realized",
       "importance": 8,
       "y": -400,
-      "hoverFactor": 0,
+      "hoverFactor": 1,
       "imageUrl": ""
     },
     {
@@ -347,8 +347,8 @@
     }
   ],
   "viewport": {
-    "panX": 2243255791304.3477,
-    "panY": 19.688483390561995,
+    "panX": 2247710117158.266,
+    "panY": 26.375559115928844,
     "scale": 2227162926.959185
   }
 }

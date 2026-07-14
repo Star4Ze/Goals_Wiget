@@ -764,6 +764,13 @@ function setupHandlers() {
     }
   });
 
+  ipcMain.handle('reload-window', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win && !win.isDestroyed()) {
+      win.webContents.reloadIgnoringCache();
+    }
+  });
+
   ipcMain.handle('get-obsidian-files', async () => {
     try {
       if (!fs.existsSync(TARGET_DIR)) {
@@ -2119,7 +2126,7 @@ app.on('web-contents-created', (event, contents) => {
   contents.on('before-input-event', (e, input) => {
     if (input.type === 'keyDown') {
       if (input.control && input.key.toLowerCase() === 'r') {
-        contents.reload();
+        contents.reloadIgnoringCache();
         e.preventDefault();
       }
       if (input.control && input.shift && input.key.toLowerCase() === 'i') {

@@ -56,6 +56,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Future Canvas additions
   openFutureCanvas: () => ipcRenderer.invoke('open-future-canvas'),
+  reloadWindow: () => ipcRenderer.invoke('reload-window'),
   minimizeWindow: () => ipcRenderer.invoke('minimize-window'),
   toggleMaximizeWindow: () => ipcRenderer.invoke('toggle-maximize-window'),
   onWindowStateChange: (callback) => ipcRenderer.on('window-state-change', (event, isMaximized) => callback(isMaximized)),

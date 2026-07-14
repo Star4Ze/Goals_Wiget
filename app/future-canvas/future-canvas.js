@@ -625,7 +625,7 @@ function handleResize() {
 
 function setupWindowControls() {
   addSafeListener('fc-btn-reload', 'click', () => {
-    window.location.reload();
+    window.electronAPI?.reloadWindow();
   });
   addSafeListener('fc-btn-min', 'click', () => {
     window.electronAPI?.minimizeWindow();
