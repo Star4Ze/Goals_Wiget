@@ -396,8 +396,8 @@ function getGridIntervalMs() {
     { ms: 24 * 60 * 60 * 1000, step: 1, type: 'day' }                  // day
   ];
   
-  // Find the first interval that leaves at least 60px spacing at the baseline
-  for (let i = 0; i < intervals.length; i++) {
+  // Find the first interval (starting from smallest) that leaves at least 60px spacing at the baseline
+  for (let i = intervals.length - 1; i >= 0; i--) {
     const spacing = intervals[i].ms / msPerPixel;
     if (spacing >= 60) {
       return intervals[i];
