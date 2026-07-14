@@ -326,6 +326,11 @@ function getStripYForProbability(probability) {
   return VP_Y + (baselineY - VP_Y) * depth;
 }
 
+function getBaselineXForDate(date) {
+  const nodeMs = new Date(date).getTime();
+  return (nodeMs - camCenterMs) / msPerPixel + canvas.width / 2;
+}
+
 function constrainNodeY(node) {
   if (!canvas || !node) return 0;
 
@@ -932,29 +937,29 @@ function drawCanvas() {
     });
   }
 
-  // 2.5 Draw vertical guide lines for hovered, selected, or dragged nodes
+  // 2.5 Draw date tether lines so every node remains visually tied to its timeline date
   if (currentBoard) {
     ctx.save();
-    ctx.setLineDash([3, 3]);
     ctx.lineWidth = 1;
     currentBoard.nodes.forEach(node => {
+      const sphere = (currentBoard.spheres || []).find(s => s.id === node.sphere);
+      if (sphere && !sphere.visible) return;
+
       const isDragged = (isDraggingNode && draggedNode && draggedNode.id === node.id);
       const isSelected = (node.id === selectedNodeId);
       const isHovered = (node.id === hoveredNodeId);
-      
-      if (isDragged || isSelected || isHovered) {
-        const pos = getProjectedPosition(node);
-        const sphere = (currentBoard.spheres || []).find(s => s.id === node.sphere);
-        const color = sphere ? sphere.color : 'rgba(141, 145, 152, 0.4)';
-        
-        ctx.strokeStyle = color;
-        ctx.globalAlpha = isDragged ? 0.8 : 0.4;
-        
-        ctx.beginPath();
-        ctx.moveTo(pos.x, pos.y);
-        ctx.lineTo(pos.x, baselineY);
-        ctx.stroke();
-      }
+      const pos = getProjectedPosition(node);
+      const baseX = getBaselineXForDate(node.date);
+      const color = sphere ? sphere.color : 'rgba(141, 145, 152, 0.4)';
+
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = (isDragged || isSelected || isHovered) ? 0.65 : 0.18;
+      ctx.setLineDash((isDragged || isSelected || isHovered) ? [] : [2, 4]);
+
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+      ctx.lineTo(baseX, baselineY);
+      ctx.stroke();
     });
     ctx.restore();
     ctx.setLineDash([]);
@@ -1438,7 +1443,7 @@ function parseICS(icsText) {
         sphere: 'work',
         status: 'active',
         importance: 5,
-        y: -60
+        y: 0
       });
     }
   }
@@ -1875,15 +1880,14 @@ function setupCanvasEvents() {
       triggerRender();
     } else if (isDraggingNode && draggedNode) {
       // Dragging node in 3D space
-      const z = (draggedNode.probability !== undefined ? draggedNode.probability : 50) / 100;
-      const minDepth = 0.45;
-      const depth = minDepth + (1.0 - minDepth) * Math.pow(1.0 - z, 0.75);
+      const depth = getDepthForProbability(draggedNode.probability);
       
       // Vertical position (node.y) is always updated instantly
       const py = VP_Y + (baselineY - VP_Y) * depth;
       const visualHeight = py - my;
       const heightOffset = visualHeight / depth;
-      draggedNode.y = -Math.max(-400, Math.min(400, heightOffset));
+      draggedNode.y = -heightOffset;
+      constrainNodeY(draggedNode);
 
       // Horizontal position (node.date) is locked until drag exceeds 40px threshold
       const deltaX = Math.abs(e.clientX - dragStartMouseX);
@@ -2270,9 +2274,10 @@ async function loadBoard(boardId) {
 
     if (currentBoard.viewport) {
       camCenterMs = currentBoard.viewport.panX || (START_MS + END_MS) / 2;
-      camCenterY = currentBoard.viewport.panY || 0;
+      camCenterY = 0;
       msPerPixel = currentBoard.viewport.scale || ((END_MS - START_MS) / (canvas.width - 2 * baselineMargin));
     }
+    const nodePositionsChanged = constrainAllNodeY();
     
     document.getElementById('fc-title-board').textContent = `/ доска: ${currentBoard.name}`;
     document.getElementById('fc-status-board').textContent = `Доска: ${currentBoard.name}`;
@@ -2290,6 +2295,9 @@ async function loadBoard(boardId) {
       connections: JSON.parse(JSON.stringify(currentBoard.connections))
     });
     updateUndoRedoButtonsUI();
+    if (nodePositionsChanged) {
+      saveBoardDebounced();
+    }
 
     // Trigger Yandex Calendar background auto-sync if url is configured
     setTimeout(autoSyncCalendarOnLoad, 1000);
@@ -2331,10 +2339,11 @@ function saveBoardDebounced() {
 
 async function saveBoardImmediate() {
   if (!window.electronAPI || !currentBoard) return;
+  constrainAllNodeY();
   
   currentBoard.viewport = {
     panX: camCenterMs,
-    panY: camCenterY,
+    panY: 0,
     scale: msPerPixel
   };
 
@@ -2484,7 +2493,7 @@ function createTempNodeAtClick(type) {
     sphere: 'work',
     status: 'hypothetical',
     importance: 5,
-    y: emptyClickWorldY
+    y: 0
   };
 }
 
@@ -2571,6 +2580,7 @@ addSafeListener('fc-nm-save', 'click', () => {
   modalTargetNode.sphere = document.getElementById('fc-nm-sphere').value;
   modalTargetNode.status = document.getElementById('fc-nm-status').value;
   modalTargetNode.importance = parseInt(document.getElementById('fc-nm-importance').value);
+  constrainNodeY(modalTargetNode);
 
   // Save image path
   modalTargetNode.imageUrl = document.getElementById('fc-nm-image').value.trim();
