@@ -450,7 +450,7 @@ function isOverAnchor(sx, sy, node) {
 }
 
 // Setup and Event Binding
-window.addEventListener('DOMContentLoaded', async () => {
+window.addEventListener('DOMContentLoaded', () => {
   updateColorsFromCSS();
 
   canvas = document.getElementById('fc-canvas');
@@ -471,11 +471,20 @@ window.addEventListener('DOMContentLoaded', async () => {
   window.addEventListener('resize', handleResize);
   handleResize();
 
+  // REGISTER ALL EVENT LISTENERS SYNCHRONOUSLY FIRST to guarantee UI buttons work instantly!
   setupWindowControls();
-  await refreshBoardsList();
   setupCanvasEvents();
   setupModalSliders();
   updateBlurButtonUI();
+
+  // Run board data loading asynchronously inside try-catch to keep app alive
+  (async () => {
+    try {
+      await refreshBoardsList();
+    } catch (e) {
+      console.error('Error loading boards:', e);
+    }
+  })();
 
   requestAnimationFrame(renderLoop);
 });
