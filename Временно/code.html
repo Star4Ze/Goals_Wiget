@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Future Canvas - Strategic Terminal</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-surface-variant": "#c3c7ce",
+                    "tertiary-fixed-dim": "#00dbe7",
+                    "tertiary-container": "#00a0a9",
+                    "background": "#121316",
+                    "on-error": "#690005",
+                    "on-tertiary": "#00363a",
+                    "surface-container": "#1e2022",
+                    "on-primary-fixed-variant": "#294969",
+                    "on-secondary-fixed": "#2a1800",
+                    "inverse-on-surface": "#2f3033",
+                    "outline": "#8d9198",
+                    "on-surface": "#e3e2e5",
+                    "inverse-primary": "#416182",
+                    "primary-fixed": "#d0e4ff",
+                    "surface": "#121316",
+                    "secondary-fixed": "#ffddb5",
+                    "on-error-container": "#ffdad6",
+                    "secondary-container": "#c3841e",
+                    "on-primary-container": "#032b4a",
+                    "on-secondary-fixed-variant": "#643f00",
+                    "error-container": "#93000a",
+                    "primary-fixed-dim": "#aac9f0",
+                    "on-tertiary-fixed": "#002022",
+                    "on-secondary": "#462b00",
+                    "on-tertiary-container": "#002f32",
+                    "inverse-surface": "#e3e2e5",
+                    "surface-container-lowest": "#0d0e11",
+                    "on-tertiary-fixed-variant": "#004f54",
+                    "surface-variant": "#333537",
+                    "outline-variant": "#43474e",
+                    "on-primary": "#0e3251",
+                    "on-secondary-container": "#3d2500",
+                    "tertiary": "#00dbe7",
+                    "error": "#ffb4ab",
+                    "surface-tint": "#aac9f0",
+                    "surface-container-highest": "#333537",
+                    "surface-container-high": "#292a2c",
+                    "secondary-fixed-dim": "#ffb956",
+                    "primary": "#aac9f0",
+                    "surface-bright": "#38393c",
+                    "on-primary-fixed": "#001d35",
+                    "tertiary-fixed": "#74f5ff",
+                    "secondary": "#ffb956",
+                    "primary-container": "#7493b8",
+                    "surface-container-low": "#1a1c1e",
+                    "on-background": "#e3e2e5",
+                    "surface-dim": "#121316"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "gutter": "16px",
+                    "margin-edge": "24px",
+                    "unit": "4px",
+                    "node-gap": "32px"
+            },
+            "fontFamily": {
+                    "body-md": ["Inter"],
+                    "data-mono": ["JetBrains Mono"],
+                    "label-caps": ["JetBrains Mono"],
+                    "body-sm": ["Inter"],
+                    "headline-md": ["JetBrains Mono"],
+                    "headline-lg": ["JetBrains Mono"]
+            },
+            "fontSize": {
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "data-mono": ["11px", {"lineHeight": "14px", "fontWeight": "500"}],
+                    "label-caps": ["10px", {"lineHeight": "12px", "letterSpacing": "0.1em", "fontWeight": "700"}],
+                    "body-sm": ["12px", {"lineHeight": "16px", "fontWeight": "400"}],
+                    "headline-md": ["18px", {"lineHeight": "24px", "letterSpacing": "0.05em", "fontWeight": "600"}],
+                    "headline-lg": ["24px", {"lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+          font-variation-settings: 'FILL' 1;
+        }
+        
+        /* The Now Line Glow */
+        .now-line-glow {
+            box-shadow: 0 0 15px 2px rgba(0, 219, 231, 0.4);
+        }
+
+        /* Node Hover Effects */
+        .node-interactive:hover {
+            transform: scale(1.1);
+            z-index: 10;
+        }
+
+        .canvas-pan-zoom {
+            /* Basic simulation of a zoomable space */
+            transform-origin: center center;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .canvas-container:active .canvas-pan-zoom {
+            cursor: grabbing;
+        }
+        
+        /* Custom scrollbar for timeline */
+        .timeline-scroll::-webkit-scrollbar {
+            height: 4px;
+        }
+        .timeline-scroll::-webkit-scrollbar-track {
+            background: rgba(141, 145, 152, 0.1);
+        }
+        .timeline-scroll::-webkit-scrollbar-thumb {
+            background: rgba(0, 219, 231, 0.5);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen overflow-hidden flex flex-col selection:bg-tertiary-container selection:text-on-tertiary-container">
+<!-- Background Shader Layer -->
+<div class="fixed inset-0 z-0 pointer-events-none mix-blend-screen opacity-60">
+
+</div>
+<!-- Top Navigation -->
+<nav class="fixed top-0 w-full h-16 flex justify-between items-center px-margin-edge z-50 bg-background/80 backdrop-blur-md border-b border-outline-variant/50">
+<!-- Menu and Brand -->
+<div class="flex items-center gap-4">
+<button class="w-10 h-10 flex items-center justify-center text-on-surface hover:bg-surface-variant transition-colors duration-150 rounded cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined text-headline-lg">menu</span>
+</button>
+<div class="font-headline-lg text-headline-md sm:text-headline-lg font-bold text-tertiary tracking-tighter uppercase ml-2">
+            Future Canvas
+        </div>
+</div>
+<!-- Trailing Actions -->
+<div class="flex items-center gap-2">
+<button class="w-10 h-10 flex items-center justify-center text-on-surface hover:bg-surface-variant transition-colors duration-150 rounded cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined text-headline-md">add</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center text-on-surface hover:bg-surface-variant transition-colors duration-150 rounded cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined text-headline-md">settings</span>
+</button>
+<div class="w-8 h-8 rounded border border-outline-variant overflow-hidden ml-4 hidden sm:block">
+<img alt="User profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBF3-0POkXsCmN0Z2LrvtXk6S5qlewNcCJAaYCJKIsVwxLethSMOsAPs938NGMV0wmvl2UHUXfxnc75Lr1U62QisXh5335Y-fgjL3ZsAa_ZpsvsNcGEPM02wh_-eAkL6fuxtBPGKP-6QrAQC4bEkn2WGJ2oLWL2FCYjvpfhJD--0weWtonFIXX2j0uhsITeDoenqK8OPiC855TsSRAwOzlahglF9Yz_BwschHfcL9lzkM24ZVGaP043jUp_c3WAcH4XPjT8_gU2QA"/>
+</div>
+</div>
+</nav>
+<!-- Main Canvas Area -->
+<main class="relative flex-1 mt-16 pb-[104px] bg-transparent overflow-hidden cursor-grab active:cursor-grabbing canvas-container" id="canvas-container">
+<div class="canvas-pan-zoom w-full h-full relative" style="transform: scale(1) translate(0px, 0px);">
+<!-- The 'Now' Line -->
+<div class="absolute top-0 bottom-0 left-[35%] w-[1px] bg-tertiary now-line-glow z-20 pointer-events-none"></div>
+<div class="absolute top-8 left-[35%] -translate-x-1/2 px-2 py-1 bg-surface-container border border-tertiary text-tertiary font-label-caps text-label-caps rounded-sm z-30 pointer-events-none shadow-[0_0_10px_rgba(0,219,231,0.2)]">NOW</div>
+<!-- Connection Lines (SVG) -->
+<svg class="absolute inset-0 w-full h-full z-10 pointer-events-none" style="stroke-linejoin: round; fill: none;">
+<!-- Neuro-network style curved connections -->
+<path class="opacity-60" d="M 20% 50% C 25% 50%, 30% 40%, 45% 40%" stroke="#43474e" stroke-width="2"></path>
+<path class="opacity-80" d="M 45% 40% C 60% 40%, 65% 50%, 75% 50%" stroke="#43474e" stroke-width="2"></path>
+<path class="opacity-50" d="M 25% 65% C 30% 65%, 40% 60%, 55% 60%" stroke="#43474e" stroke-width="1.5"></path>
+<path class="opacity-70" d="M 55% 60% C 65% 60%, 70% 50%, 75% 50%" stroke="#43474e" stroke-width="1.5"></path>
+<path class="opacity-50" d="M 60% 30% C 65% 30%, 70% 50%, 75% 50%" stroke="#43474e" stroke-width="1.5"></path>
+</svg>
+<!-- Nodes Layer -->
+<!-- Event Node 1 (Past) -->
+<div class="absolute left-[20%] top-[50%] -translate-x-1/2 -translate-y-1/2 z-20 node-interactive transition-all cursor-pointer group">
+<div class="w-4 h-4 rounded-full border-2 border-outline bg-surface-container flex items-center justify-center relative">
+<div class="w-1.5 h-1.5 rounded-full bg-outline opacity-50 group-hover:bg-primary transition-colors"></div>
+<div class="absolute top-6 whitespace-nowrap font-data-mono text-data-mono text-outline group-hover:text-primary transition-colors">Initial Research</div>
+</div>
+</div>
+<!-- Event Node 2 (Past) -->
+<div class="absolute left-[25%] top-[65%] -translate-x-1/2 -translate-y-1/2 z-20 node-interactive transition-all cursor-pointer group">
+<div class="w-3 h-3 rounded-full border-2 border-outline bg-surface-container flex items-center justify-center relative">
+<div class="absolute top-5 whitespace-nowrap font-data-mono text-label-caps text-outline group-hover:text-primary transition-colors">Prototype</div>
+</div>
+</div>
+<!-- Event Node 3 (Future) -->
+<div class="absolute left-[45%] top-[40%] -translate-x-1/2 -translate-y-1/2 z-20 node-interactive transition-all cursor-pointer group">
+<div class="w-5 h-5 rounded-full border-2 border-primary bg-surface-container flex items-center justify-center relative shadow-[0_0_8px_rgba(170,201,240,0.3)] group-hover:shadow-[0_0_12px_rgba(170,201,240,0.6)]">
+<div class="w-2 h-2 rounded-full bg-primary opacity-80 group-hover:opacity-100"></div>
+<div class="absolute top-7 whitespace-nowrap font-data-mono text-data-mono text-primary">Beta Launch</div>
+</div>
+</div>
+<!-- Event Node 4 (Future) -->
+<div class="absolute left-[55%] top-[60%] -translate-x-1/2 -translate-y-1/2 z-20 node-interactive transition-all cursor-pointer group">
+<div class="w-4 h-4 rounded-full border-2 border-primary bg-surface-container flex items-center justify-center relative">
+<div class="w-1.5 h-1.5 rounded-full bg-primary opacity-60"></div>
+<div class="absolute top-6 whitespace-nowrap font-data-mono text-data-mono text-on-surface">Marketing Push</div>
+</div>
+</div>
+<!-- Event Node 5 (Future) -->
+<div class="absolute left-[60%] top-[30%] -translate-x-1/2 -translate-y-1/2 z-20 node-interactive transition-all cursor-pointer group">
+<div class="w-3 h-3 rounded-full border-2 border-outline-variant bg-surface-container flex items-center justify-center relative">
+<div class="absolute top-5 whitespace-nowrap font-data-mono text-label-caps text-outline-variant">Hiring</div>
+</div>
+</div>
+<!-- GOAL NODE (Diamond) -->
+<div class="absolute left-[75%] top-[50%] -translate-x-1/2 -translate-y-1/2 z-20 node-interactive transition-all cursor-pointer group">
+<div class="w-8 h-8 border-2 border-secondary bg-surface-container flex items-center justify-center relative shadow-[0_0_20px_rgba(255,185,86,0.4)] group-hover:shadow-[0_0_25px_rgba(255,185,86,0.8)] rotate-45">
+<div class="w-3 h-3 bg-secondary animate-pulse"></div>
+<!-- Un-rotate text container -->
+<div class="absolute -rotate-45 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full pointer-events-none flex items-center justify-center">
+<div class="absolute top-12 whitespace-nowrap font-headline-md text-headline-md text-secondary font-bold tracking-tight bg-background/90 px-3 py-1 border border-secondary/30 rounded">V1 Release</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Timeline Bar -->
+<div class="fixed bottom-12 w-full h-16 border-t border-outline-variant/50 bg-background/80 backdrop-blur-md z-40 flex flex-col justify-center px-8 font-data-mono text-data-mono text-on-surface-variant">
+<div class="w-full relative h-8 flex items-center max-w-6xl mx-auto">
+<!-- Timeline Track -->
+<div class="absolute w-full h-[2px] bg-outline-variant/40 top-1/2 -translate-y-1/2 rounded-full"></div>
+<!-- Active Track segment (Past to Now) -->
+<div class="absolute left-0 w-[35%] h-[2px] bg-tertiary/50 top-1/2 -translate-y-1/2"></div>
+<!-- Slider/Zoom Indicator (Mock) -->
+<div class="absolute left-[20%] w-[40%] h-8 border-2 border-outline-variant/30 bg-surface-container-low/20 rounded cursor-ew-resize hover:border-outline-variant/60 transition-colors z-10 flex items-center justify-between px-1">
+<div class="w-1 h-3 bg-outline-variant/50 rounded-full"></div>
+<div class="w-1 h-3 bg-outline-variant/50 rounded-full"></div>
+</div>
+<!-- Markers -->
+<div class="absolute left-[10%] -translate-x-1/2 flex flex-col items-center top-1/2 -translate-y-1/2">
+<div class="w-2 h-2 rounded-full bg-outline-variant/50 mb-4"></div>
+<span class="absolute top-4">2024</span>
+</div>
+<!-- Now Intersection on Timeline -->
+<div class="absolute left-[35%] -translate-x-1/2 flex flex-col items-center z-20 top-1/2 -translate-y-1/2">
+<div class="w-2.5 h-2.5 rounded-full bg-tertiary mb-4 shadow-[0_0_8px_rgba(0,219,231,0.8)] border border-background"></div>
+<span class="absolute top-4 text-tertiary font-bold">2025</span>
+</div>
+<div class="absolute left-[50%] -translate-x-1/2 flex flex-col items-center top-1/2 -translate-y-1/2">
+<div class="w-2 h-2 rounded-full bg-outline-variant/50 mb-4"></div>
+<span class="absolute top-4">2026</span>
+</div>
+<div class="absolute left-[70%] -translate-x-1/2 flex flex-col items-center top-1/2 -translate-y-1/2">
+<div class="w-2 h-2 rounded-full bg-outline-variant/50 mb-4"></div>
+<span class="absolute top-4">2028</span>
+</div>
+<div class="absolute left-[90%] -translate-x-1/2 flex flex-col items-center top-1/2 -translate-y-1/2">
+<div class="w-2 h-2 rounded-full bg-outline-variant/50 mb-4"></div>
+<span class="absolute top-4">2030</span>
+</div>
+</div>
+</div>
+<!-- Footer -->
+<footer class="fixed bottom-0 w-full h-12 flex items-center justify-between px-margin-edge z-50 bg-background border-t border-outline-variant/50">
+<div class="font-label-caps text-label-caps text-on-surface-variant opacity-70">
+            © 2025 FUTURE CANVAS STRATEGIC TERMINAL
+        </div>
+<div class="flex space-x-6 font-label-caps text-label-caps text-on-surface-variant opacity-70">
+<a class="hover:text-primary transition-opacity duration-200" href="#">Protocol</a>
+<a class="hover:text-primary transition-opacity duration-200" href="#">System Logs</a>
+<a class="hover:text-primary transition-opacity duration-200" href="#">API</a>
+</div>
+</footer>
+</body></html>
