@@ -881,7 +881,34 @@ function drawCanvas() {
         );
       }
       ctx.stroke();
+  }
+
+  // 2.5 Draw vertical guide lines for hovered, selected, or dragged nodes
+  if (currentBoard) {
+    ctx.save();
+    ctx.setLineDash([3, 3]);
+    ctx.lineWidth = 1;
+    currentBoard.nodes.forEach(node => {
+      const isDragged = (isDraggingNode && draggedNode && draggedNode.id === node.id);
+      const isSelected = (node.id === selectedNodeId);
+      const isHovered = (node.id === hoveredNodeId);
+      
+      if (isDragged || isSelected || isHovered) {
+        const pos = getProjectedPosition(node);
+        const sphere = (currentBoard.spheres || []).find(s => s.id === node.sphere);
+        const color = sphere ? sphere.color : 'rgba(141, 145, 152, 0.4)';
+        
+        ctx.strokeStyle = color;
+        ctx.globalAlpha = isDragged ? 0.8 : 0.4;
+        
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+        ctx.lineTo(pos.x, baselineY);
+        ctx.stroke();
+      }
     });
+    ctx.restore();
+    ctx.setLineDash([]);
   }
 
   // 3. Draw vertical NOW line in perspective
@@ -1818,7 +1845,28 @@ function setupCanvasEvents() {
       if (isDraggingNodeHorizontalActive) {
         const sxOnBaseline = (mx - VP_X) / depth + VP_X;
         const targetMs = (sxOnBaseline - canvas.width / 2) * msPerPixel + camCenterMs;
-        const constrainedMs = Math.max(START_MS, Math.min(END_MS, targetMs));
+        
+        // Find closest visible grid line tick for snapping
+        const interval = getGridIntervalMs();
+        const ticks = getGridTicks(interval);
+        let snappedMs = targetMs;
+        let minDiffPx = Infinity;
+        let closestTick = null;
+        
+        ticks.forEach(t => {
+          const diffPx = Math.abs(t.ms - targetMs) / msPerPixel;
+          if (diffPx < minDiffPx) {
+            minDiffPx = diffPx;
+            closestTick = t;
+          }
+        });
+        
+        // Snap if within 15 pixels of the grid line
+        if (closestTick && minDiffPx < 15) {
+          snappedMs = closestTick.ms;
+        }
+
+        const constrainedMs = Math.max(START_MS, Math.min(END_MS, snappedMs));
         draggedNode.date = new Date(constrainedMs).toISOString().slice(0, 10);
       } else {
         // Keep initial date
@@ -1901,7 +1949,27 @@ function setupCanvasEvents() {
       const depth = Math.pow(0.5, 0.75);
       const sxOnBaseline = (mx - VP_X) / depth + VP_X;
       const targetMs = (sxOnBaseline - canvas.width / 2) * msPerPixel + camCenterMs;
-      const constrainedMs = Math.max(START_MS, Math.min(END_MS, targetMs));
+      
+      // Find closest visible grid line tick for snapping
+      const interval = getGridIntervalMs();
+      const ticks = getGridTicks(interval);
+      let snappedMs = targetMs;
+      let minDiffPx = Infinity;
+      let closestTick = null;
+      
+      ticks.forEach(t => {
+        const diffPx = Math.abs(t.ms - targetMs) / msPerPixel;
+        if (diffPx < minDiffPx) {
+          minDiffPx = diffPx;
+          closestTick = t;
+        }
+      });
+      
+      if (closestTick && minDiffPx < 15) {
+        snappedMs = closestTick.ms;
+      }
+
+      const constrainedMs = Math.max(START_MS, Math.min(END_MS, snappedMs));
       
       const py = VP_Y + (baselineY - VP_Y) * depth;
       const visualHeight = py - my;
@@ -1938,7 +2006,27 @@ function setupCanvasEvents() {
     } else {
       selectedNodeId = null;
       const w = screenToWorld(mx, my);
-      emptyClickWorldMs = w.wms;
+      
+      // Snap right click Ms coordinate to grid
+      const interval = getGridIntervalMs();
+      const ticks = getGridTicks(interval);
+      let snappedMs = w.wms;
+      let minDiffPx = Infinity;
+      let closestTick = null;
+      
+      ticks.forEach(t => {
+        const diffPx = Math.abs(t.ms - w.wms) / msPerPixel;
+        if (diffPx < minDiffPx) {
+          minDiffPx = diffPx;
+          closestTick = t;
+        }
+      });
+      
+      if (closestTick && minDiffPx < 15) {
+        snappedMs = closestTick.ms;
+      }
+
+      emptyClickWorldMs = snappedMs;
       emptyClickWorldY = w.wy;
       showContextMenu(e.clientX, e.clientY, false);
     }
