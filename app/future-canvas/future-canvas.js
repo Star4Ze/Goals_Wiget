@@ -15,8 +15,8 @@ const END_MS = new Date('2100-12-31').getTime();
 
 // 3D Perspective Projection System
 let VP_X = 640;               // Vanishing Point X (recalculated on resize)
-let VP_Y = 240;               // Vanishing Point Y
-let baselineY = 650;          // Baseline Y where timeline lies
+let VP_Y = 44;                // Vanishing Point Y (set very high, right under titlebar)
+let baselineY = 700;          // Baseline Y where timeline lies (recalculated on resize)
 const baselineMargin = 60;    // Margin (pixels) left and right for 1995 and 2100 bounds
 
 let camCenterMs = (START_MS + END_MS) / 2; // World X camera (starts centered)
@@ -234,10 +234,10 @@ function handleResize() {
   canvas.width = wrap.clientWidth;
   canvas.height = wrap.clientHeight;
   
-  // Set Vanishing Point and Baseline relative to viewport size
+  // Set Vanishing Point very high and Baseline right above status bar
   VP_X = canvas.width / 2;
-  VP_Y = canvas.height * 0.32;
-  baselineY = canvas.height * 0.8;
+  VP_Y = 44; // Just under custom titlebar
+  baselineY = canvas.height - 35; // Just above status bar (28px height + spacing)
 
   const timelineWrap = document.getElementById('fc-timeline');
   if (timelineWrap) {
@@ -358,6 +358,86 @@ function triggerRender() {
   });
 }
 
+// Get the appropriate grid interval dynamically based on the current zoom scale
+function getGridIntervalMs() {
+  const intervals = [
+    { ms: 10 * 365.25 * 24 * 60 * 60 * 1000, step: 10, type: 'year' }, // 10 years
+    { ms: 5 * 365.25 * 24 * 60 * 60 * 1000, step: 5, type: 'year' },   // 5 years
+    { ms: 365.25 * 24 * 60 * 60 * 1000, step: 1, type: 'year' },       // 1 year
+    { ms: 90 * 24 * 60 * 60 * 1000, step: 3, type: 'month' },          // quarter
+    { ms: 30 * 24 * 60 * 60 * 1000, step: 1, type: 'month' },          // month
+    { ms: 7 * 24 * 60 * 60 * 1000, step: 1, type: 'week' },            // week
+    { ms: 24 * 60 * 60 * 1000, step: 1, type: 'day' }                  // day
+  ];
+  
+  // Find the first interval that leaves at least 150px between lines on baseline
+  for (let i = 0; i < intervals.length; i++) {
+    const spacing = intervals[i].ms / msPerPixel;
+    if (spacing >= 150) {
+      return intervals[i];
+    }
+  }
+  return intervals[0];
+}
+
+// Generate ticks with labels aligned to intervals
+function getGridTicks(interval) {
+  const ticks = [];
+  const startYear = new Date(START_MS).getFullYear();
+  const endYear = new Date(END_MS).getFullYear();
+  
+  if (interval.type === 'year') {
+    const stepYears = interval.step;
+    const firstYear = Math.ceil(startYear / stepYears) * stepYears;
+    for (let yr = firstYear; yr <= endYear; yr += stepYears) {
+      ticks.push({
+        ms: new Date(`${yr}-01-01`).getTime(),
+        label: yr.toString()
+      });
+    }
+  } else if (interval.type === 'month') {
+    const months = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
+    let current = new Date(START_MS);
+    current.setDate(1);
+    current.setHours(0, 0, 0, 0);
+    
+    while (current.getTime() <= END_MS) {
+      ticks.push({
+        ms: current.getTime(),
+        label: `${months[current.getMonth()]} ${current.getFullYear()}`
+      });
+      current.setMonth(current.getMonth() + interval.step);
+    }
+  } else if (interval.type === 'week') {
+    let current = new Date(START_MS);
+    const day = current.getDay();
+    const diff = current.getDate() - day + (day === 0 ? -6 : 1);
+    current.setDate(diff);
+    current.setHours(0, 0, 0, 0);
+    
+    while (current.getTime() <= END_MS) {
+      ticks.push({
+        ms: current.getTime(),
+        label: `${current.getDate()}.${String(current.getMonth() + 1).padStart(2, '0')}`
+      });
+      current.setTime(current.getTime() + 7 * 24 * 60 * 60 * 1000);
+    }
+  } else {
+    // Day
+    let current = new Date(START_MS);
+    current.setHours(0, 0, 0, 0);
+    
+    while (current.getTime() <= END_MS) {
+      ticks.push({
+        ms: current.getTime(),
+        label: `${current.getDate()} ${['Вс','Пн','Вт','Ср','Чт','Пт','Сб'][current.getDay()]}`
+      });
+      current.setTime(current.getTime() + 24 * 60 * 60 * 1000);
+    }
+  }
+  return ticks;
+}
+
 // DRAWING CANVAS (3D Perspective)
 function drawCanvas() {
   if (!canvas || !ctx) return;
@@ -376,20 +456,36 @@ function drawCanvas() {
   ctx.lineTo(W - baselineMargin, baselineY);
   ctx.stroke();
 
-  // Draw timeline perspective lines converging in distance (every 10 years)
-  ctx.strokeStyle = 'rgba(67, 71, 78, 0.12)';
-  ctx.lineWidth = 1;
-  for (let yr = 2000; yr <= 2100; yr += 10) {
-    const ms = new Date(`${yr}-01-01`).getTime();
-    const sxOnBaseline = (ms - camCenterMs) / msPerPixel + W / 2;
+  // Get dynamic ticks based on zoom level
+  const interval = getGridIntervalMs();
+  const ticks = getGridTicks(interval);
+  const visibleTicks = ticks.filter(t => {
+    const sx = (t.ms - camCenterMs) / msPerPixel + W / 2;
+    return sx >= -100 && sx <= W + 100;
+  });
+
+  // Draw receding lines converging towards VP, fading out 60% (depth = 0.2) of the way
+  visibleTicks.forEach(t => {
+    const sxOnBaseline = (t.ms - camCenterMs) / msPerPixel + W / 2;
     
+    // Stop drawing grid lines 80% of the way to the vanishing point (depth = 0.2)
+    const lx = VP_X + (sxOnBaseline - VP_X) * 0.2;
+    const ly = VP_Y + (baselineY - VP_Y) * 0.2;
+    
+    const grad = ctx.createLinearGradient(sxOnBaseline, baselineY, lx, ly);
+    grad.addColorStop(0, 'rgba(67, 71, 78, 0.35)'); // Opaque at the bottom
+    grad.addColorStop(0.5, 'rgba(67, 71, 78, 0.15)'); // Fading
+    grad.addColorStop(1, 'rgba(67, 71, 78, 0.0)');    // Fully transparent
+    
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(sxOnBaseline, baselineY);
-    ctx.lineTo(VP_X, VP_Y);
+    ctx.lineTo(lx, ly);
     ctx.stroke();
-  }
+  });
 
-  // Draw horizontal depth guides (Probability boundaries)
+  // Draw horizontal depth guides (Probability levels)
   const sx1995 = (START_MS - camCenterMs) / msPerPixel + W / 2;
   const sx2100 = (END_MS - camCenterMs) / msPerPixel + W / 2;
   const probLevels = [0, 25, 50, 75, 100];
@@ -401,7 +497,7 @@ function drawCanvas() {
     const rx = VP_X + (sx2100 - VP_X) * depth;
     const gy = VP_Y + (baselineY - VP_Y) * depth;
     
-    ctx.strokeStyle = prob === 100 ? 'rgba(67, 71, 78, 0.3)' : 'rgba(67, 71, 78, 0.08)';
+    ctx.strokeStyle = prob === 100 ? 'rgba(67, 71, 78, 0.35)' : 'rgba(67, 71, 78, 0.08)';
     ctx.lineWidth = prob === 100 ? 1.5 : 1.0;
     ctx.beginPath();
     ctx.moveTo(lx, gy);
@@ -453,14 +549,23 @@ function drawCanvas() {
   // 3. Draw vertical NOW line in perspective
   const nowMs = Date.now();
   const nowXOnBaseline = (nowMs - camCenterMs) / msPerPixel + W / 2;
-  ctx.strokeStyle = colors.tertiary;
+  
+  // Stop now line 80% of the way to the vanishing point (depth = 0.2)
+  const nowEndLx = VP_X + (nowXOnBaseline - VP_X) * 0.2;
+  const nowEndLy = VP_Y + (baselineY - VP_Y) * 0.2;
+
+  const nowGrad = ctx.createLinearGradient(nowXOnBaseline, baselineY, nowEndLx, nowEndLy);
+  nowGrad.addColorStop(0, colors.tertiary);
+  nowGrad.addColorStop(1, 'rgba(0, 219, 231, 0.0)');
+
+  ctx.strokeStyle = nowGrad;
   ctx.lineWidth = 1.0;
   ctx.beginPath();
   ctx.moveTo(nowXOnBaseline, baselineY);
-  ctx.lineTo(VP_X, VP_Y);
+  ctx.lineTo(nowEndLx, nowEndLy);
   ctx.stroke();
 
-  // NOW Label
+  // NOW Label on baseline
   ctx.fillStyle = colors.tertiary;
   ctx.font = '700 9px "JetBrains Mono", monospace';
   ctx.textAlign = 'center';
@@ -580,7 +685,7 @@ function drawCanvas() {
   }
 
   // 6. Draw 3D Timeline Axis along baseline
-  drawTimelineOnMainCanvas();
+  drawTimelineOnMainCanvas(visibleTicks);
 
   // 7. Draw Tooltip description card if hovered
   if (hoveredNode) {
@@ -589,36 +694,30 @@ function drawCanvas() {
 }
 
 // DRAW TIMELINE DIRECTLY ON THE CANVAS
-function drawTimelineOnMainCanvas() {
+function drawTimelineOnMainCanvas(visibleTicks) {
   const W = canvas.width;
-  ctx.strokeStyle = 'rgba(141, 145, 152, 0.3)';
+  ctx.strokeStyle = 'rgba(141, 145, 152, 0.4)';
   ctx.lineWidth = 1;
-  
-  const stepYears = (W > 900) ? 5 : 10;
-  const startYear = 1995;
-  const endYear = 2100;
   
   ctx.font = '600 10px "JetBrains Mono", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   
-  for (let yr = startYear; yr <= endYear; yr += stepYears) {
-    const ms = new Date(`${yr}-01-01`).getTime();
-    const sx = (ms - camCenterMs) / msPerPixel + W / 2;
+  visibleTicks.forEach(t => {
+    const sx = (t.ms - camCenterMs) / msPerPixel + W / 2;
+    if (sx < baselineMargin - 10 || sx > W - baselineMargin + 10) return;
     
-    if (sx < baselineMargin - 10 || sx > W - baselineMargin + 10) continue;
-    
-    // Draw tick
-    ctx.strokeStyle = 'rgba(141, 145, 152, 0.4)';
+    // Draw tick mark
+    ctx.strokeStyle = 'rgba(141, 145, 152, 0.5)';
     ctx.beginPath();
     ctx.moveTo(sx, baselineY);
     ctx.lineTo(sx, baselineY + 6);
     ctx.stroke();
     
-    // Draw Year Label
+    // Draw Year/Date Label
     ctx.fillStyle = colors.onSurfaceVar;
-    ctx.fillText(yr.toString(), sx, baselineY + 10);
-  }
+    ctx.fillText(t.label, sx, baselineY + 10);
+  });
 }
 
 // DRAW HOVER TOOLTIP CARD INSIDE CANVAS
@@ -725,19 +824,30 @@ function drawTimeline() {
 
 // CANVAS INTERACTION EVENTS
 function setupCanvasEvents() {
-  // Zoom (X-axis timeline only)
+  // Zoom (X-axis timeline only, centering year under the mouse using perspective projection)
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
 
-    const mouseWorldMs = (mouseX - canvas.width / 2) * msPerPixel + camCenterMs;
-    const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
+    // Calculate perspective depth at mouse cursor Y
+    let depth = 1.0;
+    if (mouseY > VP_Y && baselineY !== VP_Y) {
+      const z = (mouseY - VP_Y) / (baselineY - VP_Y);
+      depth = Math.max(0.1, Math.min(1.0, z));
+    }
     
+    // Reverse project screen mouseX to get corresponding baseline X coordinate
+    const sxOnBaseline = (mouseX - VP_X) / depth + VP_X;
+    const mouseWorldMs = (sxOnBaseline - canvas.width / 2) * msPerPixel + camCenterMs;
+
+    const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
     msPerPixel = msPerPixel * factor;
     applyViewportConstraints();
 
-    camCenterMs = mouseWorldMs - (mouseX - canvas.width / 2) * msPerPixel;
+    // Recalculate camera center so the mouse is still hovering exactly over the same date
+    camCenterMs = mouseWorldMs - (sxOnBaseline - canvas.width / 2) * msPerPixel;
     applyViewportConstraints();
 
     triggerRender();
@@ -763,7 +873,6 @@ function setupCanvasEvents() {
         } else {
           isDraggingNode = true;
           draggedNode = node;
-          const pos = getProjectedPosition(node);
           const w = screenToWorld(mx, my);
           dragOffsetMs = w.wms - new Date(node.date).getTime();
           dragOffsetY = w.wy - node.y;
@@ -1130,6 +1239,7 @@ function showContextMenu(x, y, node) {
   ctxMenu.style.top = y + 'px';
 }
 
+// Hide Context Menu
 function hideContextMenu() {
   ctxMenu.style.display = 'none';
 }
