@@ -101,12 +101,12 @@
       "type": "goal",
       "title": "Капитал 10 000 000 ₽",
       "description": "Достижение целевого баланса личного инвестиционного портфеля.",
-      "date": "2029-02-25",
+      "date": "2029-12-31",
       "probability": 60,
       "sphere": "trading",
       "status": "hypothetical",
       "importance": 10,
-      "y": 174.93569263610473,
+      "y": -69.51850744931109,
       "hoverFactor": 0
     },
     {
@@ -226,20 +226,6 @@
       "importance": 10,
       "y": 400,
       "hoverFactor": 0
-    },
-    {
-      "id": "639d888a-cd0e-49a7-8e12-40404497ebd0",
-      "type": "goal",
-      "title": "32423",
-      "description": "234234",
-      "date": "2030-05-17",
-      "probability": 71,
-      "sphere": "health",
-      "status": "hypothetical",
-      "importance": 10,
-      "y": -22.457815995478075,
-      "imageUrl": "C:\\Users\\HomePC\\Pictures\\Обои\\13660.jpg",
-      "hoverFactor": 0
     }
   ],
   "connections": [
@@ -314,16 +300,6 @@
       "toNodeId": "node-17"
     },
     {
-      "id": "3b49364a-3acb-4820-b3f1-18b226337618",
-      "fromNodeId": "639d888a-cd0e-49a7-8e12-40404497ebd0",
-      "toNodeId": "node-9"
-    },
-    {
-      "id": "e8d78c7d-cd9a-4353-907e-00ba0a0ecdfc",
-      "fromNodeId": "639d888a-cd0e-49a7-8e12-40404497ebd0",
-      "toNodeId": "node-8"
-    },
-    {
       "id": "445516e2-a878-4258-87cd-804d8163c3b8",
       "fromNodeId": "node-7",
       "toNodeId": "node-3"
@@ -371,8 +347,8 @@
     }
   ],
   "viewport": {
-    "panX": 1696254363790.2065,
-    "panY": -43.15159302853064,
-    "scale": 315728958.17527324
+    "panX": 2609910311505.4775,
+    "panY": -7.353898745130599,
+    "scale": 1689228891.7783585
   }
 }
