@@ -13,7 +13,8 @@
       "sphere": "work",
       "status": "realized",
       "importance": 4,
-      "y": -120
+      "y": -120,
+      "hoverFactor": 0
     },
     {
       "id": "node-2",
@@ -25,7 +26,8 @@
       "sphere": "work",
       "status": "realized",
       "importance": 5,
-      "y": -90
+      "y": -90,
+      "hoverFactor": 0
     },
     {
       "id": "node-3",
@@ -37,7 +39,8 @@
       "sphere": "work",
       "status": "realized",
       "importance": 6,
-      "y": -60
+      "y": -60,
+      "hoverFactor": 0
     },
     {
       "id": "node-4",
@@ -49,7 +52,8 @@
       "sphere": "lumifi",
       "status": "active",
       "importance": 8,
-      "y": 0
+      "y": 0,
+      "hoverFactor": 0
     },
     {
       "id": "node-5",
@@ -61,7 +65,8 @@
       "sphere": "trading",
       "status": "hypothetical",
       "importance": 7,
-      "y": 120
+      "y": 120,
+      "hoverFactor": 0
     },
     {
       "id": "node-6",
@@ -73,7 +78,8 @@
       "sphere": "trading",
       "status": "discarded",
       "importance": 5,
-      "y": 200
+      "y": 200,
+      "hoverFactor": 0
     },
     {
       "id": "node-7",
@@ -85,7 +91,8 @@
       "sphere": "lumifi",
       "status": "hypothetical",
       "importance": 9,
-      "y": -40
+      "y": -40,
+      "hoverFactor": 0
     },
     {
       "id": "node-8",
@@ -97,7 +104,8 @@
       "sphere": "trading",
       "status": "hypothetical",
       "importance": 10,
-      "y": 140
+      "y": 140,
+      "hoverFactor": 0
     },
     {
       "id": "node-9",
@@ -109,7 +117,8 @@
       "sphere": "health",
       "status": "hypothetical",
       "importance": 7,
-      "y": -238
+      "y": -238,
+      "hoverFactor": 0
     },
     {
       "id": "node-10",
@@ -121,7 +130,8 @@
       "sphere": "work",
       "status": "hypothetical",
       "importance": 6,
-      "y": -140
+      "y": -140,
+      "hoverFactor": 0
     }
   ],
   "connections": [
@@ -188,8 +198,8 @@
     }
   ],
   "viewport": {
-    "panX": 1804752236944.7822,
-    "panY": 154,
-    "scale": 174900625.00000042
+    "panX": 1812794001167.8105,
+    "panY": -23.285622825194366,
+    "scale": 807644472.9188986
   }
 }
