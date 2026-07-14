@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Future Canvas — Strategic Terminal</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<style>
+/* ===== RESET & BASE ===== */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 100%; height: 100%;
+  user-select: none; -webkit-user-select: none;
+  background: transparent;
+  font-family: var(--font-body);
+  color: var(--on-surface);
+  overflow: hidden;
+}
+
+/* ===== DESIGN SYSTEM TOKENS ===== */
+:root {
+  --bg: #121316;
+  --bg-dim: #121316;
+  --bg-bright: #38393c;
+  --surface-lowest: #0d0e11;
+  --surface-low: #1a1c1e;
+  --surface: #1e2022;
+  --surface-high: #292a2c;
+  --surface-highest: #333537;
+  --on-surface: #e3e2e5;
+  --on-surface-var: #c3c7ce;
+  --outline: #8d9198;
+  --outline-var: #43474e;
+  --primary: #aac9f0;
+  --primary-container: #7493b8;
+  --secondary: #ffb956;
+  --secondary-container: #c3841e;
+  --tertiary: #00dbe7;
+  --tertiary-container: #00a0a9;
+  --error: #ffb4ab;
+  --now-color: #00dbe7;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-body: 'Inter', sans-serif;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 1;
+  font-size: 18px;
+}
+
+/* ===== WINDOW SHELL ===== */
+#fc-window {
+  width: 100vw;
+  height: 100vh;
+  background: rgba(18, 19, 22, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+#fc-window.is-maximized {
+  border-radius: 0;
+}
+
+/* ===== TITLEBAR ===== */
+#fc-titlebar {
+  -webkit-app-region: drag;
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 0 16px;
+  background: linear-gradient(to bottom, rgba(30,32,34,0.9), rgba(18,19,22,0.9));
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.fc-titlebar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.fc-titlebar-left .material-symbols-outlined {
+  color: var(--tertiary);
+  font-size: 18px;
+}
+.fc-title-text {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--tertiary);
+  text-transform: uppercase;
+}
+.fc-title-board {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--outline);
+  margin-left: 8px;
+}
+.fc-titlebar-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+}
+.fc-win-btn {
+  width: 38px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--outline);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.fc-win-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--on-surface);
+}
+.fc-win-btn.fc-close:hover {
+  background: #c0392b;
+  color: #fff;
+}
+.fc-win-btn .material-symbols-outlined {
+  font-size: 16px;
+}
+
+/* ===== TOOLBAR ===== */
+#fc-toolbar {
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid rgba(67, 71, 78, 0.4);
+  background: rgba(18, 19, 22, 0.6);
+}
+.fc-toolbar-left,
+.fc-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#fc-board-select {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--on-surface);
+  background: var(--surface);
+  border: 1px solid var(--outline-var);
+  padding: 4px 8px;
+  cursor: pointer;
+  outline: none;
+}
+#fc-board-select:focus {
+  border-color: var(--primary);
+}
+#fc-board-select option {
+  background: var(--surface-high);
+  color: var(--on-surface);
+}
+.fc-tool-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--on-surface-var);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.fc-tool-btn:hover {
+  background: var(--surface-highest);
+  color: var(--on-surface);
+}
+.fc-tool-btn.active {
+  background: var(--tertiary);
+  color: #002022;
+  border-color: var(--tertiary);
+}
+.fc-tool-btn .material-symbols-outlined {
+  font-size: 18px;
+}
+
+/* ===== MAIN CANVAS ===== */
+#fc-canvas-wrap {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  cursor: grab;
+  background: var(--bg);
+}
+#fc-canvas-wrap:active {
+  cursor: grabbing;
+}
+#fc-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ===== TIMELINE ===== */
+#fc-timeline {
+  height: 56px;
+  flex-shrink: 0;
+  border-top: 1px solid rgba(67, 71, 78, 0.5);
+  background: rgba(18, 19, 22, 0.8);
+  position: relative;
+}
+#fc-timeline-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ===== STATUS BAR ===== */
+#fc-statusbar {
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: var(--surface-lowest);
+  border-top: 1px solid rgba(67, 71, 78, 0.3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--on-surface-var);
+  opacity: 0.7;
+}
+.fc-status-right {
+  display: flex;
+  gap: 16px;
+}
+
+/* ===== MODAL OVERLAY ===== */
+.fc-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.fc-modal-overlay.visible {
+  display: flex;
+}
+
+/* ===== NODE MODAL ===== */
+#fc-node-modal {
+  background: var(--surface-low);
+  border: 1px solid var(--outline-var);
+  width: 100%;
+  max-width: 420px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+#fc-nm-heading {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--on-surface);
+  text-transform: uppercase;
+}
+.fc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.fc-field-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--outline);
+}
+.fc-field-input,
+.fc-field-select,
+.fc-field-textarea {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--on-surface);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--outline-var);
+  padding: 6px 0;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.fc-field-input:focus,
+.fc-field-select:focus,
+.fc-field-textarea:focus {
+  border-color: var(--primary);
+}
+.fc-field-textarea {
+  font-family: var(--font-body);
+  font-size: 13px;
+  resize: vertical;
+  min-height: 60px;
+}
+.fc-field-select {
+  cursor: pointer;
+}
+.fc-field-select option {
+  background: var(--surface-high);
+  color: var(--on-surface);
+}
+.fc-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.fc-slider-row input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: var(--outline-var);
+  outline: none;
+  cursor: pointer;
+}
+.fc-slider-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  background: var(--primary);
+  cursor: pointer;
+}
+.fc-slider-val {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  min-width: 32px;
+  text-align: right;
+}
+.fc-modal-btns {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.fc-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 8px 20px;
+  border: 1px solid var(--outline-var);
+  background: transparent;
+  color: var(--on-surface);
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+.fc-btn:hover {
+  background: var(--surface-high);
+  border-color: var(--outline);
+}
+.fc-btn-primary {
+  background: var(--primary);
+  color: #0e3251;
+  border-color: var(--primary);
+}
+.fc-btn-primary:hover {
+  background: #c0d8f8;
+  border-color: #c0d8f8;
+}
+.fc-btn-danger {
+  color: var(--error);
+  border-color: rgba(255, 180, 171, 0.3);
+}
+.fc-btn-danger:hover {
+  background: rgba(255, 180, 171, 0.1);
+  border-color: var(--error);
+}
+
+/* ===== BOARD MODAL ===== */
+#fc-board-modal {
+  background: var(--surface-low);
+  border: 1px solid var(--outline-var);
+  width: 100%;
+  max-width: 360px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+#fc-board-modal h2 {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--on-surface);
+  text-transform: uppercase;
+}
+
+/* ===== CONTEXT MENU ===== */
+#fc-ctx-menu {
+  position: absolute;
+  z-index: 900;
+  background: var(--surface-high);
+  border: 1px solid var(--outline-var);
+  min-width: 180px;
+  display: none;
+  flex-direction: column;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+#fc-ctx-menu.visible {
+  display: flex;
+}
+.fc-ctx-item {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--on-surface-var);
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fc-ctx-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--on-surface);
+}
+.fc-ctx-item.danger {
+  color: var(--error);
+}
+.fc-ctx-item.danger:hover {
+  background: rgba(255, 180, 171, 0.1);
+}
+.fc-ctx-item .material-symbols-outlined {
+  font-size: 16px;
+}
+
+/* ===== FILTER PANEL ===== */
+#fc-filter-panel {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 220px;
+  background: var(--surface-low);
+  border-left: 1px solid var(--outline-var);
+  z-index: 500;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transform: translateX(100%);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+#fc-filter-panel.visible {
+  transform: translateX(0);
+}
+#fc-filter-panel h3 {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--outline);
+}
+.fc-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--on-surface-var);
+  cursor: pointer;
+  padding: 4px 0;
+}
+.fc-filter-row input[type="checkbox"] {
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+.fc-filter-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ===== EXPORT MODAL ===== */
+#fc-export-modal-overlay .fc-export-modal {
+  background: var(--surface-low);
+  border: 1px solid var(--outline-var);
+  width: 100%;
+  max-width: 560px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+#fc-export-modal-overlay h2 {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--on-surface);
+  text-transform: uppercase;
+}
+#fc-export-text {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--on-surface-var);
+  background: var(--surface-lowest);
+  border: 1px solid var(--outline-var);
+  padding: 12px;
+  min-height: 200px;
+  resize: vertical;
+  outline: none;
+  line-height: 1.5;
+}
+
+/* ===== DATE INPUT STYLING ===== */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  cursor: pointer;
+}
+</style>
+</head>
+<body>
+
+<div id="fc-window">
+
+  <!-- ===== TITLEBAR ===== -->
+  <div id="fc-titlebar">
+    <div class="fc-titlebar-left">
+      <span class="material-symbols-outlined">hub</span>
+      <span class="fc-title-text">Future Canvas</span>
+      <span class="fc-title-board" id="fc-title-board">/ доска: личная</span>
+    </div>
+    <div class="fc-titlebar-right">
+      <button class="fc-win-btn" id="fc-btn-min" title="Свернуть">
+        <span class="material-symbols-outlined">remove</span>
+      </button>
+      <button class="fc-win-btn" id="fc-btn-max" title="Развернуть">
+        <span class="material-symbols-outlined" id="fc-max-icon">crop_square</span>
+      </button>
+      <button class="fc-win-btn fc-close" id="fc-btn-close" title="Закрыть">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== TOOLBAR ===== -->
+  <div id="fc-toolbar">
+    <div class="fc-toolbar-left">
+      <select id="fc-board-select"></select>
+      <button class="fc-tool-btn" id="fc-btn-new-board" title="Новая доска">
+        <span class="material-symbols-outlined">note_add</span>
+      </button>
+    </div>
+    <div class="fc-toolbar-right">
+      <button class="fc-tool-btn" id="fc-btn-add" title="Добавить узел">
+        <span class="material-symbols-outlined">add</span>
+      </button>
+      <button class="fc-tool-btn" id="fc-btn-filter" title="Фильтр сфер">
+        <span class="material-symbols-outlined">filter_list</span>
+      </button>
+      <button class="fc-tool-btn" id="fc-btn-now" title="Перейти к сейчас">
+        <span class="material-symbols-outlined">my_location</span>
+      </button>
+      <button class="fc-tool-btn" id="fc-btn-export" title="Экспорт для ИИ">
+        <span class="material-symbols-outlined">smart_toy</span>
+      </button>
+      <button class="fc-tool-btn" id="fc-btn-settings" title="Настройки">
+        <span class="material-symbols-outlined">settings</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== MAIN CANVAS ===== -->
+  <main id="fc-canvas-wrap">
+    <canvas id="fc-canvas"></canvas>
+    <!-- Filter panel is inside canvas-wrap for positioning -->
+    <div id="fc-filter-panel">
+      <h3>Сферы жизни</h3>
+      <div id="fc-filter-list"></div>
+    </div>
+  </main>
+
+  <!-- ===== TIMELINE ===== -->
+  <div id="fc-timeline">
+    <canvas id="fc-timeline-canvas"></canvas>
+  </div>
+
+  <!-- ===== STATUS BAR ===== -->
+  <div id="fc-statusbar">
+    <span>Future Canvas · Модуль Goals Widget</span>
+    <div class="fc-status-right">
+      <span id="fc-status-nodes">Узлов: 0</span>
+      <span id="fc-status-board">Доска: —</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===== NODE EDIT MODAL ===== -->
+<div class="fc-modal-overlay" id="fc-node-modal-overlay">
+  <div id="fc-node-modal">
+    <h2 id="fc-nm-heading">Новый узел</h2>
+    
+    <div class="fc-field">
+      <label class="fc-field-label">Тип</label>
+      <select class="fc-field-select" id="fc-nm-type">
+        <option value="event">Событие</option>
+        <option value="decision">Решение</option>
+        <option value="goal">Цель</option>
+      </select>
+    </div>
+
+    <div class="fc-field">
+      <label class="fc-field-label">Название</label>
+      <input class="fc-field-input" id="fc-nm-title" type="text" placeholder="Название узла">
+    </div>
+
+    <div class="fc-field">
+      <label class="fc-field-label">Описание</label>
+      <textarea class="fc-field-textarea" id="fc-nm-desc" placeholder="Описание..."></textarea>
+    </div>
+
+    <div class="fc-field">
+      <label class="fc-field-label">Дата</label>
+      <input class="fc-field-input" id="fc-nm-date" type="date">
+    </div>
+
+    <div class="fc-field">
+      <label class="fc-field-label">Вероятность</label>
+      <div class="fc-slider-row">
+        <input type="range" id="fc-nm-prob" min="0" max="100" value="50">
+        <span class="fc-slider-val" id="fc-nm-prob-val">50%</span>
+      </div>
+    </div>
+
+    <div class="fc-field">
+      <label class="fc-field-label">Сфера жизни</label>
+      <select class="fc-field-select" id="fc-nm-sphere">
+        <option value="work">Работа</option>
+        <option value="trading">Трейдинг</option>
+        <option value="health">Здоровье</option>
+        <option value="lumifi">LumiFi</option>
+      </select>
+    </div>
+
+    <div class="fc-field">
+      <label class="fc-field-label">Статус</label>
+      <select class="fc-field-select" id="fc-nm-status">
+        <option value="hypothetical">Гипотетический</option>
+        <option value="active">Активный</option>
+        <option value="realized">Реализован</option>
+        <option value="discarded">Не сбылся</option>
+      </select>
+    </div>
+
+    <div class="fc-field">
+      <label class="fc-field-label">Важность</label>
+      <div class="fc-slider-row">
+        <input type="range" id="fc-nm-importance" min="1" max="10" value="5">
+        <span class="fc-slider-val" id="fc-nm-importance-val">5</span>
+      </div>
+    </div>
+
+    <div class="fc-modal-btns">
+      <button class="fc-btn fc-btn-primary" id="fc-nm-save">Сохранить</button>
+      <button class="fc-btn" id="fc-nm-cancel">Отмена</button>
+      <button class="fc-btn fc-btn-danger" id="fc-nm-delete" style="display:none;">Удалить</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== BOARD CREATE MODAL ===== -->
+<div class="fc-modal-overlay" id="fc-board-modal-overlay">
+  <div id="fc-board-modal">
+    <h2>Новая доска</h2>
+    <div class="fc-field">
+      <label class="fc-field-label">Название доски</label>
+      <input class="fc-field-input" id="fc-bm-name" type="text" placeholder="Введите название">
+    </div>
+    <div class="fc-modal-btns">
+      <button class="fc-btn fc-btn-primary" id="fc-bm-save">Создать</button>
+      <button class="fc-btn" id="fc-bm-cancel">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== EXPORT MODAL ===== -->
+<div class="fc-modal-overlay" id="fc-export-modal-overlay">
+  <div class="fc-export-modal">
+    <h2>Экспорт для ИИ</h2>
+    <textarea id="fc-export-text" readonly></textarea>
+    <div class="fc-modal-btns">
+      <button class="fc-btn fc-btn-primary" id="fc-export-copy">Копировать</button>
+      <button class="fc-btn" id="fc-export-close">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CONTEXT MENU ===== -->
+<div id="fc-ctx-menu">
+  <div class="fc-ctx-item" id="fc-ctx-edit">
+    <span class="material-symbols-outlined">edit</span> Редактировать
+  </div>
+  <div class="fc-ctx-item" id="fc-ctx-connect">
+    <span class="material-symbols-outlined">timeline</span> Создать связь
+  </div>
+  <div class="fc-ctx-item" id="fc-ctx-realized">
+    <span class="material-symbols-outlined">check_circle</span> Реализован
+  </div>
+  <div class="fc-ctx-item" id="fc-ctx-discarded">
+    <span class="material-symbols-outlined">cancel</span> Не сбылся
+  </div>
+  <div class="fc-ctx-item danger" id="fc-ctx-delete">
+    <span class="material-symbols-outlined">delete</span> Удалить
+  </div>
+</div>
+
+<script src="future-canvas.js"></script>
+</body>
+</html>
