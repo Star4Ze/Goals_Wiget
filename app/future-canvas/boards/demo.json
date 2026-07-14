@@ -47,13 +47,13 @@
       "type": "decision",
       "title": "Смена архитектуры LumiFi Engine",
       "description": "Выбор: переписать на чистый Canvas с ручным управлением рендерингом или использовать WebGL/ThreeJS.",
-      "date": "2100-12-31",
+      "date": "1995-01-01",
       "probability": 100,
       "sphere": "health",
-      "status": "hypothetical",
+      "status": "realized",
       "importance": 8,
       "y": 400,
-      "hoverFactor": 0,
+      "hoverFactor": 0.032945601421837195,
       "imageUrl": ""
     },
     {
@@ -61,13 +61,13 @@
       "type": "event",
       "title": "Успех новой торговой стратегии",
       "description": "Тестирование на фьючерсах Московской биржи показало стабильную доходность.",
-      "date": "2026-08-31",
+      "date": "2026-08-06",
       "probability": 70,
       "sphere": "trading",
       "status": "active",
       "importance": 7,
-      "y": -70.7058145269244,
-      "hoverFactor": 0.8133613928122977,
+      "y": -400,
+      "hoverFactor": 0,
       "imageUrl": ""
     },
     {
@@ -351,8 +351,8 @@
     }
   ],
   "viewport": {
-    "panX": 1784317829508.9702,
-    "panY": -45.56356819995473,
-    "scale": 6000416.680062915
+    "panX": 1423409897406.568,
+    "panY": -51.61420347319291,
+    "scale": 552211921.1545414
   }
 }
