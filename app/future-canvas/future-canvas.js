@@ -238,6 +238,26 @@ function setupModalSliders() {
 function renderLoop() {
   if (isPanning || isDraggingNode || isConnecting) {
     triggerRender();
+  } else {
+    // If not panning or dragging, smoothly slide camCenterY back to center on nodes
+    if (currentBoard && currentBoard.nodes.length > 0) {
+      let sumY = 0;
+      let count = 0;
+      currentBoard.nodes.forEach(node => {
+        const sphere = currentBoard.spheres.find(s => s.id === node.sphere);
+        if (!sphere || sphere.visible !== false) {
+          sumY += node.y;
+          count++;
+        }
+      });
+      if (count > 0) {
+        const targetY = sumY / count;
+        if (Math.abs(camCenterY - targetY) > 0.5) {
+          camCenterY += (targetY - camCenterY) * 0.08; // smooth spring interpolation
+          triggerRender();
+        }
+      }
+    }
   }
   requestAnimationFrame(renderLoop);
 }

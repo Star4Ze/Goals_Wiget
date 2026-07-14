@@ -599,7 +599,7 @@ const TRADING_DB_PATH = path.join(TRADING_DIR, "trades.json");
 const TRADING_DATA_DIR = path.join(TRADING_DIR, "data");
 const TRADING_TICKERS_PATH = path.join(TRADING_DATA_DIR, "tickers.json");
 
-const CANVAS_DIR = "D:\\GoogleDisk\\Docs\\FutureCanvas";
+const CANVAS_DIR = path.join(__dirname, 'app', 'future-canvas', 'boards');
 
 function ensureTradingDir() {
   try {
@@ -1883,7 +1883,7 @@ ${content}
       }
     });
 
-    futureCanvasWindow.loadFile(path.join(__dirname, 'app', 'future-canvas.html'));
+    futureCanvasWindow.loadFile(path.join(__dirname, 'app', 'future-canvas', 'future-canvas.html'));
 
     futureCanvasWindow.on('maximize', () => {
       if (futureCanvasWindow && !futureCanvasWindow.isDestroyed()) {
