@@ -39,6 +39,9 @@ let VP_X = 640;               // Vanishing Point X (recalculated on resize)
 let VP_Y = 44;                // Vanishing Point Y (set very high, right under titlebar)
 let baselineY = 700;          // Baseline Y where timeline lies (recalculated on resize)
 const baselineMargin = 60;    // Margin (pixels) left and right for 1995 and 2100 bounds
+const NODE_BAND_HALF_HEIGHT = 28; // Nodes stay visually attached to their date/probability strip
+const NODE_TOP_PADDING = 24;
+const NODE_BOTTOM_PADDING = 18;
 
 let camCenterMs = (START_MS + END_MS) / 2; // World X camera (starts centered)
 let camCenterY = 0;          // World Y camera (centers average nodes)
@@ -282,6 +285,8 @@ function applyViewportConstraints() {
     camCenterMs = maxCamMs;
   }
 
+  camCenterY = 0;
+
   // Toggle "Вернуться в реальность" icon button based on whether "Сейчас" is off-screen
   const realityBtn = document.getElementById('fc-btn-reality');
   if (realityBtn) {
@@ -310,6 +315,49 @@ function applyViewportConstraints() {
   }
 }
 
+function getDepthForProbability(probability) {
+  const z = (probability !== undefined ? probability : 50) / 100;
+  const minDepth = 0.45;
+  return minDepth + (1.0 - minDepth) * Math.pow(1.0 - z, 0.75);
+}
+
+function getStripYForProbability(probability) {
+  const depth = getDepthForProbability(probability);
+  return VP_Y + (baselineY - VP_Y) * depth;
+}
+
+function constrainNodeY(node) {
+  if (!canvas || !node) return 0;
+
+  const depth = getDepthForProbability(node.probability);
+  const stripY = getStripYForProbability(node.probability);
+  const radius = getNodeRadius(node) * (0.5 + 0.5 * depth);
+  const minScreenY = Math.max(VP_Y + NODE_TOP_PADDING + radius, stripY - NODE_BAND_HALF_HEIGHT);
+  const maxScreenY = Math.min(baselineY - NODE_BOTTOM_PADDING - radius, stripY + NODE_BAND_HALF_HEIGHT);
+
+  if (maxScreenY < minScreenY) {
+    node.y = 0;
+    return node.y;
+  }
+
+  const minY = (minScreenY - stripY) / depth;
+  const maxY = (maxScreenY - stripY) / depth;
+  const currentY = Number.isFinite(Number(node.y)) ? Number(node.y) : 0;
+  node.y = Math.max(minY, Math.min(maxY, currentY));
+  return node.y;
+}
+
+function constrainAllNodeY() {
+  if (!currentBoard || !Array.isArray(currentBoard.nodes)) return false;
+  let changed = false;
+  currentBoard.nodes.forEach(node => {
+    const before = node.y;
+    constrainNodeY(node);
+    if (node.y !== before) changed = true;
+  });
+  return changed;
+}
+
 // Get 3D perspective projected position for a node
 // Under the new requirement, the node stays completely stationary on hover!
 // ignoreHover parameter is retained for backwards compatibility.
@@ -320,14 +368,14 @@ function getProjectedPosition(node, ignoreHover = false) {
   // 1. Calculate X position on the baseline (linear timeline)
   const sxOnBaseline = (nodeMs - camCenterMs) / msPerPixel + W / 2;
   
+  constrainNodeY(node);
+
   // 2. Probability (0-100%) maps to depth Z (0.0 to 1.0) - INVERTED: 100% at 55% depth (0.45), 0% at bottom (1.0)
-  const z = (node.probability !== undefined ? node.probability : 50) / 100;
-  const minDepth = 0.45;
-  const depth = minDepth + (1.0 - minDepth) * Math.pow(1.0 - z, 0.75);             // non-linear perspective mapping
+  const depth = getDepthForProbability(node.probability);
   
   // 3. Project baseline to vanishing point VP
   const px = VP_X + (sxOnBaseline - VP_X) * depth;
-  const py = VP_Y + (baselineY - VP_Y) * depth;
+  const py = getStripYForProbability(node.probability);
   
   // 4. Vertical offset (height above grid) - stays static (no Y-shifting on hover)
   const heightOffset = -node.y; // Positive Y in board goes down, negative goes up
