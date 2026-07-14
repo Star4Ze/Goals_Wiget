@@ -40,7 +40,7 @@
       "status": "realized",
       "importance": 6,
       "y": -283.6666717529297,
-      "hoverFactor": 0
+      "hoverFactor": 0.029531160651108404
     },
     {
       "id": "node-4",
@@ -64,10 +64,11 @@
       "date": "2026-08-31",
       "probability": 70,
       "sphere": "trading",
-      "status": "realized",
+      "status": "active",
       "importance": 7,
       "y": -70.7058145269244,
-      "hoverFactor": 0.7683830537167969
+      "hoverFactor": 0,
+      "imageUrl": ""
     },
     {
       "id": "node-6",
@@ -116,7 +117,7 @@
       "date": "2028-09-11",
       "probability": 75,
       "sphere": "health",
-      "status": "hypothetical",
+      "status": "discarded",
       "importance": 7,
       "y": -252.1820275880305,
       "hoverFactor": 0
@@ -350,8 +351,8 @@
     }
   ],
   "viewport": {
-    "panX": 1798101200720.8962,
-    "panY": -63.086293125441436,
+    "panX": 1809951640597.0317,
+    "panY": -63.078268316266765,
     "scale": 150005568.05234513
   }
 }
