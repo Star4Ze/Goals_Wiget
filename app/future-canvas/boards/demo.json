@@ -86,12 +86,12 @@
       "type": "goal",
       "title": "Релиз беты LumiFi V1",
       "description": "Полноценный публичный запуск с подключением Obsidian синхронизации.",
-      "date": "2027-01-01",
+      "date": "2026-12-21",
       "probability": 85,
       "sphere": "lumifi",
       "status": "hypothetical",
       "importance": 9,
-      "y": -212.27225085638423,
+      "y": -210.0129929989626,
       "hoverFactor": 0
     },
     {
@@ -232,12 +232,12 @@
       "description": "234234",
       "date": "2030-05-17",
       "probability": 50,
-      "sphere": "work",
+      "sphere": "health",
       "status": "hypothetical",
       "importance": 5,
       "y": -22.457815995478075,
       "imageUrl": "C:\\Users\\HomePC\\Pictures\\Обои\\13660.jpg",
-      "hoverFactor": 0.622850484375
+      "hoverFactor": 0
     }
   ],
   "connections": [
@@ -349,8 +349,8 @@
     }
   ],
   "viewport": {
-    "panX": 1900057995799.3408,
-    "panY": -66.93490252280058,
-    "scale": 65354043.86571569
+    "panX": 1978038631991.12,
+    "panY": -65.85202892492173,
+    "scale": 173843055.9518304
   }
 }
