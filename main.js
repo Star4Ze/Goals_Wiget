@@ -1,9 +1,13 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, MenuItem } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, MenuItem, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { exec } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
+
+app.disableHardwareAcceleration();
+app.commandLine.appendSwitch('disable-gpu');
+app.setPath('userData', path.join(__dirname, '.electron-user-data'));
 
 let mainWindow;
 let breakWindow = null;
@@ -112,6 +116,12 @@ async function triggerGitSync() {
       }
     }
 
+    const remainingStatusRes = await runGitCommand("status --porcelain");
+    if (remainingStatusRes.success && remainingStatusRes.stdout !== "") {
+      logAction(`⚠️ Автосинк Git: pull --rebase пропущен, потому что в Obsidian остались незакоммиченные изменения вне папки виджета:\n${remainingStatusRes.stdout}`);
+      return;
+    }
+
     // 4. Подтягиваем изменения с удаленного репозитория с использованием rebase
     logAction("🔄 Автосинк Git: Получение свежих изменений (pull --rebase)...");
     
@@ -207,6 +217,34 @@ function loadWindowBounds() {
   return { width: 520, height: 650 };
 }
 
+function normalizeWindowBounds(bounds) {
+  const width = Math.max(320, Number(bounds.width) || 520);
+  const height = Math.max(360, Number(bounds.height) || 650);
+  const normalized = { ...bounds, width, height };
+
+  if (normalized.x === undefined || normalized.y === undefined) {
+    return normalized;
+  }
+
+  const isVisible = screen.getAllDisplays().some(display => {
+    const area = display.workArea;
+    return normalized.x < area.x + area.width &&
+      normalized.x + normalized.width > area.x &&
+      normalized.y < area.y + area.height &&
+      normalized.y + normalized.height > area.y;
+  });
+
+  if (isVisible) {
+    return normalized;
+  }
+
+  const area = screen.getPrimaryDisplay().workArea;
+  normalized.x = area.x + Math.max(0, Math.round((area.width - normalized.width) / 2));
+  normalized.y = area.y + Math.max(0, Math.round((area.height - normalized.height) / 2));
+  logAction('📐 Сохраненные координаты окна были вне экрана. Окно возвращено на основной монитор.');
+  return normalized;
+}
+
 function getFilePath(fileName) {
   try {
     if (!fs.existsSync(TARGET_DIR)) {
@@ -226,7 +264,7 @@ function logAction(message) {
 }
 
 function createWindow() {
-  const savedBounds = loadWindowBounds();
+  const savedBounds = normalizeWindowBounds(loadWindowBounds());
   
   mainWindow = new BrowserWindow({
     x: savedBounds.x !== undefined ? savedBounds.x : undefined,
