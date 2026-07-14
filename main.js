@@ -1922,6 +1922,24 @@ ${content}
   ipcMain.handle('get-canvas-boards', async () => {
     ensureCanvasDir();
     try {
+      // Auto-copy preset boards from project app directory to CANVAS_DIR if missing
+      const localBoardsDir = path.join(__dirname, 'app', 'future-canvas', 'boards');
+      if (fs.existsSync(localBoardsDir)) {
+        const localFiles = fs.readdirSync(localBoardsDir).filter(f => f.endsWith('.json'));
+        localFiles.forEach(f => {
+          const targetPath = path.join(CANVAS_DIR, f);
+          if (!fs.existsSync(targetPath)) {
+            const srcPath = path.join(localBoardsDir, f);
+            try {
+              fs.copyFileSync(srcPath, targetPath);
+              logAction(`📐 Скопирована демо-доска: ${f} -> ${CANVAS_DIR}`);
+            } catch (err) {
+              logAction(`Ошибка копирования демо-доски ${f}: ${err.message}`);
+            }
+          }
+        });
+      }
+
       const files = fs.readdirSync(CANVAS_DIR)
         .filter(f => f.endsWith('.json'))
         .map(f => {
