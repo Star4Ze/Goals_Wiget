@@ -2023,6 +2023,49 @@ function setupCanvasEvents() {
     alert('Future Canvas Terminal v1.0.0\nТема: Void (#0A0E14)\nСохранение: автоматическое в папку boards внутри проекта.');
   });
 
+  addSafeListener('fc-btn-rename-board', 'click', async () => {
+    if (!currentBoard) return;
+    const oldName = currentBoard.name;
+    const newName = prompt('Введите новое название доски:', oldName);
+    if (newName && newName.trim() && newName !== oldName) {
+      if (window.electronAPI) {
+        const success = await window.electronAPI.renameCanvasBoard(currentBoard.id, newName.trim());
+        if (success) {
+          debugLog(`Доска переименована в "${newName.trim()}"`);
+          currentBoard.name = newName.trim();
+          await refreshBoardsList();
+        }
+      }
+    }
+  });
+
+  addSafeListener('fc-btn-delete-board', 'click', async () => {
+    if (!currentBoard) return;
+    if (currentBoard.id === 'personal' && boardList.length <= 1) {
+      alert('Невозможно удалить единственную доску по умолчанию.');
+      return;
+    }
+    const confirmDelete = confirm(`Вы уверены, что хотите навсегда удалить доску "${currentBoard.name}"?`);
+    if (confirmDelete) {
+      if (window.electronAPI) {
+        const success = await window.electronAPI.deleteCanvasBoard(currentBoard.id);
+        if (success) {
+          debugLog(`Доска "${currentBoard.name}" успешно удалена.`);
+          // Switch to another board
+          const remainingBoards = boardList.filter(b => b.id !== currentBoard.id);
+          let targetBoardId = 'personal';
+          if (remainingBoards.length > 0) {
+            targetBoardId = remainingBoards[0].id;
+          }
+          currentBoard = null; // reset current
+          await refreshBoardsList();
+          boardSelect.value = targetBoardId;
+          await loadBoard(targetBoardId);
+        }
+      }
+    }
+  });
+
   addSafeListener('fc-btn-new-board', 'click', () => {
     debugLog('Кнопка новой доски нажата.');
     const overlay = document.getElementById('fc-board-modal-overlay');

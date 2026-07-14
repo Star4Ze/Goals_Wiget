@@ -707,6 +707,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <div id="fc-toolbar">
     <div class="fc-toolbar-left" style="gap: 6px;">
       <select id="fc-board-select"></select>
+      <button class="fc-tool-btn" id="fc-btn-rename-board" title="Переименовать доску">
+        <span class="material-symbols-outlined">edit</span>
+      </button>
+      <button class="fc-tool-btn" id="fc-btn-delete-board" title="Удалить доску" style="color: var(--error);">
+        <span class="material-symbols-outlined">delete_forever</span>
+      </button>
       <button class="fc-tool-btn" id="fc-btn-new-board" title="Новая доска">
         <span class="material-symbols-outlined">note_add</span>
       </button>

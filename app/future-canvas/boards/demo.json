@@ -67,7 +67,7 @@
       "status": "active",
       "importance": 7,
       "y": -400,
-      "hoverFactor": 0,
+      "hoverFactor": 0.622850484375,
       "imageUrl": ""
     },
     {
@@ -93,7 +93,7 @@
       "sphere": "lumifi",
       "status": "hypothetical",
       "importance": 9,
-      "y": -156.90656496388036,
+      "y": -400,
       "hoverFactor": 0
     },
     {
@@ -347,8 +347,8 @@
     }
   ],
   "viewport": {
-    "panX": 2609910311505.4775,
-    "panY": -7.353898745130599,
-    "scale": 1689228891.7783585
+    "panX": 1786154174781.312,
+    "panY": -16.914306036382097,
+    "scale": 8340086.737369793
   }
 }
