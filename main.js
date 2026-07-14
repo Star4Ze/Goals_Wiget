@@ -1873,8 +1873,8 @@ ${content}
       minWidth: 900,
       minHeight: 600,
       frame: false,
-      transparent: true,
-      backgroundColor: '#00000000',
+      transparent: false,
+      backgroundColor: '#121316',
       resizable: true,
       webPreferences: {
         nodeIntegration: false,
