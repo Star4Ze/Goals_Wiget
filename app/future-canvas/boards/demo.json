@@ -14,7 +14,7 @@
       "status": "realized",
       "importance": 4,
       "y": -400,
-      "hoverFactor": 0.8387446467559783
+      "hoverFactor": 0
     },
     {
       "id": "node-2",
@@ -27,7 +27,7 @@
       "status": "realized",
       "importance": 5,
       "y": 400,
-      "hoverFactor": 0.15
+      "hoverFactor": 0
     },
     {
       "id": "node-3",
@@ -371,8 +371,8 @@
     }
   ],
   "viewport": {
-    "panX": 1911169293439.9177,
-    "panY": 148.38486081557426,
-    "scale": 417551547.18679905
+    "panX": 1793298906157.6758,
+    "panY": 139.52865273905675,
+    "scale": 89749875.20182551
   }
 }
