@@ -493,8 +493,8 @@ function isOverAnchor(sx, sy, node) {
 }
 
 // Setup and Event Binding
-window.addEventListener('DOMContentLoaded', () => {
-  debugLog('Страница загружена (DOMContentLoaded). Начало инициализации...');
+function init() {
+  debugLog('Инициализация приложения (init)...');
   updateColorsFromCSS();
 
   canvas = document.getElementById('fc-canvas');
@@ -534,7 +534,13 @@ window.addEventListener('DOMContentLoaded', () => {
   })();
 
   requestAnimationFrame(renderLoop);
-});
+}
+
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
 
 function handleResize() {
   const wrap = document.getElementById('fc-canvas-wrap');
