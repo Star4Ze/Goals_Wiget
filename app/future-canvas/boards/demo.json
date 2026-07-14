@@ -64,10 +64,10 @@
       "date": "2026-08-31",
       "probability": 70,
       "sphere": "trading",
-      "status": "hypothetical",
+      "status": "realized",
       "importance": 7,
       "y": -70.7058145269244,
-      "hoverFactor": 0
+      "hoverFactor": 0.7683830537167969
     },
     {
       "id": "node-6",
