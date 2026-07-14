@@ -668,7 +668,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 <!-- ===== NODE EDIT MODAL ===== -->
 <div class="fc-modal-overlay" id="fc-node-modal-overlay">
   <div id="fc-node-modal">
-    <h2 id="fc-nm-heading">Новый узел</h2>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <h2 id="fc-nm-heading" style="margin: 0;">Новый узел</h2>
+      <canvas id="fc-nm-preview-canvas" width="50" height="50" style="background: rgba(30, 32, 34, 0.4); border: 1px solid var(--outline-var); border-radius: 4px;"></canvas>
+    </div>
     
     <div class="fc-field">
       <label class="fc-field-label">Тип</label>
