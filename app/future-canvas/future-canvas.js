@@ -1047,11 +1047,6 @@ function drawCanvas() {
   if (currentBoard) {
     drawSmartLabels();
   }
-
-  // 8. Draw Tooltip description card if hovered
-  if (hoveredNode) {
-    drawNodeTooltip(hoveredNode);
-  }
 }
 
 // DRAW TIMELINE DIRECTLY ON THE CANVAS
@@ -1152,87 +1147,145 @@ function drawSmartLabels() {
   });
 }
 
-// DRAW HOVER TOOLTIP CARD INSIDE CANVAS
-function drawNodeTooltip(node) {
-  const pos = getProjectedPosition(node);
-  
-  ctx.save();
-  ctx.shadowBlur = 15;
-  ctx.shadowColor = 'rgba(0,0,0,0.5)';
-  
-  const cardW = 240;
-  const cardH = 110;
-  const cardX = Math.max(10, Math.min(canvas.width - cardW - 10, pos.x - cardW / 2));
-  const cardY = Math.max(50, pos.y - pos.radius - cardH - 15);
-  
-  const sphere = (currentBoard.spheres || []).find(s => s.id === node.sphere);
-  const color = sphere ? sphere.color : 'var(--tertiary)';
-  
-  // Image cache check
-  const img = getCachedImage(node.imageUrl);
-  const hasImage = !!img;
+// INTERACTIVE DOM HOVER TOOLTIP HELPERS
+let tooltipHideTimeout = null;
 
-  // Draw card frame
-  ctx.fillStyle = 'rgba(18, 19, 22, 0.95)';
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.rect(cardX, cardY, cardW, cardH);
-  ctx.fill();
-  ctx.stroke();
-  
-  ctx.shadowBlur = 0;
-  
-  // Draw image if loaded
-  if (hasImage) {
-    ctx.drawImage(img, cardX + cardW - 72, cardY + 12, 60, 60);
-    ctx.strokeStyle = 'rgba(141, 145, 152, 0.3)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(cardX + cardW - 72, cardY + 12, 60, 60);
+function showDOMTooltip(node) {
+  if (tooltipHideTimeout) {
+    clearTimeout(tooltipHideTimeout);
+    tooltipHideTimeout = null;
   }
-
-  // Title (wrap narrower if image present)
-  ctx.fillStyle = 'var(--on-surface)';
-  ctx.font = 'bold 12px "JetBrains Mono", monospace';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  const title = node.title || 'Без названия';
-  const maxTitleChars = hasImage ? 18 : 26;
-  ctx.fillText(truncateText(title, maxTitleChars), cardX + 12, cardY + 12);
   
-  // Type metadata
+  const tooltipEl = document.getElementById('fc-hover-tooltip');
+  if (!tooltipEl) return;
+
+  // Set title
+  let titleText = node.title || 'Без названия';
+  if (node.probability !== undefined && node.type !== 'goal') {
+    titleText += ` (${node.probability}%)`;
+  }
+  document.getElementById('fc-tt-title').textContent = titleText;
+
+  // Set meta info
+  const sphere = (currentBoard?.spheres || []).find(s => s.id === node.sphere);
+  const color = sphere ? sphere.color : 'var(--tertiary)';
   const typeMap = { 'event': 'Событие', 'decision': 'Решение', 'goal': 'Цель' };
   const typeText = typeMap[node.type] || 'Узел';
-  ctx.fillStyle = color;
-  ctx.font = '700 9px "JetBrains Mono", monospace';
-  ctx.fillText(typeText.toUpperCase(), cardX + 12, cardY + 30);
-  
-  ctx.fillStyle = 'var(--on-surface-var)';
-  ctx.font = '500 10px "JetBrains Mono", monospace';
-  ctx.fillText(`Дата: ${node.date}`, cardX + (hasImage ? 90 : 110), cardY + 30);
-  
-  // Stats
-  ctx.fillStyle = 'var(--on-surface-var)';
-  ctx.fillText(`Вероятность: ${node.probability}%`, cardX + 12, cardY + 45);
-  if (!hasImage) {
-    ctx.fillText(`Важность: ${node.importance}/10`, cardX + 130, cardY + 45);
+  const metaSpan = document.getElementById('fc-tt-meta');
+  if (metaSpan) {
+    metaSpan.innerHTML = `
+      <span style="color: ${color};">${typeText.toUpperCase()}</span> &middot; 
+      <span>Дата: ${node.date}</span> &middot; 
+      <span>Вероятность: ${node.probability}%</span>
+    `;
   }
+
+  // Set description
+  const descEl = document.getElementById('fc-tt-desc');
+  if (descEl) descEl.textContent = node.description || 'Описание отсутствует';
+
+  // Set image
+  const imgEl = document.getElementById('fc-tt-image');
+  if (imgEl) {
+    if (node.imageUrl) {
+      imgEl.src = toFileUrl(node.imageUrl);
+      imgEl.style.display = 'block';
+    } else {
+      imgEl.style.display = 'none';
+    }
+  }
+
+  // Set Border color matching category
+  tooltipEl.style.borderColor = color;
+
+  // Configure "Выполнить" Button
+  const completeBtn = document.getElementById('fc-btn-complete-task');
+  if (completeBtn) {
+    // Show only if not already realized
+    if (node.status !== 'realized') {
+      completeBtn.style.display = 'flex';
+      completeBtn.onclick = () => {
+        node.status = 'realized';
+        pushState();
+        triggerRender();
+        saveBoardImmediate();
+        hideDOMTooltip();
+      };
+    } else {
+      completeBtn.style.display = 'none';
+    }
+  }
+
+  // Calculate projected node position on screen
+  const pos = getProjectedPosition(node);
+
+  // Position tooltip above the node
+  tooltipEl.style.display = 'flex';
   
-  // Line separator
-  ctx.strokeStyle = 'rgba(67, 71, 78, 0.3)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(cardX + 12, cardY + 60);
-  ctx.lineTo(cardX + cardW - 12, cardY + 60);
-  ctx.stroke();
-  
-  // Description wrap
-  ctx.fillStyle = 'rgba(227, 226, 229, 0.85)';
-  ctx.font = '11px "Inter", sans-serif';
-  const desc = node.description || 'Описание отсутствует';
-  wrapText(ctx, desc, cardX + 12, cardY + 68, hasImage ? cardW - 90 : cardW - 24, 14, 2);
-  
-  ctx.restore();
+  // Wait a microtask to read offsetHeight correctly for centering
+  requestAnimationFrame(() => {
+    const tooltipWidth = tooltipEl.offsetWidth || 260;
+    const tooltipHeight = tooltipEl.offsetHeight || 110;
+    
+    // Bounds check to keep tooltip inside the canvas-wrap container
+    const wrap = document.getElementById('fc-canvas-wrap');
+    if (wrap) {
+      const wrapW = wrap.clientWidth;
+      const wrapH = wrap.clientHeight;
+      
+      let left = pos.x - tooltipWidth / 2;
+      let top = pos.y - pos.radius - tooltipHeight - 15;
+      
+      // Check boundaries
+      if (left < 10) left = 10;
+      if (left + tooltipWidth > wrapW - 10) left = wrapW - tooltipWidth - 10;
+      if (top < 50) {
+        // If goes too high (under titlebar), position it BELOW the node instead!
+        top = pos.y + pos.radius + 15;
+      }
+      
+      tooltipEl.style.left = left + 'px';
+      tooltipEl.style.top = top + 'px';
+      tooltipEl.classList.add('visible');
+    }
+  });
+}
+
+function hideDOMTooltip() {
+  const tooltipEl = document.getElementById('fc-hover-tooltip');
+  if (tooltipEl) {
+    tooltipEl.classList.remove('visible');
+    // Hide display completely after transition finishes
+    setTimeout(() => {
+      if (tooltipEl && !tooltipEl.classList.contains('visible')) {
+        tooltipEl.style.display = 'none';
+      }
+    }, 150);
+  }
+}
+
+function startTooltipHideTimeout() {
+  if (tooltipHideTimeout) clearTimeout(tooltipHideTimeout);
+  tooltipHideTimeout = setTimeout(() => {
+    hideDOMTooltip();
+  }, 200); // 200ms buffer to allow moving mouse into tooltip
+}
+
+// Bind tooltip mouse listeners in DOM on startup
+function setupDOMTooltipEvents() {
+  const tooltipEl = document.getElementById('fc-hover-tooltip');
+  if (tooltipEl) {
+    tooltipEl.addEventListener('mouseenter', () => {
+      if (tooltipHideTimeout) {
+        clearTimeout(tooltipHideTimeout);
+        tooltipHideTimeout = null;
+      }
+    });
+
+    tooltipEl.addEventListener('mouseleave', () => {
+      startTooltipHideTimeout();
+    });
+  }
 }
 
 function truncateText(text, maxChars) {
@@ -1682,6 +1735,7 @@ function setupCanvasEvents() {
   // Mouse Down
   canvas.addEventListener('mousedown', (e) => {
     hideContextMenu();
+    hideDOMTooltip();
     
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left;
@@ -2350,6 +2404,8 @@ function closeAllModals() {
   
   const sOverlay = document.getElementById('fc-spheres-modal-overlay');
   if (sOverlay) sOverlay.classList.remove('visible');
+
+  hideDOMTooltip();
 }
 
 // EXPORT TO AI
