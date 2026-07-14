@@ -34,26 +34,26 @@
       "type": "event",
       "title": "Неудача бета-теста Engine V1",
       "description": "Тестирование выявило утечки памяти и сильные лаги при масштабировании.",
-      "date": "2025-09-01",
+      "date": "2100-12-31",
       "probability": 100,
       "sphere": "work",
       "status": "realized",
       "importance": 6,
-      "y": -283.6666717529297,
-      "hoverFactor": 0
+      "y": 400,
+      "hoverFactor": 0.866735607092992
     },
     {
       "id": "node-4",
       "type": "decision",
       "title": "Смена архитектуры LumiFi Engine",
       "description": "Выбор: переписать на чистый Canvas с ручным управлением рендерингом или использовать WebGL/ThreeJS.",
-      "date": "1995-01-01",
-      "probability": 100,
+      "date": "2013-05-09",
+      "probability": 53,
       "sphere": "health",
       "status": "realized",
       "importance": 8,
-      "y": 400,
-      "hoverFactor": 0.032945601421837195,
+      "y": -400,
+      "hoverFactor": 0,
       "imageUrl": ""
     },
     {
@@ -351,8 +351,8 @@
     }
   ],
   "viewport": {
-    "panX": 1423409897406.568,
-    "panY": -51.61420347319291,
+    "panX": 1394142665585.3774,
+    "panY": -90.46630284506085,
     "scale": 552211921.1545414
   }
 }
