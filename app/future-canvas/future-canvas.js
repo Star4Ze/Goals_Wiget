@@ -74,6 +74,37 @@ const colors = {
   error: '#ffb4ab'
 };
 
+// Real-time debug log console system visible on user's screen
+function debugLog(msg) {
+  console.log(`[FutureCanvas] ${msg}`);
+  const logsEl = document.getElementById('fc-debug-logs');
+  if (logsEl) {
+    const div = document.createElement('div');
+    div.style.borderBottom = '1px dashed rgba(0, 255, 102, 0.15)';
+    div.style.padding = '2px 0';
+    div.style.wordBreak = 'break-all';
+    div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    logsEl.appendChild(div);
+    
+    // Keep last 40 logs
+    while (logsEl.children.length > 40) {
+      logsEl.removeChild(logsEl.firstChild);
+    }
+    // Auto scroll to bottom
+    const consoleEl = document.getElementById('fc-debug-console');
+    if (consoleEl) consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
+}
+
+// Global Exception Handlers
+window.onerror = function(message, source, lineno, colno, error) {
+  debugLog(`ГЛОБАЛЬНАЯ ОШИБКА: ${message} (Строка: ${lineno}, Файл: ${source ? source.split('/').pop() : '?'})`);
+  return false;
+};
+window.addEventListener('unhandledrejection', function(event) {
+  debugLog(`ОШИБКА PROMISE: ${event.reason}`);
+});
+
 function updateColorsFromCSS() {
   try {
     const style = getComputedStyle(document.documentElement);
@@ -86,8 +117,10 @@ function updateColorsFromCSS() {
     colors.secondary = style.getPropertyValue('--secondary').trim() || colors.secondary;
     colors.tertiary = style.getPropertyValue('--tertiary').trim() || colors.tertiary;
     colors.error = style.getPropertyValue('--error').trim() || colors.error;
+    debugLog('Цветовая гамма CSS успешно считана.');
   } catch (e) {
     console.error('Error reading CSS color variables:', e);
+    debugLog(`Ошибка чтения цветов CSS: ${e.message}`);
   }
 }
 
@@ -108,7 +141,18 @@ function generateUUID() {
 function addSafeListener(id, event, callback) {
   const el = document.getElementById(id);
   if (el) {
-    el.addEventListener(event, callback);
+    el.addEventListener(event, (e) => {
+      debugLog(`Клик/Событие "${event}" на элементе с ID "${id}"`);
+      try {
+        callback(e);
+      } catch (err) {
+        debugLog(`ОШИБКА в обработчике #${id}: ${err.message}`);
+        console.error(err);
+      }
+    });
+    debugLog(`Слушатель "${event}" зарегистрирован для #${id}`);
+  } else {
+    debugLog(`ПРЕДУПРЕЖДЕНИЕ: элемент #${id} не найден`);
   }
 }
 
@@ -450,6 +494,7 @@ function isOverAnchor(sx, sy, node) {
 
 // Setup and Event Binding
 window.addEventListener('DOMContentLoaded', () => {
+  debugLog('Страница загружена (DOMContentLoaded). Начало инициализации...');
   updateColorsFromCSS();
 
   canvas = document.getElementById('fc-canvas');
@@ -479,8 +524,11 @@ window.addEventListener('DOMContentLoaded', () => {
   // Run board data loading asynchronously inside try-catch to keep app alive
   (async () => {
     try {
+      debugLog('Запуск асинхронного считывания досок...');
       await refreshBoardsList();
+      debugLog('Асинхронное считывание досок успешно завершено.');
     } catch (e) {
+      debugLog(`ОШИБКА загрузки досок на старте: ${e.message}`);
       console.error('Error loading boards:', e);
     }
   })();
@@ -1471,6 +1519,7 @@ function setupCanvasEvents() {
 
   // Category Manager modal triggers (Dynamic DOM lookup queries are used here to prevent cached null errors)
   addSafeListener('fc-btn-manage-spheres', 'click', () => {
+    debugLog(`Кнопка категорий нажата. currentBoard: ${currentBoard ? currentBoard.name : 'null'}`);
     if (!currentBoard) {
       alert('Пожалуйста, подождите, пока загрузится доска.');
       return;
@@ -1478,7 +1527,12 @@ function setupCanvasEvents() {
     tempSpheres = JSON.parse(JSON.stringify(currentBoard.spheres || []));
     buildSpheresManagerList();
     const overlay = document.getElementById('fc-spheres-modal-overlay');
-    if (overlay) overlay.classList.add('visible');
+    if (overlay) {
+      overlay.classList.add('visible');
+      debugLog('Модалка категорий переведена в visible.');
+    } else {
+      debugLog('ОШИБКА: Оверлей #fc-spheres-modal-overlay не найден!');
+    }
   });
 
   addSafeListener('fc-sm-add-btn', 'click', () => {
@@ -1883,8 +1937,14 @@ function setupCanvasEvents() {
   });
 
   addSafeListener('fc-btn-new-board', 'click', () => {
+    debugLog('Кнопка новой доски нажата.');
     const overlay = document.getElementById('fc-board-modal-overlay');
-    if (overlay) overlay.classList.add('visible');
+    if (overlay) {
+      overlay.classList.add('visible');
+      debugLog('Оверлей новой доски переведен в visible.');
+    } else {
+      debugLog('ОШИБКА: Оверлей #fc-board-modal-overlay не найден!');
+    }
     const bName = document.getElementById('fc-bm-name');
     if (bName) {
       bName.value = '';
@@ -1895,8 +1955,12 @@ function setupCanvasEvents() {
 
 // BOARD MANAGEMENT
 async function refreshBoardsList() {
-  if (!window.electronAPI) return;
+  if (!window.electronAPI) {
+    debugLog('ПРЕДУПРЕЖДЕНИЕ: window.electronAPI не обнаружен. Работа в режиме оффлайн.');
+    return;
+  }
   boardList = await window.electronAPI.getCanvasBoards();
+  debugLog(`Загружен список досок с диска. Всего досок: ${boardList.length}`);
   
   boardSelect.innerHTML = '';
   boardList.forEach(b => {
@@ -1916,6 +1980,7 @@ async function refreshBoardsList() {
 
 async function loadBoard(boardId) {
   if (!window.electronAPI) return;
+  debugLog(`Попытка загрузки доски с ID: ${boardId}`);
   
   if (currentBoard) {
     await saveBoardImmediate();
@@ -1923,6 +1988,7 @@ async function loadBoard(boardId) {
 
   currentBoard = await window.electronAPI.getCanvasBoardData(boardId);
   if (currentBoard) {
+    debugLog(`Доска "${currentBoard.name}" успешно загружена в память.`);
     localStorage.setItem('fc_last_board_id', boardId);
     
     // Safely guarantee spheres array exists
@@ -1960,6 +2026,8 @@ async function loadBoard(boardId) {
 
     // Trigger Yandex Calendar background auto-sync if url is configured
     setTimeout(autoSyncCalendarOnLoad, 1000);
+  } else {
+    debugLog(`ОШИБКА: Данные доски с ID ${boardId} вернули null!`);
   }
 }
 
