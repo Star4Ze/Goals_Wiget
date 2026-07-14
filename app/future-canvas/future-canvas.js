@@ -9,6 +9,14 @@ let boardList = [];
 let selectedNodeId = null;
 let hoveredNodeId = null;
 
+// Undo/Redo history stacks
+const undoStack = [];
+const redoStack = [];
+
+// Coordinates for empty space right click
+let emptyClickWorldMs = 0;
+let emptyClickWorldY = 0;
+
 // Blur state toggle
 let isBlurEnabled = localStorage.getItem('fc_blur_enabled') !== 'false';
 
@@ -108,6 +116,84 @@ function getCachedImage(url) {
   return null;
 }
 
+// Undo/Redo implementation
+function pushState() {
+  if (!currentBoard) return;
+  const state = {
+    nodes: JSON.parse(JSON.stringify(currentBoard.nodes)),
+    connections: JSON.parse(JSON.stringify(currentBoard.connections))
+  };
+  
+  if (undoStack.length > 0) {
+    const top = undoStack[undoStack.length - 1];
+    if (JSON.stringify(top.nodes) === JSON.stringify(state.nodes) && 
+        JSON.stringify(top.connections) === JSON.stringify(state.connections)) {
+      return; // No change
+    }
+  }
+  
+  undoStack.push(state);
+  redoStack.length = 0; // Clear redo history on new action
+  updateUndoRedoButtonsUI();
+}
+
+function undo() {
+  if (undoStack.length <= 1) return;
+  const currentState = undoStack.pop();
+  redoStack.push(currentState);
+  
+  const previousState = undoStack[undoStack.length - 1];
+  currentBoard.nodes = JSON.parse(JSON.stringify(previousState.nodes));
+  currentBoard.connections = JSON.parse(JSON.stringify(previousState.connections));
+  
+  updateUndoRedoButtonsUI();
+  saveBoardImmediate();
+  triggerRender();
+}
+
+function redo() {
+  if (redoStack.length === 0) return;
+  const nextState = redoStack.pop();
+  undoStack.push(nextState);
+  
+  currentBoard.nodes = JSON.parse(JSON.stringify(nextState.nodes));
+  currentBoard.connections = JSON.parse(JSON.stringify(nextState.connections));
+  
+  updateUndoRedoButtonsUI();
+  saveBoardImmediate();
+  triggerRender();
+}
+
+function updateUndoRedoButtonsUI() {
+  const undoBtn = document.getElementById('fc-btn-undo');
+  const redoBtn = document.getElementById('fc-btn-redo');
+  if (!undoBtn || !redoBtn) return;
+  
+  if (undoStack.length > 1) {
+    undoBtn.style.color = '#ffffff';
+    undoBtn.style.opacity = '1.0';
+    undoBtn.style.pointerEvents = 'auto';
+    undoBtn.style.cursor = 'pointer';
+  } else {
+    undoBtn.style.color = 'var(--outline-var)';
+    undoBtn.style.opacity = '0.4';
+    undoBtn.style.pointerEvents = 'none';
+    undoBtn.style.cursor = 'default';
+  }
+  
+  if (redoStack.length > 0) {
+    redoBtn.style.color = '#ffffff';
+    redoBtn.style.opacity = '1.0';
+    redoBtn.style.pointerEvents = 'auto';
+    redoBtn.style.cursor = 'pointer';
+  } else {
+    redoBtn.style.color = 'var(--outline-var)';
+    redoBtn.style.opacity = '0.4';
+    redoBtn.style.pointerEvents = 'none';
+    redoBtn.style.cursor = 'default';
+  }
+}
+
 // Calculate viewport zoom/pan bounds to lock edges at 1995 and 2100
 function applyViewportConstraints() {
   if (!canvas) return;
@@ -134,6 +220,18 @@ function applyViewportConstraints() {
     camCenterMs = minCamMs;
   } else if (camCenterMs > maxCamMs) {
     camCenterMs = maxCamMs;
+  }
+
+  // Toggle "Вернуться в реальность" button based on distance from today (now)
+  const diff = Math.abs(camCenterMs - Date.now());
+  const showRealityBtn = diff > 45 * 24 * 60 * 60 * 1000; // 45 days panned away from today
+  const realityBtn = document.getElementById('fc-btn-reality');
+  if (realityBtn) {
+    if (showRealityBtn) {
+      realityBtn.classList.add('visible');
+    } else {
+      realityBtn.classList.remove('visible');
+    }
   }
 }
 
@@ -922,6 +1020,7 @@ async function syncYandexCalendar() {
     currentBoard.nodes = currentBoard.nodes.filter(n => !n.id.startsWith('yandex-'));
     currentBoard.nodes.push(...events);
     
+    pushState(); // Push state to undo stack
     alert(`Яндекс.Календарь успешно синхронизирован! Импортировано событий: ${events.length}`);
     await saveBoardImmediate();
     triggerRender();
@@ -975,6 +1074,38 @@ function setupCanvasEvents() {
     localStorage.setItem('fc_blur_enabled', isBlurEnabled);
     updateBlurButtonUI();
     triggerRender();
+  });
+
+  // Undo/Redo button clicks
+  document.getElementById('fc-btn-undo').addEventListener('click', undo);
+  document.getElementById('fc-btn-redo').addEventListener('click', redo);
+
+  // Reality Button (smooth easing back to now)
+  document.getElementById('fc-btn-reality').addEventListener('click', () => {
+    const startMs = camCenterMs;
+    const targetMs = Date.now();
+    const startTime = Date.now();
+    const duration = 600; // 600ms transition duration
+    
+    const animatePan = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(1.0, elapsed / duration);
+      // Ease In Out Cubic
+      const ease = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+      
+      camCenterMs = startMs + (targetMs - startMs) * ease;
+      applyViewportConstraints();
+      triggerRender();
+      
+      if (progress < 1.0) {
+        requestAnimationFrame(animatePan);
+      } else {
+        saveBoardDebounced();
+      }
+    };
+    
+    camCenterY = 0; // Reset vertical centering as well
+    animatePan();
   });
 
   // Yandex Calendar import trigger
@@ -1120,6 +1251,7 @@ function setupCanvasEvents() {
     } else if (isDraggingNode) {
       isDraggingNode = false;
       draggedNode = null;
+      pushState(); // Save state after node dragging finishes
       saveBoardDebounced();
     } else if (isConnecting) {
       isConnecting = false;
@@ -1135,6 +1267,7 @@ function setupCanvasEvents() {
             fromNodeId: connectSourceNode.id,
             toNodeId: targetNode.id
           });
+          pushState(); // Save state after connection creation
           saveBoardDebounced();
         }
       }
@@ -1179,7 +1312,7 @@ function setupCanvasEvents() {
     }
   });
 
-  // Right Click (Context Menu)
+  // Right Click (Context Menu - handles nodes and empty spaces dynamically)
   canvas.addEventListener('contextmenu', (e) => {
     e.preventDefault();
     const rect = canvas.getBoundingClientRect();
@@ -1190,13 +1323,30 @@ function setupCanvasEvents() {
     if (node) {
       selectedNodeId = node.id;
       triggerRender();
-      showContextMenu(e.clientX, e.clientY, node);
+      showContextMenu(e.clientX, e.clientY, true);
+    } else {
+      selectedNodeId = null;
+      const w = screenToWorld(mx, my);
+      emptyClickWorldMs = w.wms;
+      emptyClickWorldY = w.wy;
+      showContextMenu(e.clientX, e.clientY, false);
     }
   });
 
-  // Keyboard Shortcuts
+  // Keyboard Shortcuts (Handles Ctrl+Z / Ctrl+Y undo redo)
   window.addEventListener('keydown', (e) => {
     if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+
+    if (e.ctrlKey && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      undo();
+      return;
+    }
+    if (e.ctrlKey && e.key.toLowerCase() === 'y') {
+      e.preventDefault();
+      redo();
+      return;
+    }
 
     if (e.key === 'Delete' || e.key === 'Backspace') {
       if (selectedNodeId) {
@@ -1314,6 +1464,15 @@ async function loadBoard(boardId) {
     updateStatusBar();
     triggerRender();
 
+    // Initialize session history stack
+    undoStack.length = 0;
+    redoStack.length = 0;
+    undoStack.push({
+      nodes: JSON.parse(JSON.stringify(currentBoard.nodes)),
+      connections: JSON.parse(JSON.stringify(currentBoard.connections))
+    });
+    updateUndoRedoButtonsUI();
+
     // Trigger Yandex Calendar background auto-sync if url is configured
     setTimeout(autoSyncCalendarOnLoad, 1000);
   }
@@ -1399,10 +1558,21 @@ function buildFilterPanel() {
 }
 
 // CONTEXT MENU
-function showContextMenu(x, y, node) {
+function showContextMenu(x, y, isNode) {
   ctxMenu.style.display = 'block';
   ctxMenu.style.left = x + 'px';
   ctxMenu.style.top = y + 'px';
+
+  const nodeItems = ctxMenu.querySelectorAll('.fc-ctx-node-only');
+  const emptyItems = ctxMenu.querySelectorAll('.fc-ctx-empty-only');
+
+  if (isNode) {
+    nodeItems.forEach(el => el.style.display = 'block');
+    emptyItems.forEach(el => el.style.display = 'none');
+  } else {
+    nodeItems.forEach(el => el.style.display = 'none');
+    emptyItems.forEach(el => el.style.display = 'block');
+  }
 }
 
 // Hide Context Menu
@@ -1433,6 +1603,7 @@ document.getElementById('fc-ctx-realized').addEventListener('click', () => {
   const node = currentBoard.nodes.find(n => n.id === selectedNodeId);
   if (node) {
     node.status = 'realized';
+    pushState(); // Save state
     triggerRender();
     saveBoardImmediate();
   }
@@ -1443,6 +1614,7 @@ document.getElementById('fc-ctx-discarded').addEventListener('click', () => {
   const node = currentBoard.nodes.find(n => n.id === selectedNodeId);
   if (node) {
     node.status = 'discarded';
+    pushState(); // Save state
     triggerRender();
     saveBoardImmediate();
   }
@@ -1458,10 +1630,45 @@ document.getElementById('fc-ctx-delete').addEventListener('click', () => {
   hideContextMenu();
 });
 
+// Empty space right click actions
+document.getElementById('fc-ctx-add-goal').addEventListener('click', () => {
+  const tempNode = createTempNodeAtClick('goal');
+  showNodeModal(tempNode, true);
+  hideContextMenu();
+});
+
+document.getElementById('fc-ctx-add-event').addEventListener('click', () => {
+  const tempNode = createTempNodeAtClick('event');
+  showNodeModal(tempNode, true);
+  hideContextMenu();
+});
+
+document.getElementById('fc-ctx-add-decision').addEventListener('click', () => {
+  const tempNode = createTempNodeAtClick('decision');
+  showNodeModal(tempNode, true);
+  hideContextMenu();
+});
+
+function createTempNodeAtClick(type) {
+  return {
+    id: '',
+    type: type,
+    title: '',
+    description: '',
+    date: new Date(emptyClickWorldMs).toISOString().slice(0, 10),
+    probability: type === 'goal' ? 100 : 50,
+    sphere: 'work',
+    status: 'hypothetical',
+    importance: 5,
+    y: emptyClickWorldY
+  };
+}
+
 function deleteNode(id) {
   if (!currentBoard) return;
   currentBoard.nodes = currentBoard.nodes.filter(n => n.id !== id);
   currentBoard.connections = currentBoard.connections.filter(c => c.fromNodeId !== id && c.toNodeId !== id);
+  pushState(); // Save state
   saveBoardImmediate();
 }
 
@@ -1521,6 +1728,7 @@ document.getElementById('fc-nm-save').addEventListener('click', () => {
     currentBoard.nodes.push(modalTargetNode);
   }
 
+  pushState(); // Save state to history stack
   nodeModal.classList.remove('visible');
   saveBoardImmediate();
   triggerRender();
