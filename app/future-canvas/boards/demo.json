@@ -159,7 +159,7 @@
       "sphere": "lumifi",
       "status": "hypothetical",
       "importance": 9,
-      "y": -9.563531867892841,
+      "y": -39.98441518748445,
       "hoverFactor": 0
     },
     {
@@ -232,12 +232,12 @@
       "type": "goal",
       "title": "23123123",
       "description": "123123",
-      "date": "2026-07-01",
+      "date": "2026-07-28",
       "probability": 96,
       "sphere": "work",
       "status": "hypothetical",
       "importance": 9,
-      "y": -36.034553999026826,
+      "y": -56.09047443952483,
       "imageUrl": "C:\\Users\\HomePC\\Pictures\\Обои\\5c1c8af585e04-wallpaper-270f02449f15df7a6fd2f481a1c13745.jpg",
       "hoverFactor": 0
     }
@@ -337,6 +337,11 @@
       "id": "fc8e03ef-24fd-42e3-b0a9-d8089e988934",
       "fromNodeId": "node-4",
       "toNodeId": "node-13"
+    },
+    {
+      "id": "3e302f8a-3724-4e36-ad73-6764acec8003",
+      "fromNodeId": "837cf83e-4dbc-44dd-8ef6-25d7fcc8ad77",
+      "toNodeId": "node-11"
     }
   ],
   "spheres": [
@@ -350,24 +355,24 @@
       "id": "trading",
       "name": "Трейдинг",
       "color": "#00dbe7",
-      "visible": true
+      "visible": false
     },
     {
       "id": "health",
       "name": "Здоровье",
       "color": "#00e676",
-      "visible": true
+      "visible": false
     },
     {
       "id": "lumifi",
       "name": "LumiFi",
       "color": "#a186f1",
-      "visible": true
+      "visible": false
     }
   ],
   "viewport": {
-    "panX": 1783453528179.8096,
+    "panX": 1889876664398.0754,
     "panY": 0,
-    "scale": 3594606.311498426
+    "scale": 416272675.67933553
   }
 }
