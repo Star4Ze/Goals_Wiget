@@ -1,0 +1,38 @@
+{
+  "id": "владиславlife",
+  "name": "ВладиславLife",
+  "createdAt": "2026-07-14T16:42:08.743Z",
+  "nodes": [],
+  "connections": [],
+  "spheres": [
+    {
+      "id": "work",
+      "name": "Работа",
+      "color": "#5B7A9D",
+      "visible": true
+    },
+    {
+      "id": "trading",
+      "name": "Трейдинг",
+      "color": "#00dbe7",
+      "visible": true
+    },
+    {
+      "id": "health",
+      "name": "Здоровье",
+      "color": "#00e676",
+      "visible": true
+    },
+    {
+      "id": "lumifi",
+      "name": "LumiFi",
+      "color": "#a186f1",
+      "visible": true
+    }
+  ],
+  "viewport": {
+    "panX": 1783684945205.2205,
+    "panY": 0,
+    "scale": 3934304.4081365904
+  }
+}
