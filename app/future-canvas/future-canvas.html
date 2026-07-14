@@ -751,11 +751,30 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <!-- ===== MAIN CANVAS ===== -->
   <main id="fc-canvas-wrap">
     <canvas id="fc-canvas"></canvas>
+    
+    <!-- Floating Interactive Tooltip -->
+    <div id="fc-hover-tooltip" class="fc-dom-tooltip">
+      <div class="fc-tooltip-header">
+        <div style="display: flex; flex-direction: column;">
+          <span id="fc-tt-title" class="fc-tt-title"></span>
+          <span id="fc-tt-meta" class="fc-tt-meta"></span>
+        </div>
+        <img id="fc-tt-image" class="fc-tt-image" style="display: none;" />
+      </div>
+      <div id="fc-tt-desc" class="fc-tt-desc"></div>
+      <div class="fc-tt-footer">
+        <button id="fc-btn-complete-task" class="fc-btn fc-btn-primary fc-btn-sm" style="display: none;">
+          <span class="material-symbols-outlined" style="font-size: 14px;">check_circle</span>
+          Выполнить
+        </button>
+      </div>
+    </div>
+
     <!-- Reality Button -->
-    <button id="fc-btn-reality" class="fc-reality-btn">
-      <span class="material-symbols-outlined" style="font-size: 16px;">my_location</span>
-      Вернуться в реальность
+    <button id="fc-btn-reality" class="fc-reality-btn" title="Вернуться в реальность">
+      <span class="material-symbols-outlined" style="font-size: 20px;">my_location</span>
     </button>
+
     <!-- Filter panel is inside canvas-wrap for positioning -->
     <div id="fc-filter-panel">
       <h3>Сферы жизни</h3>
@@ -936,15 +955,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   <div class="fc-ctx-item fc-ctx-empty-only" id="fc-ctx-add-decision">
     <span class="material-symbols-outlined">alt_route</span> Создать решение
   </div>
-</div>
-
-<!-- Floating Debug Console Panel -->
-<div id="fc-debug-console" style="position: fixed; bottom: 35px; right: 10px; background: rgba(10, 14, 20, 0.95); color: #00ff66; border: 1px solid #00ff66; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 10px; z-index: 99999; width: 320px; max-height: 200px; overflow-y: auto; box-shadow: 0 0 15px rgba(0, 255, 102, 0.25); pointer-events: auto; display: flex; flex-direction: column; gap: 4px; border-radius: 4px;">
-  <div style="font-weight: bold; border-bottom: 1px solid #00ff66; padding-bottom: 4px; display: flex; justify-content: space-between; align-items: center;">
-    <span>🌌 FUTURE CANVAS LOG CONSOLE</span>
-    <button onclick="document.getElementById('fc-debug-console').style.display='none'" style="background:transparent; border:none; color:#00ff66; cursor:pointer; font-weight:bold;">[Х]</button>
-  </div>
-  <div id="fc-debug-logs" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;"></div>
 </div>
 
 <script src="future-canvas.js"></script>

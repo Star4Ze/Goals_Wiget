@@ -74,26 +74,9 @@ const colors = {
   error: '#ffb4ab'
 };
 
-// Real-time debug log console system visible on user's screen
+// Real-time debug log console system
 function debugLog(msg) {
   console.log(`[FutureCanvas] ${msg}`);
-  const logsEl = document.getElementById('fc-debug-logs');
-  if (logsEl) {
-    const div = document.createElement('div');
-    div.style.borderBottom = '1px dashed rgba(0, 255, 102, 0.15)';
-    div.style.padding = '2px 0';
-    div.style.wordBreak = 'break-all';
-    div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-    logsEl.appendChild(div);
-    
-    // Keep last 40 logs
-    while (logsEl.children.length > 40) {
-      logsEl.removeChild(logsEl.firstChild);
-    }
-    // Auto scroll to bottom
-    const consoleEl = document.getElementById('fc-debug-console');
-    if (consoleEl) consoleEl.scrollTop = consoleEl.scrollHeight;
-  }
 }
 
 // Global Exception Handlers
@@ -292,14 +275,29 @@ function applyViewportConstraints() {
     camCenterMs = maxCamMs;
   }
 
-  // Toggle "Вернуться в реальность" button based on distance from today (now)
-  const diff = Math.abs(camCenterMs - Date.now());
-  const showRealityBtn = diff > 45 * 24 * 60 * 60 * 1000; // 45 days panned away from today
+  // Toggle "Вернуться в реальность" icon button based on whether "Сейчас" is off-screen
   const realityBtn = document.getElementById('fc-btn-reality');
   if (realityBtn) {
-    if (showRealityBtn) {
+    const iconSpan = realityBtn.querySelector('.material-symbols-outlined');
+    const nowMs = Date.now();
+    const nowX = (nowMs - camCenterMs) / msPerPixel + W / 2;
+    
+    if (nowX < 0) {
+      // NOW line is off-screen to the left
+      realityBtn.style.left = '24px';
+      realityBtn.style.right = 'auto';
+      if (iconSpan) iconSpan.textContent = 'arrow_back';
+      realityBtn.title = 'Вернуться в реальность (Сейчас слева)';
+      realityBtn.classList.add('visible');
+    } else if (nowX > W) {
+      // NOW line is off-screen to the right
+      realityBtn.style.left = 'auto';
+      realityBtn.style.right = '24px';
+      if (iconSpan) iconSpan.textContent = 'arrow_forward';
+      realityBtn.title = 'Вернуться в реальность (Сейчас справа)';
       realityBtn.classList.add('visible');
     } else {
+      // NOW line is visible on screen
       realityBtn.classList.remove('visible');
     }
   }
@@ -520,6 +518,7 @@ function init() {
   setupCanvasEvents();
   setupModalSliders();
   updateBlurButtonUI();
+  setupDOMTooltipEvents();
 
   // Run board data loading asynchronously inside try-catch to keep app alive
   (async () => {
@@ -1758,11 +1757,13 @@ function setupCanvasEvents() {
         if (hoveredNodeId !== node.id) {
           hoveredNodeId = node.id;
           document.body.style.cursor = 'pointer';
+          showDOMTooltip(node);
         }
       } else {
         if (hoveredNodeId !== null) {
           hoveredNodeId = null;
           document.body.style.cursor = 'default';
+          startTooltipHideTimeout();
         }
       }
     }
