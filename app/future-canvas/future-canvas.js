@@ -55,6 +55,10 @@ let connectSourceNode = null;
 let connectMouseX = 0;
 let connectMouseY = 0;
 
+// Spheres editor modal state
+let spheresModal;
+let tempSpheres = [];
+
 // Auto-save debounce timer
 let saveDebounceTimer = null;
 
@@ -284,8 +288,9 @@ function screenToWorld(sx, sy) {
 }
 
 // Determine base node radius based on importance
+// Increased base radius to 15 (nodes are larger, so clipped images inside them are highly visible)
 function getNodeRadius(node) {
-  const baseRadius = 8;
+  const baseRadius = 15;
   const importance = node.importance || 5;
   return baseRadius * (importance / 5);
 }
@@ -331,8 +336,8 @@ function updateModalPreview() {
   const sphere = currentBoard?.spheres.find(s => s.id === sphereId) || { color: '#aac9f0' };
   const color = sphere.color;
   
-  const baseRadius = 8;
-  const radius = Math.min(18, baseRadius * (importance / 5) * 1.1); // Scaled for preview frame
+  const baseRadius = 15; // match updated base size
+  const radius = Math.min(18, baseRadius * (importance / 5) * 1.0); // Scaled for preview frame
   
   const cx = 25;
   const cy = 25;
@@ -437,6 +442,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   boardModal = document.getElementById('fc-board-modal-overlay');
   exportModal = document.getElementById('fc-export-modal-overlay');
   ctxMenu = document.getElementById('fc-ctx-menu');
+  spheresModal = document.getElementById('fc-spheres-modal-overlay');
 
   window.addEventListener('resize', handleResize);
   handleResize();
@@ -1039,7 +1045,6 @@ function drawSmartLabels() {
       ctx.shadowBlur = 0;
       
       const z = (node.probability !== undefined ? node.probability : 50) / 100;
-      const hoverFactor = node.hoverFactor || 0;
       const opacity = (node.status === 'discarded' ? 0.25 : (node.status === 'hypothetical' ? 0.65 : 1.0)) * (0.3 + 0.7 * pos.depth);
       ctx.globalAlpha = isSpecial ? 1.0 : opacity;
 
@@ -1265,6 +1270,140 @@ function updateBlurButtonUI() {
   }
 }
 
+// Dynamically populate Category Select dropdown inside the Node modal
+function populateSphereSelect() {
+  const select = document.getElementById('fc-nm-sphere');
+  if (!select || !currentBoard) return;
+  select.innerHTML = '';
+  currentBoard.spheres.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.id;
+    opt.textContent = `${s.icon || '🎯'} ${s.name}`;
+    select.appendChild(opt);
+  });
+}
+
+// Dynamically render capsule pill toggles in the top-left area
+function buildSpheresPills() {
+  const box = document.getElementById('fc-spheres-pillbox');
+  if (!box || !currentBoard) return;
+  box.innerHTML = '';
+
+  currentBoard.spheres.forEach(s => {
+    const pill = document.createElement('button');
+    pill.className = 'fc-sphere-pill';
+
+    const isVisible = s.visible !== false;
+
+    if (isVisible) {
+      pill.style.background = s.color + '22'; // 13% opacity hex
+      pill.style.borderColor = s.color;
+      pill.style.color = s.color;
+    } else {
+      pill.style.background = 'transparent';
+      pill.style.borderColor = 'var(--outline-var)';
+      pill.style.color = 'var(--on-surface-var)';
+      pill.style.opacity = '0.5';
+    }
+
+    pill.innerHTML = `
+      <span class="fc-sphere-pill-dot" style="background: ${isVisible ? s.color : 'var(--outline-var)'};"></span>
+      ${s.icon || '🎯'} ${s.name}
+    `;
+
+    pill.addEventListener('click', () => {
+      s.visible = !isVisible;
+      buildSpheresPills();
+      buildFilterPanel(); // keep filter panel in sync
+      triggerRender();
+      saveBoardDebounced();
+    });
+
+    box.appendChild(pill);
+  });
+}
+
+// Build the category rows inside the Spheres Manager Modal
+function buildSpheresManagerList() {
+  const list = document.getElementById('fc-sm-list');
+  if (!list) return;
+  list.innerHTML = '';
+
+  tempSpheres.forEach((sphere, index) => {
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.gap = '8px';
+    row.style.alignItems = 'center';
+    row.style.background = 'var(--surface-lowest)';
+    row.style.padding = '6px';
+    row.style.borderRadius = '4px';
+    row.style.border = '1px solid var(--outline-var)';
+
+    // Icon input (emoji picker)
+    const iconInput = document.createElement('input');
+    iconInput.className = 'fc-field-input';
+    iconInput.type = 'text';
+    iconInput.value = sphere.icon || '🎯';
+    iconInput.style.width = '36px';
+    iconInput.style.textAlign = 'center';
+    iconInput.style.fontSize = '14px';
+    iconInput.style.padding = '4px 0';
+    iconInput.addEventListener('input', (e) => {
+      tempSpheres[index].icon = e.target.value.trim();
+    });
+
+    // Name input
+    const nameInput = document.createElement('input');
+    nameInput.className = 'fc-field-input';
+    nameInput.type = 'text';
+    nameInput.value = sphere.name;
+    nameInput.placeholder = 'Название...';
+    nameInput.style.flex = '1';
+    nameInput.style.padding = '4px 8px';
+    nameInput.addEventListener('input', (e) => {
+      tempSpheres[index].name = e.target.value;
+    });
+
+    // Color picker
+    const colorInput = document.createElement('input');
+    colorInput.type = 'color';
+    colorInput.value = sphere.color;
+    colorInput.style.width = '32px';
+    colorInput.style.height = '28px';
+    colorInput.style.padding = '0';
+    colorInput.style.border = '1px solid var(--outline-var)';
+    colorInput.style.background = 'transparent';
+    colorInput.style.cursor = 'pointer';
+    colorInput.style.borderRadius = '2px';
+    colorInput.addEventListener('input', (e) => {
+      tempSpheres[index].color = e.target.value;
+    });
+
+    // Delete button
+    const delBtn = document.createElement('button');
+    delBtn.className = 'fc-btn fc-btn-danger';
+    delBtn.style.padding = '4px 8px';
+    delBtn.style.height = '28px';
+    delBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size: 16px;">delete</span>';
+    delBtn.addEventListener('click', () => {
+      const hasNodes = currentBoard.nodes.some(n => n.sphere === sphere.id);
+      if (hasNodes) {
+        if (!confirm(`К направлению "${sphere.name}" привязаны узлы на карте. Всё равно удалить его?`)) {
+          return;
+        }
+      }
+      tempSpheres.splice(index, 1);
+      buildSpheresManagerList();
+    });
+
+    row.appendChild(iconInput);
+    row.appendChild(nameInput);
+    row.appendChild(colorInput);
+    row.appendChild(delBtn);
+    list.appendChild(row);
+  });
+}
+
 // CANVAS INTERACTION EVENTS
 function setupCanvasEvents() {
   // Image chooser dialog triggers
@@ -1291,6 +1430,49 @@ function setupCanvasEvents() {
   // Undo/Redo button clicks
   document.getElementById('fc-btn-undo').addEventListener('click', undo);
   document.getElementById('fc-btn-redo').addEventListener('click', redo);
+
+  // Category Manager modal triggers
+  document.getElementById('fc-btn-manage-spheres').addEventListener('click', () => {
+    if (!currentBoard) return;
+    tempSpheres = JSON.parse(JSON.stringify(currentBoard.spheres));
+    buildSpheresManagerList();
+    spheresModal.classList.add('visible');
+  });
+
+  document.getElementById('fc-sm-add-btn').addEventListener('click', () => {
+    const newId = 'sphere_' + Date.now();
+    tempSpheres.push({
+      id: newId,
+      name: 'Новое направление',
+      color: '#aac9f0',
+      icon: '🎯',
+      visible: true
+    });
+    buildSpheresManagerList();
+  });
+
+  document.getElementById('fc-sm-save').addEventListener('click', async () => {
+    if (!currentBoard) return;
+
+    const hasEmptyName = tempSpheres.some(s => !s.name.trim());
+    if (hasEmptyName) {
+      alert('Название направления не может быть пустым.');
+      return;
+    }
+
+    currentBoard.spheres = JSON.parse(JSON.stringify(tempSpheres));
+    pushState(); // Save state
+    spheresModal.classList.remove('visible');
+
+    buildSpheresPills();
+    buildFilterPanel(); // keep filter panel in sync
+    triggerRender();
+    await saveBoardImmediate();
+  });
+
+  document.getElementById('fc-sm-cancel').addEventListener('click', () => {
+    spheresModal.classList.remove('visible');
+  });
 
   // Reality Button (smooth easing back to now)
   document.getElementById('fc-btn-reality').addEventListener('click', () => {
@@ -1673,6 +1855,7 @@ async function loadBoard(boardId) {
     document.getElementById('fc-status-board').textContent = `Доска: ${currentBoard.name}`;
     
     buildFilterPanel();
+    buildSpheresPills(); // Load top-left pill box
     updateStatusBar();
     triggerRender();
 
@@ -1737,7 +1920,7 @@ function updateStatusBar() {
   document.getElementById('fc-status-nodes').textContent = `Узлов: ${currentBoard.nodes.length}`;
 }
 
-// FILTER PANEL
+// FILTER PANEL (kept in sync with top-left pills)
 function buildFilterPanel() {
   if (!currentBoard) return;
   filterList.innerHTML = '';
@@ -1751,6 +1934,7 @@ function buildFilterPanel() {
     chk.checked = s.visible !== false;
     chk.addEventListener('change', () => {
       s.visible = chk.checked;
+      buildSpheresPills(); // keep top-left pills in sync
       triggerRender();
       saveBoardDebounced();
     });
@@ -1892,6 +2076,9 @@ function showNodeModal(node, isNew = false) {
   modalTargetNode = node;
   isNewNodeModal = isNew;
 
+  // Dynamically populate Category dropdown in Modal from spheres array
+  populateSphereSelect();
+
   document.getElementById('fc-nm-heading').textContent = isNew ? 'Новый узел' : 'Редактировать узел';
   document.getElementById('fc-nm-type').value = node.type;
   document.getElementById('fc-nm-title').value = node.title || '';
@@ -1967,6 +2154,7 @@ function closeAllModals() {
   boardModal.classList.remove('visible');
   exportModal.classList.remove('visible');
   filterPanel.classList.remove('visible');
+  spheresModal.classList.remove('visible');
 }
 
 // EXPORT TO AI

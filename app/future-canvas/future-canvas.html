@@ -234,6 +234,28 @@ html, body {
   color: #121316;
   box-shadow: 0 0 20px rgba(0, 219, 231, 0.45);
 }
+.fc-sphere-pill {
+  padding: 3px 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: bold;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.12s ease;
+  background: transparent;
+  flex-shrink: 0;
+  height: 22px;
+}
+.fc-sphere-pill-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  display: inline-block;
+}
 #fc-canvas {
   display: block;
   width: 100%;
@@ -596,18 +618,23 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   <!-- ===== TOOLBAR ===== -->
   <div id="fc-toolbar">
-    <div class="fc-toolbar-left">
+    <div class="fc-toolbar-left" style="gap: 6px;">
       <select id="fc-board-select"></select>
       <button class="fc-tool-btn" id="fc-btn-new-board" title="Новая доска">
         <span class="material-symbols-outlined">note_add</span>
       </button>
-      <div style="width: 1px; height: 16px; background: var(--outline-var); margin: 0 6px; align-self: center; opacity: 0.4;"></div>
+      <button class="fc-tool-btn" id="fc-btn-manage-spheres" title="Направления (Категории)">
+        <span class="material-symbols-outlined">category</span>
+      </button>
+      <div style="width: 1px; height: 16px; background: var(--outline-var); margin: 0 2px; align-self: center; opacity: 0.4;"></div>
       <button class="fc-tool-btn" id="fc-btn-undo" title="Отменить (Ctrl+Z)">
         <span class="material-symbols-outlined">undo</span>
       </button>
       <button class="fc-tool-btn" id="fc-btn-redo" title="Вернуть (Ctrl+Y)">
         <span class="material-symbols-outlined">redo</span>
       </button>
+      <div style="width: 1px; height: 16px; background: var(--outline-var); margin: 0 2px; align-self: center; opacity: 0.4;"></div>
+      <div id="fc-spheres-pillbox" style="display: flex; gap: 6px; align-items: center; overflow-x: auto; max-width: 420px; padding-right: 8px;"></div>
     </div>
     <div class="fc-toolbar-right">
       <button class="fc-tool-btn" id="fc-btn-add" title="Добавить узел">
@@ -759,6 +786,23 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     <div class="fc-modal-btns">
       <button class="fc-btn fc-btn-primary" id="fc-bm-save">Создать</button>
       <button class="fc-btn" id="fc-bm-cancel">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SPHERES MANAGE MODAL ===== -->
+<div class="fc-modal-overlay" id="fc-spheres-modal-overlay">
+  <div id="fc-spheres-modal" style="max-width: 480px; width: 90%;">
+    <h2>Направления (Сферы жизни)</h2>
+    <div id="fc-sm-list" style="max-height: 280px; overflow-y: auto; margin-bottom: 16px; display: flex; flex-direction: column; gap: 12px; padding-right: 4px;">
+      <!-- Dynamically populated rows -->
+    </div>
+    <button class="fc-btn" id="fc-sm-add-btn" style="width: 100%; margin-bottom: 16px; border: 1px dashed var(--outline); background: transparent; color: var(--on-surface-var);">
+      <span class="material-symbols-outlined" style="font-size: 14px; vertical-align: middle;">add</span> Добавить направление
+    </button>
+    <div class="fc-modal-btns">
+      <button class="fc-btn fc-btn-primary" id="fc-sm-save">Сохранить</button>
+      <button class="fc-btn" id="fc-sm-cancel">Отмена</button>
     </div>
   </div>
 </div>
