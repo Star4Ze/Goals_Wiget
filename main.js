@@ -5,10 +5,6 @@ const { exec } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
 
-app.disableHardwareAcceleration();
-app.commandLine.appendSwitch('disable-gpu');
-app.commandLine.appendSwitch('disable-gpu-sandbox');
-app.commandLine.appendSwitch('no-sandbox');
 app.setPath('userData', path.join(__dirname, '.electron-user-data'));
 
 let mainWindow;
