@@ -61,7 +61,7 @@
       "type": "event",
       "title": "Успех новой торговой стратегии",
       "description": "Тестирование на фьючерсах Московской биржи показало стабильную доходность.",
-      "date": "2026-08-06",
+      "date": "2027-06-16",
       "probability": 70,
       "sphere": "trading",
       "status": "active",
@@ -160,7 +160,7 @@
       "status": "hypothetical",
       "importance": 9,
       "y": -9.563531867892841,
-      "hoverFactor": 0.032945601421837195
+      "hoverFactor": 0
     },
     {
       "id": "node-13",
@@ -225,6 +225,20 @@
       "status": "hypothetical",
       "importance": 10,
       "y": 55.10125234548125,
+      "hoverFactor": 0
+    },
+    {
+      "id": "837cf83e-4dbc-44dd-8ef6-25d7fcc8ad77",
+      "type": "goal",
+      "title": "23123123",
+      "description": "123123",
+      "date": "2026-07-01",
+      "probability": 96,
+      "sphere": "work",
+      "status": "hypothetical",
+      "importance": 9,
+      "y": -36.034553999026826,
+      "imageUrl": "C:\\Users\\HomePC\\Pictures\\Обои\\5c1c8af585e04-wallpaper-270f02449f15df7a6fd2f481a1c13745.jpg",
       "hoverFactor": 0
     }
   ],
@@ -352,8 +366,8 @@
     }
   ],
   "viewport": {
-    "panX": 2461406400000,
+    "panX": 1783453528179.8096,
     "panY": 0,
-    "scale": 2561237366.0030627
+    "scale": 3594606.311498426
   }
 }
