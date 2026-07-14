@@ -232,12 +232,12 @@
       "type": "goal",
       "title": "23123123",
       "description": "123123",
-      "date": "2026-07-28",
-      "probability": 96,
+      "date": "2026-07-22",
+      "probability": 100,
       "sphere": "work",
       "status": "hypothetical",
-      "importance": 9,
-      "y": -56.09047443952483,
+      "importance": 10,
+      "y": -62.22222222222222,
       "imageUrl": "C:\\Users\\HomePC\\Pictures\\Обои\\5c1c8af585e04-wallpaper-270f02449f15df7a6fd2f481a1c13745.jpg",
       "hoverFactor": 0
     }
@@ -355,24 +355,24 @@
       "id": "trading",
       "name": "Трейдинг",
       "color": "#00dbe7",
-      "visible": false
+      "visible": true
     },
     {
       "id": "health",
       "name": "Здоровье",
       "color": "#00e676",
-      "visible": false
+      "visible": true
     },
     {
       "id": "lumifi",
       "name": "LumiFi",
       "color": "#a186f1",
-      "visible": false
+      "visible": true
     }
   ],
   "viewport": {
-    "panX": 1889876664398.0754,
+    "panX": 1784070012796.645,
     "panY": 0,
-    "scale": 416272675.67933553
+    "scale": 508020.88599257014
   }
 }
