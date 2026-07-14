@@ -585,20 +585,16 @@ function setupCanvasEvents() {
     e.preventDefault();
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
 
     const mouseWorldMs = (mouseX - canvas.width / 2) * msPerPixel + camCenterMs;
-    const mouseWorldY = (mouseY - canvas.height / 2) / yScale + camCenterY;
 
     const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
     const minZoom = 1000 * 60 * 30; // 30 mins per pixel
     const maxZoom = 1000 * 60 * 60 * 24 * 365 * 15; // 15 years per pixel
     
     msPerPixel = Math.max(minZoom, Math.min(maxZoom, msPerPixel * factor));
-    yScale = Math.max(0.1, Math.min(10.0, yScale / factor));
 
     camCenterMs = mouseWorldMs - (mouseX - canvas.width / 2) * msPerPixel;
-    camCenterY = mouseWorldY - (mouseY - canvas.height / 2) / yScale;
 
     triggerRender();
     saveBoardDebounced();
