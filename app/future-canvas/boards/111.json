@@ -8,14 +8,14 @@
       "type": "decision",
       "title": "Без названия",
       "description": "",
-      "date": "2026-06-30",
+      "date": "2026-07-08",
       "probability": 50,
       "sphere": "work",
       "status": "hypothetical",
       "importance": 5,
-      "y": 98.3203111064396,
+      "y": 400,
       "imageUrl": "",
-      "hoverFactor": 0.7683830537167969
+      "hoverFactor": 0.16734324368961423
     }
   ],
   "connections": [],
@@ -46,8 +46,8 @@
     }
   ],
   "viewport": {
-    "panX": 1784245498018.2021,
-    "panY": 99.965996283162,
+    "panX": 1783026166487.744,
+    "panY": 399.5373697822627,
     "scale": 15241644.130727267
   }
 }
