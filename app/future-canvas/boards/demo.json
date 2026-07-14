@@ -233,11 +233,11 @@
       "title": "23123123",
       "description": "123123",
       "date": "2026-07-22",
-      "probability": 100,
+      "probability": 0,
       "sphere": "work",
       "status": "hypothetical",
-      "importance": 10,
-      "y": -62.22222222222222,
+      "importance": 3,
+      "y": -27,
       "imageUrl": "C:\\Users\\HomePC\\Pictures\\Обои\\5c1c8af585e04-wallpaper-270f02449f15df7a6fd2f481a1c13745.jpg",
       "hoverFactor": 0
     }
@@ -371,8 +371,8 @@
     }
   ],
   "viewport": {
-    "panX": 1784070012796.645,
+    "panX": 2581840236585.694,
     "panY": 0,
-    "scale": 508020.88599257014
+    "scale": 2227162926.959185
   }
 }
