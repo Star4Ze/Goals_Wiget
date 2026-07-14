@@ -1,12 +1,48 @@
 /**
  * Future Canvas — JavaScript Engine (Vanilla JS)
- * Handles infinite canvas rendering, node/connection operations, timeline, and Electron IPC.
+ * Handles 3D perspective timeline planning, node/connection rendering, depth blurring, and Electron IPC.
  */
 
 // Global State
 let currentBoard = null;
 let boardList = [];
 let selectedNodeId = null;
+let hoveredNodeId = null;
+
+// Time range constants (1995 to 2100 locked)
+const START_MS = new Date('1995-01-01').getTime();
+const END_MS = new Date('2100-12-31').getTime();
+
+// 3D Perspective Projection System
+let VP_X = 640;               // Vanishing Point X (recalculated on resize)
+let VP_Y = 240;               // Vanishing Point Y
+let baselineY = 650;          // Baseline Y where timeline lies
+const baselineMargin = 60;    // Margin (pixels) left and right for 1995 and 2100 bounds
+
+let camCenterMs = (START_MS + END_MS) / 2; // World X camera (starts centered)
+let camCenterY = 0;          // World Y camera (centers average nodes)
+let msPerPixel = (END_MS - START_MS) / (1200 - 2 * baselineMargin); // current zoom
+let yScale = 1.0;            // Keeps vertical zoom constant (fixed Y axis)
+
+// Interaction States
+let isPanning = false;
+let panStartX = 0;
+let panStartY = 0;
+let panStartCamMs = 0;
+let panStartCamY = 0;
+
+let isDraggingNode = false;
+let draggedNode = null;
+let dragOffsetMs = 0;
+let dragOffsetY = 0;
+
+let isConnecting = false;
+let connectSourceNode = null;
+let connectMouseX = 0;
+let connectMouseY = 0;
+
+// Auto-save debounce timer
+let saveDebounceTimer = null;
 
 // Design system colors (resolved from CSS variables dynamically)
 const colors = {
@@ -38,35 +74,9 @@ function updateColorsFromCSS() {
   }
 }
 
-// Camera & Coordinate Zoom System
-let camCenterMs = Date.now(); // World X center (milliseconds timestamp)
-let camCenterY = 0;          // World Y center
-let msPerPixel = (2 * 365.25 * 24 * 60 * 60 * 1000) / 1200; // default zoom: 2 years across 1200px
-let yScale = 1.0;            // Screen pixels per world-Y-unit
-
-// Interaction States
-let isPanning = false;
-let panStartX = 0;
-let panStartY = 0;
-let panStartCamMs = 0;
-let panStartCamY = 0;
-
-let isDraggingNode = false;
-let draggedNode = null;
-let dragOffsetMs = 0;
-let dragOffsetY = 0;
-
-let isConnecting = false;
-let connectSourceNode = null;
-let connectMouseX = 0;
-let connectMouseY = 0;
-
-// Auto-save debounce timer
-let saveDebounceTimer = null;
-
 // Elements
 let canvas, ctx;
-let timelineCanvas, timelineCtx;
+let timelineCanvas, timelineCtx; // (Dummy/Hidden)
 let boardSelect;
 let filterPanel, filterList;
 let nodeModal, boardModal, exportModal;
@@ -77,54 +87,110 @@ function generateUUID() {
   return typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15);
 }
 
-// Convert World coordinates to Screen pixels
-function worldToScreen(wms, wy) {
-  const sx = (wms - camCenterMs) / msPerPixel + canvas.width / 2;
-  const sy = (wy - camCenterY) * yScale + canvas.height / 2;
-  return { x: sx, y: sy };
+// Calculate viewport zoom/pan bounds to lock edges at 1995 and 2100
+function applyViewportConstraints() {
+  if (!canvas) return;
+  const W = canvas.width;
+  
+  // Max scale: whole 1995-2100 range fits perfectly inside W minus baseline margins
+  const maxMsPerPixel = (END_MS - START_MS) / (W - 2 * baselineMargin);
+  if (msPerPixel > maxMsPerPixel || isNaN(msPerPixel)) {
+    msPerPixel = maxMsPerPixel;
+  }
+  
+  // Min scale: zoomed in to see about 2 years
+  const minMsPerPixel = (2.0 * 365.25 * 24 * 60 * 60 * 1000) / W;
+  if (msPerPixel < minMsPerPixel) {
+    msPerPixel = minMsPerPixel;
+  }
+  
+  // Constrain camCenterMs so view boundaries cannot exceed START_MS and END_MS
+  const halfWidthMs = (W / 2 - baselineMargin) * msPerPixel;
+  const minCamMs = START_MS + halfWidthMs;
+  const maxCamMs = END_MS - halfWidthMs;
+  
+  if (camCenterMs < minCamMs) {
+    camCenterMs = minCamMs;
+  } else if (camCenterMs > maxCamMs) {
+    camCenterMs = maxCamMs;
+  }
 }
 
-// Convert Screen pixels to World coordinates
+// Get 3D perspective projected position for a node
+function getProjectedPosition(node) {
+  const nodeMs = new Date(node.date).getTime();
+  const W = canvas.width;
+  
+  // 1. Calculate X position on the baseline (linear timeline)
+  const sxOnBaseline = (nodeMs - camCenterMs) / msPerPixel + W / 2;
+  
+  // 2. Probability (0-100%) maps to depth Z (0.0 to 1.0)
+  // Hover makes node fly forward towards user (Z -> 1.0)
+  const z = (node.probability !== undefined ? node.probability : 50) / 100;
+  const hoverFactor = node.hoverFactor || 0;
+  const visualZ = z + (1.0 - z) * hoverFactor * 0.6; // fly forward
+  const depth = Math.pow(visualZ, 0.75);             // non-linear perspective mapping
+  
+  // 3. Project baseline to vanishing point VP
+  const px = VP_X + (sxOnBaseline - VP_X) * depth;
+  const py = VP_Y + (baselineY - VP_Y) * depth;
+  
+  // 4. Vertical offset (height above grid)
+  const heightOffset = -node.y; // Positive Y in board goes down, negative goes up
+  const visualHeight = heightOffset * depth + 40 * hoverFactor; // fly up on hover
+  const pyFinal = py - visualHeight;
+  
+  return {
+    x: px,
+    y: pyFinal,
+    depth: depth,
+    radius: getNodeRadius(node) * (0.5 + 0.5 * depth)
+  };
+}
+
+// Convert screen coordinates back to 3D perspective world coordinates
 function screenToWorld(sx, sy) {
-  const wms = (sx - canvas.width / 2) * msPerPixel + camCenterMs;
-  const wy = (sy - canvas.height / 2) / yScale + camCenterY;
+  // We assume default depth (z = 0.5, 50% probability) for conversion of new/clicked nodes
+  const depth = Math.pow(0.5, 0.75);
+  const sxOnBaseline = (sx - VP_X) / depth + VP_X;
+  const wms = (sxOnBaseline - canvas.width / 2) * msPerPixel + camCenterMs;
+  
+  const py = VP_Y + (baselineY - VP_Y) * depth;
+  const visualHeight = py - sy;
+  const wy = -(visualHeight / depth);
+  
   return { wms, wy };
 }
 
-// Determine node radius based on importance
+// Determine base node radius based on importance
 function getNodeRadius(node) {
   const baseRadius = 8;
   const importance = node.importance || 5;
   return baseRadius * (importance / 5);
 }
 
-// Find node under screen mouse coordinates
+// Find node under screen mouse coordinates using projected 3D positions
 function findNodeAt(sx, sy) {
   if (!currentBoard) return null;
-  // Search in reverse order to click top-most nodes first
+  // Search in reverse order to select top-most nodes first
   for (let i = currentBoard.nodes.length - 1; i >= 0; i--) {
     const node = currentBoard.nodes[i];
-    // Skip if filtered out
     const sphere = currentBoard.spheres.find(s => s.id === node.sphere);
     if (sphere && !sphere.visible) continue;
 
-    const nodeMs = new Date(node.date).getTime();
-    const pos = worldToScreen(nodeMs, node.y);
-    const radius = getNodeRadius(node);
+    const pos = getProjectedPosition(node);
     const dist = Math.hypot(sx - pos.x, sy - pos.y);
-    if (dist <= radius + 4) {
+    if (dist <= pos.radius + 6) {
       return node;
     }
   }
   return null;
 }
 
-// Check if mouse is over connection handle (anchor) on the node's right edge
+// Connection handles (anchors)
 function getAnchorScreenPos(node) {
-  const nodeMs = new Date(node.date).getTime();
-  const radius = getNodeRadius(node);
-  const pos = worldToScreen(nodeMs, node.y);
-  return { x: pos.x + radius, y: pos.y };
+  const pos = getProjectedPosition(node);
+  return { x: pos.x + pos.radius, y: pos.y };
 }
 
 function isOverAnchor(sx, sy, node) {
@@ -135,10 +201,8 @@ function isOverAnchor(sx, sy, node) {
 
 // Setup and Event Binding
 window.addEventListener('DOMContentLoaded', async () => {
-  // Resolve CSS color variables before rendering
   updateColorsFromCSS();
 
-  // DOM Elements initialization
   canvas = document.getElementById('fc-canvas');
   ctx = canvas.getContext('2d');
   timelineCanvas = document.getElementById('fc-timeline-canvas');
@@ -153,23 +217,14 @@ window.addEventListener('DOMContentLoaded', async () => {
   exportModal = document.getElementById('fc-export-modal-overlay');
   ctxMenu = document.getElementById('fc-ctx-menu');
 
-  // Window Resize
   window.addEventListener('resize', handleResize);
   handleResize();
 
-  // Load Window Controls
   setupWindowControls();
-
-  // Load Boards List
   await refreshBoardsList();
-
-  // Add canvas interaction events
   setupCanvasEvents();
-
-  // Modal sliders updates
   setupModalSliders();
 
-  // Start rendering loop
   requestAnimationFrame(renderLoop);
 });
 
@@ -179,12 +234,18 @@ function handleResize() {
   canvas.width = wrap.clientWidth;
   canvas.height = wrap.clientHeight;
   
+  // Set Vanishing Point and Baseline relative to viewport size
+  VP_X = canvas.width / 2;
+  VP_Y = canvas.height * 0.32;
+  baselineY = canvas.height * 0.8;
+
   const timelineWrap = document.getElementById('fc-timeline');
   if (timelineWrap) {
     timelineCanvas.width = timelineWrap.clientWidth;
     timelineCanvas.height = timelineWrap.clientHeight;
   }
   
+  applyViewportConstraints();
   triggerRender();
 }
 
@@ -234,12 +295,36 @@ function setupModalSliders() {
   });
 }
 
-// Render loop wrapper
+// Render loop wrapper with hover animation transitions
+let lastTime = Date.now();
 function renderLoop() {
-  if (isPanning || isDraggingNode || isConnecting) {
+  const now = Date.now();
+  const dt = (now - lastTime) / 1000;
+  lastTime = now;
+
+  let animating = false;
+
+  if (currentBoard) {
+    // Smoothly update hoverFactor for all nodes
+    currentBoard.nodes.forEach(node => {
+      if (!node.hoverFactor) node.hoverFactor = 0;
+      
+      const target = (node.id === hoveredNodeId) ? 1.0 : 0.0;
+      const diff = target - node.hoverFactor;
+      
+      if (Math.abs(diff) > 0.005) {
+        node.hoverFactor += diff * 0.15; // smooth visual transition
+        animating = true;
+      } else {
+        node.hoverFactor = target;
+      }
+    });
+  }
+
+  if (isPanning || isDraggingNode || isConnecting || animating) {
     triggerRender();
   } else {
-    // If not panning or dragging, smoothly slide camCenterY back to center on nodes
+    // Slide camera Y smoothly back to average height of all visible nodes
     if (currentBoard && currentBoard.nodes.length > 0) {
       let sumY = 0;
       let count = 0;
@@ -253,7 +338,7 @@ function renderLoop() {
       if (count > 0) {
         const targetY = sumY / count;
         if (Math.abs(camCenterY - targetY) > 0.5) {
-          camCenterY += (targetY - camCenterY) * 0.08; // smooth spring interpolation
+          camCenterY += (targetY - camCenterY) * 0.08;
           triggerRender();
         }
       }
@@ -268,80 +353,85 @@ function triggerRender() {
   renderScheduled = true;
   requestAnimationFrame(() => {
     drawCanvas();
-    drawTimeline();
+    drawTimeline(); // Dummy
     renderScheduled = false;
   });
 }
 
-// DRAWING CANVAS
+// DRAWING CANVAS (3D Perspective)
 function drawCanvas() {
   if (!canvas || !ctx) return;
   
-  // Clear canvas
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  applyViewportConstraints();
 
-  const startWorld = screenToWorld(0, 0);
-  const endWorld = screenToWorld(canvas.width, canvas.height);
-
-  // 1. Draw Grid Lines (faint time lines)
-  ctx.strokeStyle = 'rgba(67, 71, 78, 0.15)';
-  ctx.lineWidth = 1;
+  const W = canvas.width;
   
-  // Determine grid interval based on zoom
-  const daysInView = (endWorld.wms - startWorld.wms) / (24 * 60 * 60 * 1000);
-  let stepMs;
-  if (daysInView > 365 * 5) {
-    stepMs = 365.25 * 24 * 60 * 60 * 1000; // year
-  } else if (daysInView > 30 * 6) {
-    stepMs = 30 * 24 * 60 * 60 * 1000; // month
-  } else if (daysInView > 7) {
-    stepMs = 7 * 24 * 60 * 60 * 1000; // week
-  } else {
-    stepMs = 24 * 60 * 60 * 1000; // day
-  }
+  // 1. Draw 3D Perspective Grid
+  // Draw baseline
+  ctx.strokeStyle = 'rgba(67, 71, 78, 0.4)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(baselineMargin, baselineY);
+  ctx.lineTo(W - baselineMargin, baselineY);
+  ctx.stroke();
 
-  const firstTick = Math.ceil(startWorld.wms / stepMs) * stepMs;
-  for (let t = firstTick; t < endWorld.wms; t += stepMs) {
-    const sx = (t - camCenterMs) / msPerPixel + canvas.width / 2;
+  // Draw timeline perspective lines converging in distance (every 10 years)
+  ctx.strokeStyle = 'rgba(67, 71, 78, 0.12)';
+  ctx.lineWidth = 1;
+  for (let yr = 2000; yr <= 2100; yr += 10) {
+    const ms = new Date(`${yr}-01-01`).getTime();
+    const sxOnBaseline = (ms - camCenterMs) / msPerPixel + W / 2;
+    
     ctx.beginPath();
-    ctx.moveTo(sx, 0);
-    ctx.lineTo(sx, canvas.height);
+    ctx.moveTo(sxOnBaseline, baselineY);
+    ctx.lineTo(VP_X, VP_Y);
     ctx.stroke();
   }
 
-  // 2. Draw Connections (sigmoidal/Bézier paths)
+  // Draw horizontal depth guides (Probability boundaries)
+  const sx1995 = (START_MS - camCenterMs) / msPerPixel + W / 2;
+  const sx2100 = (END_MS - camCenterMs) / msPerPixel + W / 2;
+  const probLevels = [0, 25, 50, 75, 100];
+  probLevels.forEach(prob => {
+    const z = prob / 100;
+    const depth = Math.pow(z, 0.75);
+    
+    const lx = VP_X + (sx1995 - VP_X) * depth;
+    const rx = VP_X + (sx2100 - VP_X) * depth;
+    const gy = VP_Y + (baselineY - VP_Y) * depth;
+    
+    ctx.strokeStyle = prob === 100 ? 'rgba(67, 71, 78, 0.3)' : 'rgba(67, 71, 78, 0.08)';
+    ctx.lineWidth = prob === 100 ? 1.5 : 1.0;
+    ctx.beginPath();
+    ctx.moveTo(lx, gy);
+    ctx.lineTo(rx, gy);
+    ctx.stroke();
+  });
+
+  // 2. Draw Connections (Sigmoidal Bézier curves in 3D perspective space)
   if (currentBoard) {
-    ctx.shadowBlur = 0; // reset shadow
     currentBoard.connections.forEach(conn => {
       const fromNode = currentBoard.nodes.find(n => n.id === conn.fromNodeId);
       const toNode = currentBoard.nodes.find(n => n.id === conn.toNodeId);
-      
       if (!fromNode || !toNode) return;
-      
-      // Skip if sphere filtered out
+
       const fromSphere = currentBoard.spheres.find(s => s.id === fromNode.sphere);
       const toSphere = currentBoard.spheres.find(s => s.id === toNode.sphere);
       if ((fromSphere && !fromSphere.visible) || (toSphere && !toSphere.visible)) return;
 
-      const fromMs = new Date(fromNode.date).getTime();
-      const toMs = new Date(toNode.date).getTime();
+      const pStart = getProjectedPosition(fromNode);
+      const pEnd = getProjectedPosition(toNode);
 
-      const pStart = worldToScreen(fromMs, fromNode.y);
-      const pEnd = worldToScreen(toMs, toNode.y);
-
-      // Path opacity & styling
       const prob = fromNode.probability || 50;
-      const thickness = Math.max(1.0, prob / 25);
+      const thickness = Math.max(1.0, (prob / 25) * (0.4 + 0.6 * pStart.depth));
       ctx.lineWidth = thickness;
       
-      // Discarded connections get faded
       const isDiscarded = fromNode.status === 'discarded' || toNode.status === 'discarded';
-      ctx.strokeStyle = isDiscarded ? 'rgba(141, 145, 152, 0.15)' : 'rgba(141, 145, 152, 0.45)';
+      ctx.strokeStyle = isDiscarded ? 'rgba(141, 145, 152, 0.08)' : `rgba(141, 145, 152, ${0.1 + 0.35 * pStart.depth})`;
 
-      // Bezier curve
       ctx.beginPath();
       ctx.moveTo(pStart.x, pStart.y);
-      
       const dx = pEnd.x - pStart.x;
       if (dx > 0) {
         ctx.bezierCurveTo(
@@ -350,10 +440,9 @@ function drawCanvas() {
           pEnd.x, pEnd.y
         );
       } else {
-        // backward link curve
         ctx.bezierCurveTo(
-          pStart.x + 50, pStart.y,
-          pEnd.x - 50, pEnd.y,
+          pStart.x + 50 * pStart.depth, pStart.y,
+          pEnd.x - 50 * pEnd.depth, pEnd.y,
           pEnd.x, pEnd.y
         );
       }
@@ -361,56 +450,60 @@ function drawCanvas() {
     });
   }
 
-  // 3. Draw Now Line
+  // 3. Draw vertical NOW line in perspective
   const nowMs = Date.now();
-  const nowX = (nowMs - camCenterMs) / msPerPixel + canvas.width / 2;
+  const nowXOnBaseline = (nowMs - camCenterMs) / msPerPixel + W / 2;
   ctx.strokeStyle = colors.tertiary;
-  ctx.lineWidth = 1;
-  ctx.shadowColor = colors.tertiary;
-  ctx.shadowBlur = 10;
+  ctx.lineWidth = 1.0;
   ctx.beginPath();
-  ctx.moveTo(nowX, 0);
-  ctx.lineTo(nowX, canvas.height);
+  ctx.moveTo(nowXOnBaseline, baselineY);
+  ctx.lineTo(VP_X, VP_Y);
   ctx.stroke();
-  ctx.shadowBlur = 0; // reset
 
-  // Label "СЕЙЧАС"
+  // NOW Label
   ctx.fillStyle = colors.tertiary;
   ctx.font = '700 9px "JetBrains Mono", monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('СЕЙЧАС', nowX, 15);
+  ctx.fillText('СЕЙЧАС', nowXOnBaseline, baselineY - 10);
 
-  // 4. Draw Nodes
+  // 4. Draw Nodes (Sorted by depth - Painter's Algorithm)
+  let hoveredNode = null;
   if (currentBoard) {
-    currentBoard.nodes.forEach(node => {
+    const sortedNodes = [...currentBoard.nodes].map(node => {
+      return { node, pos: getProjectedPosition(node) };
+    }).sort((a, b) => a.pos.depth - b.pos.depth);
+
+    sortedNodes.forEach(({ node, pos }) => {
       const sphere = currentBoard.spheres.find(s => s.id === node.sphere);
       if (sphere && !sphere.visible) return;
 
-      const nodeMs = new Date(node.date).getTime();
-      const pos = worldToScreen(nodeMs, node.y);
-      const radius = getNodeRadius(node);
-
-      // Check off-screen
-      if (pos.x + radius + 100 < 0 || pos.x - radius - 100 > canvas.width ||
-          pos.y + radius + 50 < 0 || pos.y - radius - 50 > canvas.height) {
-        return;
+      if (node.id === hoveredNodeId) {
+        hoveredNode = node;
       }
 
       const color = sphere ? sphere.color : '#aac9f0';
       const isSelected = (node.id === selectedNodeId);
 
-      // Handle Opacity by status
-      let opacity = 1.0;
-      if (node.status === 'hypothetical') opacity = 0.65;
-      if (node.status === 'discarded') opacity = 0.25;
+      const baseOpacity = node.status === 'discarded' ? 0.25 : (node.status === 'hypothetical' ? 0.65 : 1.0);
+      const opacity = baseOpacity * (0.3 + 0.7 * pos.depth);
+
+      // Depth of Field (DoF) Blur
+      const hoverFactor = node.hoverFactor || 0;
+      const blurVal = Math.max(0, (1 - pos.depth) * 4.5 * (1 - hoverFactor));
 
       ctx.save();
       ctx.globalAlpha = opacity;
+      
+      if (blurVal > 0.5) {
+        ctx.filter = `blur(${blurVal}px)`;
+      } else {
+        ctx.filter = 'none';
+      }
 
-      // Glow effect for Goals or Selected Node
+      // Neon glowing shadows
       if (node.type === 'goal' || isSelected) {
         ctx.shadowColor = color;
-        ctx.shadowBlur = isSelected ? 20 : 12;
+        ctx.shadowBlur = isSelected ? 22 : 12;
       } else {
         ctx.shadowBlur = 0;
       }
@@ -422,44 +515,44 @@ function drawCanvas() {
         ctx.strokeStyle = color;
         ctx.fillStyle = isSelected ? color : 'rgba(30, 32, 34, 0.8)';
         ctx.beginPath();
-        ctx.moveTo(pos.x, pos.y - radius * 1.2);
-        ctx.lineTo(pos.x + radius * 1.2, pos.y);
-        ctx.lineTo(pos.x, pos.y + radius * 1.2);
-        ctx.lineTo(pos.x - radius * 1.2, pos.y);
+        ctx.moveTo(pos.x, pos.y - pos.radius * 1.25);
+        ctx.lineTo(pos.x + pos.radius * 1.25, pos.y);
+        ctx.lineTo(pos.x, pos.y + pos.radius * 1.25);
+        ctx.lineTo(pos.x - pos.radius * 1.25, pos.y);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
       } else {
-        // Draw Event / Goal Circle
+        // Draw Circle
         ctx.strokeStyle = color;
         ctx.fillStyle = (node.status === 'realized' || isSelected) ? color : 'rgba(30, 32, 34, 0.8)';
         ctx.beginPath();
-        ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+        ctx.arc(pos.x, pos.y, pos.radius, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
 
-        // Inner circle dot for event types
+        // Inner dot
         if (node.type === 'event' && node.status !== 'realized' && !isSelected) {
           ctx.fillStyle = color;
           ctx.beginPath();
-          ctx.arc(pos.x, pos.y, radius * 0.4, 0, Math.PI * 2);
+          ctx.arc(pos.x, pos.y, pos.radius * 0.4, 0, Math.PI * 2);
           ctx.fill();
         }
       }
 
-      // Draw hover connection handle anchor if hovering
+      // Selected connection anchor handle
       if (isSelected) {
         ctx.shadowBlur = 0;
         ctx.globalAlpha = 1.0;
         ctx.fillStyle = colors.tertiary;
         ctx.beginPath();
-        ctx.arc(pos.x + radius, pos.y, 4, 0, Math.PI * 2);
+        ctx.arc(pos.x + pos.radius, pos.y, 4, 0, Math.PI * 2);
         ctx.fill();
       }
 
       // Label below node
       ctx.shadowBlur = 0;
-      ctx.fillStyle = isSelected ? colors.onSurface : colors.onSurfaceVar;
+      ctx.fillStyle = isSelected ? 'var(--on-surface)' : 'var(--on-surface-var)';
       ctx.font = isSelected ? '600 11px "JetBrains Mono", monospace' : '500 11px "JetBrains Mono", monospace';
       ctx.textAlign = 'center';
       
@@ -467,7 +560,7 @@ function drawCanvas() {
       if (node.probability !== undefined && node.type !== 'goal') {
         titleText += ` (${node.probability}%)`;
       }
-      ctx.fillText(titleText, pos.x, pos.y + radius + 15);
+      ctx.fillText(titleText, pos.x, pos.y + pos.radius + 15);
 
       ctx.restore();
     });
@@ -475,8 +568,7 @@ function drawCanvas() {
 
   // 5. Draw Temp Drag Connection Line
   if (isConnecting && connectSourceNode) {
-    const fromMs = new Date(connectSourceNode.date).getTime();
-    const pStart = worldToScreen(fromMs, connectSourceNode.y);
+    const pStart = getProjectedPosition(connectSourceNode);
     ctx.lineWidth = 1.5;
     ctx.strokeStyle = colors.tertiary;
     ctx.setLineDash([4, 4]);
@@ -484,137 +576,169 @@ function drawCanvas() {
     ctx.moveTo(pStart.x, pStart.y);
     ctx.lineTo(connectMouseX, connectMouseY);
     ctx.stroke();
-    ctx.setLineDash([]); // reset
+    ctx.setLineDash([]);
+  }
+
+  // 6. Draw 3D Timeline Axis along baseline
+  drawTimelineOnMainCanvas();
+
+  // 7. Draw Tooltip description card if hovered
+  if (hoveredNode) {
+    drawNodeTooltip(hoveredNode);
   }
 }
 
-// DRAWING TIMELINE
+// DRAW TIMELINE DIRECTLY ON THE CANVAS
+function drawTimelineOnMainCanvas() {
+  const W = canvas.width;
+  ctx.strokeStyle = 'rgba(141, 145, 152, 0.3)';
+  ctx.lineWidth = 1;
+  
+  const stepYears = (W > 900) ? 5 : 10;
+  const startYear = 1995;
+  const endYear = 2100;
+  
+  ctx.font = '600 10px "JetBrains Mono", monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  
+  for (let yr = startYear; yr <= endYear; yr += stepYears) {
+    const ms = new Date(`${yr}-01-01`).getTime();
+    const sx = (ms - camCenterMs) / msPerPixel + W / 2;
+    
+    if (sx < baselineMargin - 10 || sx > W - baselineMargin + 10) continue;
+    
+    // Draw tick
+    ctx.strokeStyle = 'rgba(141, 145, 152, 0.4)';
+    ctx.beginPath();
+    ctx.moveTo(sx, baselineY);
+    ctx.lineTo(sx, baselineY + 6);
+    ctx.stroke();
+    
+    // Draw Year Label
+    ctx.fillStyle = colors.onSurfaceVar;
+    ctx.fillText(yr.toString(), sx, baselineY + 10);
+  }
+}
+
+// DRAW HOVER TOOLTIP CARD INSIDE CANVAS
+function drawNodeTooltip(node) {
+  const pos = getProjectedPosition(node);
+  
+  ctx.save();
+  ctx.shadowBlur = 15;
+  ctx.shadowColor = 'rgba(0,0,0,0.5)';
+  
+  const cardW = 240;
+  const cardH = 110;
+  const cardX = Math.max(10, Math.min(canvas.width - cardW - 10, pos.x - cardW / 2));
+  const cardY = Math.max(50, pos.y - pos.radius - cardH - 15);
+  
+  const sphere = currentBoard.spheres.find(s => s.id === node.sphere);
+  const color = sphere ? sphere.color : 'var(--tertiary)';
+  
+  // Draw card frame
+  ctx.fillStyle = 'rgba(18, 19, 22, 0.95)';
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.rect(cardX, cardY, cardW, cardH);
+  ctx.fill();
+  ctx.stroke();
+  
+  ctx.shadowBlur = 0;
+  
+  // Title
+  ctx.fillStyle = 'var(--on-surface)';
+  ctx.font = 'bold 12px "JetBrains Mono", monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  const title = node.title || 'Без названия';
+  ctx.fillText(truncateText(title, 26), cardX + 12, cardY + 12);
+  
+  // Type metadata
+  const typeMap = { 'event': 'Событие', 'decision': 'Решение', 'goal': 'Цель' };
+  const typeText = typeMap[node.type] || 'Узел';
+  ctx.fillStyle = color;
+  ctx.font = '700 9px "JetBrains Mono", monospace';
+  ctx.fillText(typeText.toUpperCase(), cardX + 12, cardY + 30);
+  
+  ctx.fillStyle = 'var(--on-surface-var)';
+  ctx.font = '500 10px "JetBrains Mono", monospace';
+  ctx.fillText(`Дата: ${node.date}`, cardX + 110, cardY + 30);
+  
+  // Stats
+  ctx.fillStyle = 'var(--on-surface-var)';
+  ctx.fillText(`Вероятность: ${node.probability}%`, cardX + 12, cardY + 45);
+  ctx.fillText(`Важность: ${node.importance}/10`, cardX + 130, cardY + 45);
+  
+  // Line separator
+  ctx.strokeStyle = 'rgba(67, 71, 78, 0.3)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cardX + 12, cardY + 60);
+  ctx.lineTo(cardX + cardW - 12, cardY + 60);
+  ctx.stroke();
+  
+  // Description wrap
+  ctx.fillStyle = 'rgba(227, 226, 229, 0.85)';
+  ctx.font = '11px "Inter", sans-serif';
+  const desc = node.description || 'Описание отсутствует';
+  wrapText(ctx, desc, cardX + 12, cardY + 68, cardW - 24, 14, 2);
+  
+  ctx.restore();
+}
+
+function truncateText(text, maxChars) {
+  if (text.length > maxChars) {
+    return text.substring(0, maxChars - 3) + '...';
+  }
+  return text;
+}
+
+function wrapText(context, text, x, y, maxWidth, lineHeight, maxLines) {
+  const words = text.split(' ');
+  let line = '';
+  let lineCount = 0;
+
+  for (let n = 0; n < words.length; n++) {
+    let testLine = line + words[n] + ' ';
+    let metrics = context.measureText(testLine);
+    let testWidth = metrics.width;
+    if (testWidth > maxWidth && n > 0) {
+      context.fillText(line, x, y);
+      line = words[n] + ' ';
+      y += lineHeight;
+      lineCount++;
+      if (lineCount >= maxLines) return;
+    } else {
+      line = testLine;
+    }
+  }
+  context.fillText(line, x, y);
+}
+
+// DUMMY/LEGACY FUNCTION (No-op)
 function drawTimeline() {
-  if (!timelineCanvas || !timelineCtx) return;
-
-  timelineCtx.clearRect(0, 0, timelineCanvas.width, timelineCanvas.height);
-
-  const startWorld = screenToWorld(0, 0);
-  const endWorld = screenToWorld(timelineCanvas.width, timelineCanvas.height);
-
-  // Line track
-  timelineCtx.strokeStyle = 'rgba(141, 145, 152, 0.2)';
-  timelineCtx.lineWidth = 2;
-  timelineCtx.beginPath();
-  timelineCtx.moveTo(0, timelineCanvas.height / 2);
-  timelineCtx.lineTo(timelineCanvas.width, timelineCanvas.height / 2);
-  timelineCtx.stroke();
-
-  // Find ticks
-  const daysInView = (endWorld.wms - startWorld.wms) / (24 * 60 * 60 * 1000);
-  let ticks = [];
-  let formatLabel;
-
-  if (daysInView > 365 * 10) {
-    const step = 5 * 365.25 * 24 * 60 * 60 * 1000;
-    const startYear = new Date(startWorld.wms).getFullYear();
-    const firstYear = Math.ceil(startYear / 5) * 5;
-    let t = new Date(firstYear, 0, 1).getTime();
-    while (t < endWorld.wms) {
-      ticks.push(t);
-      t += step;
-    }
-    formatLabel = ms => new Date(ms).getFullYear();
-  } else if (daysInView > 365 * 2) {
-    const startYear = new Date(startWorld.wms).getFullYear();
-    let t = new Date(startYear + 1, 0, 1).getTime();
-    while (t < endWorld.wms) {
-      ticks.push(t);
-      t = new Date(new Date(t).getFullYear() + 1, 0, 1).getTime();
-    }
-    formatLabel = ms => new Date(ms).getFullYear();
-  } else if (daysInView > 90) {
-    const startDate = new Date(startWorld.wms);
-    let current = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1);
-    while (current.getTime() < endWorld.wms) {
-      ticks.push(current.getTime());
-      current.setMonth(current.getMonth() + 1);
-    }
-    const months = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
-    formatLabel = ms => {
-      const d = new Date(ms);
-      return months[d.getMonth()] + ' ' + d.getFullYear();
-    };
-  } else if (daysInView > 14) {
-    const step = 7 * 24 * 60 * 60 * 1000;
-    const first = Math.ceil(startWorld.wms / step) * step;
-    for (let t = first; t < endWorld.wms; t += step) {
-      ticks.push(t);
-    }
-    formatLabel = ms => {
-      const d = new Date(ms);
-      return d.getDate() + '.' + String(d.getMonth() + 1).padStart(2, '0');
-    };
-  } else {
-    const step = 24 * 60 * 60 * 1000;
-    const first = Math.ceil(startWorld.wms / step) * step;
-    for (let t = first; t < endWorld.wms; t += step) {
-      ticks.push(t);
-    }
-    formatLabel = ms => {
-      const d = new Date(ms);
-      return d.getDate() + ' ' + ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'][d.getDay()];
-    };
-  }
-
-  // Draw ticks
-  timelineCtx.font = '500 10px "JetBrains Mono", monospace';
-  timelineCtx.textAlign = 'center';
-  timelineCtx.textBaseline = 'top';
-
-  ticks.forEach(t => {
-    const sx = (t - camCenterMs) / msPerPixel + timelineCanvas.width / 2;
-    timelineCtx.strokeStyle = 'rgba(141, 145, 152, 0.4)';
-    timelineCtx.lineWidth = 1;
-    timelineCtx.beginPath();
-    timelineCtx.moveTo(sx, timelineCanvas.height / 2 - 4);
-    timelineCtx.lineTo(sx, timelineCanvas.height / 2 + 4);
-    timelineCtx.stroke();
-
-    timelineCtx.fillStyle = colors.onSurfaceVar;
-    timelineCtx.fillText(formatLabel(t), sx, timelineCanvas.height / 2 + 10);
-  });
-
-  // Draw "Now" indicator
-  const nowMs = Date.now();
-  const nowX = (nowMs - camCenterMs) / msPerPixel + timelineCanvas.width / 2;
-  if (nowX >= 0 && nowX <= timelineCanvas.width) {
-    timelineCtx.fillStyle = colors.tertiary;
-    timelineCtx.shadowColor = colors.tertiary;
-    timelineCtx.shadowBlur = 8;
-    timelineCtx.beginPath();
-    timelineCtx.arc(nowX, timelineCanvas.height / 2, 4, 0, Math.PI * 2);
-    timelineCtx.fill();
-    timelineCtx.shadowBlur = 0;
-
-    timelineCtx.fillStyle = colors.tertiary;
-    timelineCtx.font = '700 9px "JetBrains Mono", monospace';
-    timelineCtx.fillText(new Date().getFullYear().toString(), nowX, timelineCanvas.height / 2 - 14);
-  }
+  // Timeline features are integrated in main canvas rendering loop
 }
 
 // CANVAS INTERACTION EVENTS
 function setupCanvasEvents() {
-  // Zoom
+  // Zoom (X-axis timeline only)
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
 
     const mouseWorldMs = (mouseX - canvas.width / 2) * msPerPixel + camCenterMs;
-
     const factor = e.deltaY > 0 ? 1.15 : 1 / 1.15;
-    const minZoom = 1000 * 60 * 30; // 30 mins per pixel
-    const maxZoom = 1000 * 60 * 60 * 24 * 365 * 15; // 15 years per pixel
     
-    msPerPixel = Math.max(minZoom, Math.min(maxZoom, msPerPixel * factor));
+    msPerPixel = msPerPixel * factor;
+    applyViewportConstraints();
 
     camCenterMs = mouseWorldMs - (mouseX - canvas.width / 2) * msPerPixel;
+    applyViewportConstraints();
 
     triggerRender();
     saveBoardDebounced();
@@ -639,6 +763,7 @@ function setupCanvasEvents() {
         } else {
           isDraggingNode = true;
           draggedNode = node;
+          const pos = getProjectedPosition(node);
           const w = screenToWorld(mx, my);
           dragOffsetMs = w.wms - new Date(node.date).getTime();
           dragOffsetY = w.wy - node.y;
@@ -669,18 +794,44 @@ function setupCanvasEvents() {
       
       camCenterMs = panStartCamMs - dx * msPerPixel;
       camCenterY = panStartCamY - dy / yScale;
+      applyViewportConstraints();
       triggerRender();
     } else if (isDraggingNode && draggedNode) {
-      const w = screenToWorld(mx, my);
-      draggedNode.y = w.wy - dragOffsetY;
-
-      const targetMs = w.wms - dragOffsetMs;
-      draggedNode.date = new Date(targetMs).toISOString().slice(0, 10);
+      // Dragging node in 3D space
+      const z = (draggedNode.probability !== undefined ? draggedNode.probability : 50) / 100;
+      const hoverFactor = draggedNode.hoverFactor || 0;
+      const visualZ = z + (1.0 - z) * hoverFactor * 0.6;
+      const depth = Math.pow(visualZ, 0.75);
+      
+      const sxOnBaseline = (mx - VP_X) / depth + VP_X;
+      const targetMs = (sxOnBaseline - canvas.width / 2) * msPerPixel + camCenterMs;
+      const constrainedMs = Math.max(START_MS, Math.min(END_MS, targetMs));
+      draggedNode.date = new Date(constrainedMs).toISOString().slice(0, 10);
+      
+      const py = VP_Y + (baselineY - VP_Y) * depth;
+      const visualHeight = py - my;
+      const heightOffset = (visualHeight - 40 * hoverFactor) / depth;
+      draggedNode.y = -Math.max(-400, Math.min(400, heightOffset));
+      
       triggerRender();
     } else if (isConnecting) {
       connectMouseX = mx;
       connectMouseY = my;
       triggerRender();
+    } else {
+      // Hover hit detection
+      const node = findNodeAt(mx, my);
+      if (node) {
+        if (hoveredNodeId !== node.id) {
+          hoveredNodeId = node.id;
+          document.body.style.cursor = 'pointer';
+        }
+      } else {
+        if (hoveredNodeId !== null) {
+          hoveredNodeId = null;
+          document.body.style.cursor = 'default';
+        }
+      }
     }
   });
 
@@ -720,7 +871,7 @@ function setupCanvasEvents() {
     }
   });
 
-  // Double Click (Create/Edit Node)
+  // Double Click (Create Node / Edit Node)
   canvas.addEventListener('dblclick', (e) => {
     const rect = canvas.getBoundingClientRect();
     const mx = e.clientX - rect.left;
@@ -730,18 +881,27 @@ function setupCanvasEvents() {
     if (clickedNode) {
       showNodeModal(clickedNode);
     } else {
-      const w = screenToWorld(mx, my);
+      // Calculate 3D projected point under cursor (assuming default 50% probability depth)
+      const depth = Math.pow(0.5, 0.75);
+      const sxOnBaseline = (mx - VP_X) / depth + VP_X;
+      const targetMs = (sxOnBaseline - canvas.width / 2) * msPerPixel + camCenterMs;
+      const constrainedMs = Math.max(START_MS, Math.min(END_MS, targetMs));
+      
+      const py = VP_Y + (baselineY - VP_Y) * depth;
+      const visualHeight = py - my;
+      const heightOffset = visualHeight / depth;
+      
       const tempNode = {
         id: '',
         type: 'event',
         title: '',
         description: '',
-        date: new Date(w.wms).toISOString().slice(0, 10),
+        date: new Date(constrainedMs).toISOString().slice(0, 10),
         probability: 50,
         sphere: 'work',
         status: 'hypothetical',
         importance: 5,
-        y: w.wy
+        y: -heightOffset
       };
       showNodeModal(tempNode, true);
     }
@@ -762,16 +922,6 @@ function setupCanvasEvents() {
     }
   });
 
-  // Timeline Click
-  timelineCanvas.addEventListener('click', (e) => {
-    const rect = timelineCanvas.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const targetMs = (clickX - timelineCanvas.width / 2) * msPerPixel + camCenterMs;
-    camCenterMs = targetMs;
-    triggerRender();
-    saveBoardDebounced();
-  });
-
   // Keyboard Shortcuts
   window.addEventListener('keydown', (e) => {
     if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
@@ -790,7 +940,7 @@ function setupCanvasEvents() {
       triggerRender();
     }
     if (e.key === 'Home') {
-      camCenterMs = Date.now();
+      camCenterMs = (START_MS + END_MS) / 2;
       camCenterY = 0;
       triggerRender();
       saveBoardDebounced();
@@ -816,7 +966,14 @@ function setupCanvasEvents() {
 
   document.getElementById('fc-btn-now').addEventListener('click', () => {
     camCenterMs = Date.now();
-    camCenterY = 0;
+    // Center Y on nodes
+    if (currentBoard && currentBoard.nodes.length > 0) {
+      let sumY = 0;
+      currentBoard.nodes.forEach(n => sumY += n.y);
+      camCenterY = sumY / currentBoard.nodes.length;
+    } else {
+      camCenterY = 0;
+    }
     triggerRender();
     saveBoardDebounced();
   });
@@ -830,7 +987,7 @@ function setupCanvasEvents() {
   });
 
   document.getElementById('fc-btn-settings').addEventListener('click', () => {
-    alert('Future Canvas Terminal v1.0.0\nТема: Void (#0A0E14)\nСохранение: автоматическое в D:/GoogleDisk/Docs/FutureCanvas');
+    alert('Future Canvas Terminal v1.0.0\nТема: Void (#0A0E14)\nСохранение: автоматическое в папку boards внутри проекта.');
   });
 
   document.getElementById('fc-btn-new-board').addEventListener('click', () => {
@@ -873,9 +1030,9 @@ async function loadBoard(boardId) {
     localStorage.setItem('fc_last_board_id', boardId);
     
     if (currentBoard.viewport) {
-      camCenterMs = currentBoard.viewport.panX || Date.now();
+      camCenterMs = currentBoard.viewport.panX || (START_MS + END_MS) / 2;
       camCenterY = currentBoard.viewport.panY || 0;
-      msPerPixel = currentBoard.viewport.scale || ((2 * 365.25 * 24 * 60 * 60 * 1000) / 1200);
+      msPerPixel = currentBoard.viewport.scale || ((END_MS - START_MS) / (canvas.width - 2 * baselineMargin));
     }
     
     document.getElementById('fc-title-board').textContent = `/ доска: ${currentBoard.name}`;
@@ -887,12 +1044,10 @@ async function loadBoard(boardId) {
   }
 }
 
-// Dropdown Change
 document.getElementById('fc-board-select').addEventListener('change', async (e) => {
   await loadBoard(e.target.value);
 });
 
-// Create Board
 document.getElementById('fc-bm-save').addEventListener('click', async () => {
   const name = document.getElementById('fc-bm-name').value.trim();
   if (!name) return;
