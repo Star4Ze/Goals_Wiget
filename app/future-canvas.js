@@ -189,6 +189,9 @@ function handleResize() {
 }
 
 function setupWindowControls() {
+  document.getElementById('fc-btn-reload')?.addEventListener('click', () => {
+    window.location.reload();
+  });
   document.getElementById('fc-btn-min').addEventListener('click', () => {
     window.electronAPI?.minimizeWindow();
   });
