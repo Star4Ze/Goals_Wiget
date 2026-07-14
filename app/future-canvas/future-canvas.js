@@ -881,6 +881,7 @@ function drawCanvas() {
         );
       }
       ctx.stroke();
+    });
   }
 
   // 2.5 Draw vertical guide lines for hovered, selected, or dragged nodes

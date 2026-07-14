@@ -1919,13 +1919,11 @@ ${content}
       webPreferences: {
         nodeIntegration: false,
         contextIsolation: true,
-        preload: path.join(__dirname, 'preload.js'),
-        webSecurity: false // allow loading local images using file://
+        preload: path.join(__dirname, 'preload.js')
       }
     });
 
     futureCanvasWindow.loadFile(path.join(__dirname, 'app', 'future-canvas', 'future-canvas.html'));
-    futureCanvasWindow.webContents.openDevTools();
 
     futureCanvasWindow.on('maximize', () => {
       if (futureCanvasWindow && !futureCanvasWindow.isDestroyed()) {
