@@ -224,6 +224,20 @@
       "importance": 10,
       "y": 0,
       "hoverFactor": 0
+    },
+    {
+      "id": "639d888a-cd0e-49a7-8e12-40404497ebd0",
+      "type": "goal",
+      "title": "32423",
+      "description": "234234",
+      "date": "2030-05-17",
+      "probability": 50,
+      "sphere": "work",
+      "status": "hypothetical",
+      "importance": 5,
+      "y": -22.457815995478075,
+      "imageUrl": "C:\\Users\\HomePC\\Pictures\\Обои\\13660.jpg",
+      "hoverFactor": 0.622850484375
     }
   ],
   "connections": [
@@ -296,6 +310,16 @@
       "id": "conn-14",
       "fromNodeId": "node-16",
       "toNodeId": "node-17"
+    },
+    {
+      "id": "3b49364a-3acb-4820-b3f1-18b226337618",
+      "fromNodeId": "639d888a-cd0e-49a7-8e12-40404497ebd0",
+      "toNodeId": "node-9"
+    },
+    {
+      "id": "e8d78c7d-cd9a-4353-907e-00ba0a0ecdfc",
+      "fromNodeId": "639d888a-cd0e-49a7-8e12-40404497ebd0",
+      "toNodeId": "node-8"
     }
   ],
   "spheres": [
@@ -325,8 +349,8 @@
     }
   ],
   "viewport": {
-    "panX": 1814060419579.7556,
-    "panY": -70.5340381561252,
-    "scale": 18577698.145845808
+    "panX": 1900057995799.3408,
+    "panY": -66.93490252280058,
+    "scale": 65354043.86571569
   }
 }
