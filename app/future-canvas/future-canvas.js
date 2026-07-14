@@ -9,6 +9,9 @@ let boardList = [];
 let selectedNodeId = null;
 let hoveredNodeId = null;
 
+// Blur state toggle
+let isBlurEnabled = localStorage.getItem('fc_blur_enabled') !== 'false';
+
 // Image caching
 const imageCache = {};
 
@@ -135,7 +138,8 @@ function applyViewportConstraints() {
 }
 
 // Get 3D perspective projected position for a node
-// ignoreHover=true is used for hover hit collider calculations to prevent feedback loops
+// Under the new requirement, the node stays completely stationary on hover!
+// ignoreHover parameter is retained for backwards compatibility.
 function getProjectedPosition(node, ignoreHover = false) {
   const nodeMs = new Date(node.date).getTime();
   const W = canvas.width;
@@ -144,26 +148,26 @@ function getProjectedPosition(node, ignoreHover = false) {
   const sxOnBaseline = (nodeMs - camCenterMs) / msPerPixel + W / 2;
   
   // 2. Probability (0-100%) maps to depth Z (0.0 to 1.0)
-  // Hover makes node fly forward towards user (Z -> 1.0)
   const z = (node.probability !== undefined ? node.probability : 50) / 100;
-  const hoverFactor = ignoreHover ? 0 : (node.hoverFactor || 0);
-  const visualZ = z + (1.0 - z) * hoverFactor * 0.6; // fly forward
-  const depth = Math.pow(visualZ, 0.75);             // non-linear perspective mapping
+  const depth = Math.pow(z, 0.75);             // non-linear perspective mapping
   
   // 3. Project baseline to vanishing point VP
   const px = VP_X + (sxOnBaseline - VP_X) * depth;
   const py = VP_Y + (baselineY - VP_Y) * depth;
   
-  // 4. Vertical offset (height above grid)
+  // 4. Vertical offset (height above grid) - stays static (no Y-shifting on hover)
   const heightOffset = -node.y; // Positive Y in board goes down, negative goes up
-  const visualHeight = heightOffset * depth + 40 * hoverFactor; // fly up on hover
-  const pyFinal = py - visualHeight;
+  const pyFinal = py - heightOffset * depth;
   
+  // Visual scale hover expands size slightly without changing projected screen center
+  const hoverFactor = ignoreHover ? 0 : (node.hoverFactor || 0);
+
   return {
     x: px,
     y: pyFinal,
     depth: depth,
-    radius: getNodeRadius(node) * (0.5 + 0.5 * depth)
+    // Radius expands slightly on hover (e.g. 25% larger)
+    radius: getNodeRadius(node) * (0.5 + 0.5 * depth) * (1.0 + 0.25 * hoverFactor)
   };
 }
 
@@ -188,8 +192,7 @@ function getNodeRadius(node) {
   return baseRadius * (importance / 5);
 }
 
-// Find node under screen mouse coordinates using unhovered projected positions
-// (prevents collision shifting out from under the cursor)
+// Find node under screen mouse coordinates using projected 3D positions
 function findNodeAt(sx, sy) {
   if (!currentBoard) return null;
   // Search in reverse order to select top-most nodes first
@@ -198,8 +201,8 @@ function findNodeAt(sx, sy) {
     const sphere = currentBoard.spheres.find(s => s.id === node.sphere);
     if (sphere && !sphere.visible) continue;
 
-    // Use ignoreHover = true to prevent the node from running away from the cursor!
-    const pos = getProjectedPosition(node, true);
+    // Hit-testing uses the exact projected position
+    const pos = getProjectedPosition(node);
     const dist = Math.hypot(sx - pos.x, sy - pos.y);
     if (dist <= pos.radius + 7) {
       return node;
@@ -245,6 +248,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   await refreshBoardsList();
   setupCanvasEvents();
   setupModalSliders();
+  updateBlurButtonUI();
 
   requestAnimationFrame(renderLoop);
 });
@@ -380,6 +384,7 @@ function triggerRender() {
 }
 
 // Get the appropriate grid interval dynamically based on the current zoom scale
+// (Lowered threshold to 60px to show months, weeks, and days lines early when zooming)
 function getGridIntervalMs() {
   const intervals = [
     { ms: 10 * 365.25 * 24 * 60 * 60 * 1000, step: 10, type: 'year' }, // 10 years
@@ -391,10 +396,10 @@ function getGridIntervalMs() {
     { ms: 24 * 60 * 60 * 1000, step: 1, type: 'day' }                  // day
   ];
   
-  // Find the first interval that leaves at least 150px between lines on baseline
+  // Find the first interval that leaves at least 60px spacing at the baseline
   for (let i = 0; i < intervals.length; i++) {
     const spacing = intervals[i].ms / msPerPixel;
-    if (spacing >= 150) {
+    if (spacing >= 60) {
       return intervals[i];
     }
   }
@@ -613,9 +618,9 @@ function drawCanvas() {
       const baseOpacity = node.status === 'discarded' ? 0.25 : (node.status === 'hypothetical' ? 0.65 : 1.0);
       const opacity = baseOpacity * (0.3 + 0.7 * pos.depth);
 
-      // Depth of Field (DoF) Blur
+      // Depth of Field (DoF) Blur (Bypassed if user toggled blur off)
       const hoverFactor = node.hoverFactor || 0;
-      const blurVal = Math.max(0, (1 - pos.depth) * 4.5 * (1 - hoverFactor));
+      const blurVal = isBlurEnabled ? Math.max(0, (1 - pos.depth) * 4.5 * (1 - hoverFactor)) : 0;
 
       ctx.save();
       ctx.globalAlpha = opacity;
@@ -927,6 +932,29 @@ async function syncYandexCalendar() {
   }
 }
 
+// Update Yandex Calendar from the configured iCal address asynchronously on load
+async function autoSyncCalendarOnLoad() {
+  if (currentBoard && currentBoard.yandexCalendarUrl) {
+    await syncYandexCalendar();
+  }
+}
+
+// Update the blur button UI based on active state
+function updateBlurButtonUI() {
+  const blurBtn = document.getElementById('fc-btn-blur');
+  if (!blurBtn) return;
+  const icon = blurBtn.querySelector('.material-symbols-outlined');
+  if (isBlurEnabled) {
+    icon.textContent = 'blur_on';
+    blurBtn.title = 'Выключить размытие фона';
+    blurBtn.style.color = 'var(--tertiary)';
+  } else {
+    icon.textContent = 'blur_off';
+    blurBtn.title = 'Включить размытие фона';
+    blurBtn.style.color = 'var(--on-surface-var)';
+  }
+}
+
 // CANVAS INTERACTION EVENTS
 function setupCanvasEvents() {
   // Image chooser dialog triggers
@@ -939,6 +967,14 @@ function setupCanvasEvents() {
       // In Electron, File.path holds the absolute native filesystem path!
       document.getElementById('fc-nm-image').value = e.target.files[0].path;
     }
+  });
+
+  // Blur toggle button click
+  document.getElementById('fc-btn-blur').addEventListener('click', () => {
+    isBlurEnabled = !isBlurEnabled;
+    localStorage.setItem('fc_blur_enabled', isBlurEnabled);
+    updateBlurButtonUI();
+    triggerRender();
   });
 
   // Yandex Calendar import trigger
@@ -1037,9 +1073,7 @@ function setupCanvasEvents() {
     } else if (isDraggingNode && draggedNode) {
       // Dragging node in 3D space
       const z = (draggedNode.probability !== undefined ? draggedNode.probability : 50) / 100;
-      const hoverFactor = draggedNode.hoverFactor || 0;
-      const visualZ = z + (1.0 - z) * hoverFactor * 0.6;
-      const depth = Math.pow(visualZ, 0.75);
+      const depth = Math.pow(z, 0.75);
       
       const sxOnBaseline = (mx - VP_X) / depth + VP_X;
       const targetMs = (sxOnBaseline - canvas.width / 2) * msPerPixel + camCenterMs;
@@ -1048,7 +1082,7 @@ function setupCanvasEvents() {
       
       const py = VP_Y + (baselineY - VP_Y) * depth;
       const visualHeight = py - my;
-      const heightOffset = (visualHeight - 40 * hoverFactor) / depth;
+      const heightOffset = visualHeight / depth;
       draggedNode.y = -Math.max(-400, Math.min(400, heightOffset));
       
       triggerRender();
@@ -1057,7 +1091,7 @@ function setupCanvasEvents() {
       connectMouseY = my;
       triggerRender();
     } else {
-      // Hover hit detection using ignoreHover = true to prevent hover feedback loops
+      // Hover hit detection
       const node = findNodeAt(mx, my);
       if (node) {
         if (hoveredNodeId !== node.id) {
@@ -1279,6 +1313,9 @@ async function loadBoard(boardId) {
     buildFilterPanel();
     updateStatusBar();
     triggerRender();
+
+    // Trigger Yandex Calendar background auto-sync if url is configured
+    setTimeout(autoSyncCalendarOnLoad, 1000);
   }
 }
 
@@ -1322,13 +1359,6 @@ async function saveBoardImmediate() {
 
   await window.electronAPI.saveCanvasBoardData(currentBoard.id, currentBoard);
   updateStatusBar();
-}
-
-// Update Yandex Calendar from the configured iCal address
-async function autoSyncCalendarOnLoad() {
-  if (currentBoard && currentBoard.yandexCalendarUrl) {
-    await syncYandexCalendar();
-  }
 }
 
 function updateStatusBar() {
