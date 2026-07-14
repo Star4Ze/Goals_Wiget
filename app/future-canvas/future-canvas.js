@@ -56,7 +56,6 @@ let connectMouseX = 0;
 let connectMouseY = 0;
 
 // Spheres editor modal state
-let spheresModal;
 let tempSpheres = [];
 
 // Auto-save debounce timer
@@ -97,7 +96,7 @@ let canvas, ctx;
 let timelineCanvas, timelineCtx; // (Dummy/Hidden)
 let boardSelect;
 let filterPanel, filterList;
-let nodeModal, boardModal, exportModal;
+let nodeModal, boardModal, exportModal, spheresModal;
 let ctxMenu;
 
 // Helpers
@@ -324,7 +323,7 @@ function findNodeAt(sx, sy) {
   // Search in reverse order to select top-most nodes first
   for (let i = currentBoard.nodes.length - 1; i >= 0; i--) {
     const node = currentBoard.nodes[i];
-    const sphere = currentBoard.spheres.find(s => s.id === node.sphere);
+    const sphere = (currentBoard.spheres || []).find(s => s.id === node.sphere);
     if (sphere && !sphere.visible) continue;
 
     // Hit-testing uses the exact projected position
@@ -356,7 +355,7 @@ function updateModalPreview() {
   const importance = parseInt(document.getElementById('fc-nm-importance').value) || 5;
   const imageUrl = document.getElementById('fc-nm-image').value.trim();
   
-  const sphere = currentBoard?.spheres.find(s => s.id === sphereId) || { color: '#aac9f0' };
+  const sphere = (currentBoard?.spheres || []).find(s => s.id === sphereId) || { color: '#aac9f0' };
   const color = sphere.color;
   
   const baseRadius = 15; // match updated base size
@@ -605,7 +604,7 @@ function renderLoop() {
       let sumY = 0;
       let count = 0;
       currentBoard.nodes.forEach(node => {
-        const sphere = currentBoard.spheres.find(s => s.id === node.sphere);
+        const sphere = (currentBoard.spheres || []).find(s => s.id === node.sphere);
         if (!sphere || sphere.visible !== false) {
           sumY += node.y;
           count++;
@@ -789,8 +788,8 @@ function drawCanvas() {
       const toNode = currentBoard.nodes.find(n => n.id === conn.toNodeId);
       if (!fromNode || !toNode) return;
 
-      const fromSphere = currentBoard.spheres.find(s => s.id === fromNode.sphere);
-      const toSphere = currentBoard.spheres.find(s => s.id === toNode.sphere);
+      const fromSphere = (currentBoard.spheres || []).find(s => s.id === fromNode.sphere);
+      const toSphere = (currentBoard.spheres || []).find(s => s.id === toNode.sphere);
       if ((fromSphere && !fromSphere.visible) || (toSphere && !toSphere.visible)) return;
 
       const pStart = getProjectedPosition(fromNode);
@@ -856,7 +855,7 @@ function drawCanvas() {
     }).sort((a, b) => a.pos.depth - b.pos.depth);
 
     sortedNodes.forEach(({ node, pos }) => {
-      const sphere = currentBoard.spheres.find(s => s.id === node.sphere);
+      const sphere = (currentBoard.spheres || []).find(s => s.id === node.sphere);
       if (sphere && !sphere.visible) return;
 
       if (node.id === hoveredNodeId) {
@@ -1048,7 +1047,7 @@ function drawSmartLabels() {
   });
 
   labelNodes.forEach(({ node, pos }) => {
-    const sphere = currentBoard.spheres.find(s => s.id === node.sphere);
+    const sphere = (currentBoard.spheres || []).find(s => s.id === node.sphere);
     if (sphere && !sphere.visible) return;
 
     let titleText = node.title || 'Без названия';
@@ -1113,7 +1112,7 @@ function drawNodeTooltip(node) {
   const cardX = Math.max(10, Math.min(canvas.width - cardW - 10, pos.x - cardW / 2));
   const cardY = Math.max(50, pos.y - pos.radius - cardH - 15);
   
-  const sphere = currentBoard.spheres.find(s => s.id === node.sphere);
+  const sphere = (currentBoard.spheres || []).find(s => s.id === node.sphere);
   const color = sphere ? sphere.color : 'var(--tertiary)';
   
   // Image cache check
@@ -1315,7 +1314,8 @@ function populateSphereSelect() {
   const select = document.getElementById('fc-nm-sphere');
   if (!select || !currentBoard) return;
   select.innerHTML = '';
-  currentBoard.spheres.forEach(s => {
+  const spheres = currentBoard.spheres || [];
+  spheres.forEach(s => {
     const opt = document.createElement('option');
     opt.value = s.id;
     opt.textContent = `${s.icon || '🎯'} ${s.name}`;
@@ -1329,7 +1329,8 @@ function buildSpheresPills() {
   if (!box || !currentBoard) return;
   box.innerHTML = '';
 
-  currentBoard.spheres.forEach(s => {
+  const spheres = currentBoard.spheres || [];
+  spheres.forEach(s => {
     const pill = document.createElement('button');
     pill.className = 'fc-sphere-pill';
 
@@ -1468,12 +1469,16 @@ function setupCanvasEvents() {
   addSafeListener('fc-btn-undo', 'click', undo);
   addSafeListener('fc-btn-redo', 'click', redo);
 
-  // Category Manager modal triggers
+  // Category Manager modal triggers (Dynamic DOM lookup queries are used here to prevent cached null errors)
   addSafeListener('fc-btn-manage-spheres', 'click', () => {
-    if (!currentBoard) return;
-    tempSpheres = JSON.parse(JSON.stringify(currentBoard.spheres));
+    if (!currentBoard) {
+      alert('Пожалуйста, подождите, пока загрузится доска.');
+      return;
+    }
+    tempSpheres = JSON.parse(JSON.stringify(currentBoard.spheres || []));
     buildSpheresManagerList();
-    if (spheresModal) spheresModal.classList.add('visible');
+    const overlay = document.getElementById('fc-spheres-modal-overlay');
+    if (overlay) overlay.classList.add('visible');
   });
 
   addSafeListener('fc-sm-add-btn', 'click', () => {
@@ -1531,7 +1536,8 @@ function setupCanvasEvents() {
 
     currentBoard.spheres = JSON.parse(JSON.stringify(tempSpheres));
     pushState(); // Save state
-    if (spheresModal) spheresModal.classList.remove('visible');
+    const overlay = document.getElementById('fc-spheres-modal-overlay');
+    if (overlay) overlay.classList.remove('visible');
 
     buildSpheresPills();
     buildFilterPanel(); // keep filter panel in sync
@@ -1540,7 +1546,8 @@ function setupCanvasEvents() {
   });
 
   addSafeListener('fc-sm-cancel', 'click', () => {
-    if (spheresModal) spheresModal.classList.remove('visible');
+    const overlay = document.getElementById('fc-spheres-modal-overlay');
+    if (overlay) overlay.classList.remove('visible');
   });
 
   // Reality Button (smooth easing back to now)
@@ -1876,7 +1883,8 @@ function setupCanvasEvents() {
   });
 
   addSafeListener('fc-btn-new-board', 'click', () => {
-    boardModal.classList.add('visible');
+    const overlay = document.getElementById('fc-board-modal-overlay');
+    if (overlay) overlay.classList.add('visible');
     const bName = document.getElementById('fc-bm-name');
     if (bName) {
       bName.value = '';
@@ -1917,6 +1925,16 @@ async function loadBoard(boardId) {
   if (currentBoard) {
     localStorage.setItem('fc_last_board_id', boardId);
     
+    // Safely guarantee spheres array exists
+    if (!currentBoard.spheres || !Array.isArray(currentBoard.spheres)) {
+      currentBoard.spheres = [
+        { id: 'work', name: 'Работа', color: '#5B7A9D', visible: true },
+        { id: 'trading', name: 'Трейдинг', color: '#00dbe7', visible: true },
+        { id: 'health', name: 'Здоровье', color: '#00e676', visible: true },
+        { id: 'lumifi', name: 'LumiFi', color: '#a186f1', visible: true }
+      ];
+    }
+
     if (currentBoard.viewport) {
       camCenterMs = currentBoard.viewport.panX || (START_MS + END_MS) / 2;
       camCenterY = currentBoard.viewport.panY || 0;
@@ -1956,7 +1974,8 @@ addSafeListener('fc-bm-save', 'click', async () => {
   if (window.electronAPI) {
     const newB = await window.electronAPI.createCanvasBoard(name);
     if (newB) {
-      boardModal.classList.remove('visible');
+      const overlay = document.getElementById('fc-board-modal-overlay');
+      if (overlay) overlay.classList.remove('visible');
       await refreshBoardsList();
       boardSelect.value = newB.id;
       await loadBoard(newB.id);
@@ -1965,7 +1984,8 @@ addSafeListener('fc-bm-save', 'click', async () => {
 });
 
 addSafeListener('fc-bm-cancel', 'click', () => {
-  boardModal.classList.remove('visible');
+  const overlay = document.getElementById('fc-board-modal-overlay');
+  if (overlay) overlay.classList.remove('visible');
 });
 
 // Auto-save logic
@@ -1997,7 +2017,8 @@ function buildFilterPanel() {
   if (!currentBoard) return;
   filterList.innerHTML = '';
 
-  currentBoard.spheres.forEach(s => {
+  const spheres = currentBoard.spheres || [];
+  spheres.forEach(s => {
     const row = document.createElement('div');
     row.className = 'fc-filter-item';
 
@@ -2245,10 +2266,15 @@ addSafeListener('fc-nm-delete', 'click', () => {
 
 function closeAllModals() {
   if (nodeModal) nodeModal.classList.remove('visible');
-  if (boardModal) boardModal.classList.remove('visible');
+  
+  const bOverlay = document.getElementById('fc-board-modal-overlay');
+  if (bOverlay) bOverlay.classList.remove('visible');
+  
   if (exportModal) exportModal.classList.remove('visible');
   if (filterPanel) filterPanel.classList.remove('visible');
-  if (spheresModal) spheresModal.classList.remove('visible');
+  
+  const sOverlay = document.getElementById('fc-spheres-modal-overlay');
+  if (sOverlay) sOverlay.classList.remove('visible');
 }
 
 // EXPORT TO AI
