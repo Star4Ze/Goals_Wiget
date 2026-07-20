@@ -116,58 +116,66 @@
           <button class="fc-win-btn fc-close" id="fc-btn-close" title="Закрыть">
             <span class="material-symbols-outlined">close</span>
           </button>
-        </div>
       </div>
+
+      <script>
+        // ═══════════════════════════════════════════════════════════
+        // ELECTRON WINDOW CONTROLS (Isolated Startup)
+        // ═══════════════════════════════════════════════════════════
+        (function() {
+          function addSafeListener(id, event, cb) {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener(event, cb);
+          }
+
+          function setupWindowControls() {
+            addSafeListener('fc-btn-reload', 'click', () => {
+              window.location.reload();
+            });
+            addSafeListener('fc-btn-min', 'click', () => {
+              window.electronAPI?.minimizeWindow();
+            });
+            addSafeListener('fc-btn-max', 'click', () => {
+              window.electronAPI?.toggleMaximizeWindow();
+            });
+            addSafeListener('fc-btn-close', 'click', () => {
+              window.electronAPI?.closeWindow();
+            });
+
+            const titlebar = document.getElementById('fc-titlebar');
+            if (titlebar) {
+              titlebar.addEventListener('dblclick', (e) => {
+                if (e.target.closest('.fc-win-btn')) return;
+                window.electronAPI?.toggleMaximizeWindow();
+              });
+            }
+
+            window.electronAPI?.onWindowStateChange((isMaximized) => {
+              const win = document.getElementById('fc-window');
+              const maxIcon = document.getElementById('fc-max-icon');
+              if (isMaximized) {
+                if (win) win.classList.add('is-maximized');
+                if (maxIcon) maxIcon.textContent = 'filter_none';
+              } else {
+                if (win) win.classList.remove('is-maximized');
+                if (maxIcon) maxIcon.textContent = 'crop_square';
+              }
+            });
+          }
+
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupWindowControls);
+          } else {
+            setupWindowControls();
+          }
+        })();
+      </script>
       
       <!-- React app mount point -->
       <div id="root" style="flex: 1; overflow: hidden; position: relative;"></div>
     </div>
 
     <script>
-      // ═══════════════════════════════════════════════════════════
-      // ELECTRON WINDOW CONTROLS
-      // ═══════════════════════════════════════════════════════════
-      function addSafeListener(id, event, cb) {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener(event, cb);
-      }
-
-      function setupWindowControls() {
-        addSafeListener('fc-btn-reload', 'click', () => {
-          window.location.reload();
-        });
-        addSafeListener('fc-btn-min', 'click', () => {
-          window.electronAPI?.minimizeWindow();
-        });
-        addSafeListener('fc-btn-max', 'click', () => {
-          window.electronAPI?.toggleMaximizeWindow();
-        });
-        addSafeListener('fc-btn-close', 'click', () => {
-          window.electronAPI?.closeWindow();
-        });
-
-        const titlebar = document.getElementById('fc-titlebar');
-        if (titlebar) {
-          titlebar.addEventListener('dblclick', (e) => {
-            if (e.target.closest('.fc-win-btn')) return;
-            window.electronAPI?.toggleMaximizeWindow();
-          });
-        }
-
-        window.electronAPI?.onWindowStateChange((isMaximized) => {
-          const win = document.getElementById('fc-window');
-          const maxIcon = document.getElementById('fc-max-icon');
-          if (isMaximized) {
-            if (win) win.classList.add('is-maximized');
-            if (maxIcon) maxIcon.textContent = 'filter_none';
-          } else {
-            if (win) win.classList.remove('is-maximized');
-            if (maxIcon) maxIcon.textContent = 'crop_square';
-          }
-        });
-      }
-
-      setupWindowControls();
     </script>
   </body>
 </html>

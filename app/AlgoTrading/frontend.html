@@ -374,8 +374,60 @@ select:focus,input:focus{border-color:var(--accent);}
       <button class="fc-win-btn fc-close" id="fc-btn-close" title="Закрыть">
         <span class="material-symbols-outlined">close</span>
       </button>
-    </div>
   </div>
+
+  <script>
+    // ═══════════════════════════════════════════════════════════
+    // ELECTRON WINDOW CONTROLS (Isolated Startup)
+    // ═══════════════════════════════════════════════════════════
+    (function() {
+      function addSafeListener(id, event, cb) {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener(event, cb);
+      }
+
+      function setupWindowControls() {
+        addSafeListener('fc-btn-reload', 'click', () => {
+          window.electronAPI?.reloadWindow();
+        });
+        addSafeListener('fc-btn-min', 'click', () => {
+          window.electronAPI?.minimizeWindow();
+        });
+        addSafeListener('fc-btn-max', 'click', () => {
+          window.electronAPI?.toggleMaximizeWindow();
+        });
+        addSafeListener('fc-btn-close', 'click', () => {
+          window.electronAPI?.closeWindow();
+        });
+
+        const titlebar = document.getElementById('fc-titlebar');
+        if (titlebar) {
+          titlebar.addEventListener('dblclick', (e) => {
+            if (e.target.closest('.fc-win-btn')) return;
+            window.electronAPI?.toggleMaximizeWindow();
+          });
+        }
+
+        window.electronAPI?.onWindowStateChange((isMaximized) => {
+          const win = document.getElementById('fc-window');
+          const maxIcon = document.getElementById('fc-max-icon');
+          if (isMaximized) {
+            if (win) win.classList.add('is-maximized');
+            if (maxIcon) maxIcon.textContent = 'filter_none';
+          } else {
+            if (win) win.classList.remove('is-maximized');
+            if (maxIcon) maxIcon.textContent = 'crop_square';
+          }
+        });
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', setupWindowControls);
+      } else {
+        setupWindowControls();
+      }
+    })();
+  </script>
 
   <div id="algo-content" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative;">
 
@@ -3616,51 +3668,6 @@ function openSellerDashboard() {
 
 // Запускаем опрос статуса бота каждые 6 секунд
 setInterval(loadBotStatus, 6000);
-
-// ═══════════════════════════════════════════════════════════
-// ELECTRON WINDOW CONTROLS
-// ═══════════════════════════════════════════════════════════
-function addSafeListener(id, event, cb) {
-  const el = document.getElementById(id);
-  if (el) el.addEventListener(event, cb);
-}
-
-function setupWindowControls() {
-  addSafeListener('fc-btn-reload', 'click', () => {
-    window.electronAPI?.reloadWindow();
-  });
-  addSafeListener('fc-btn-min', 'click', () => {
-    window.electronAPI?.minimizeWindow();
-  });
-  addSafeListener('fc-btn-max', 'click', () => {
-    window.electronAPI?.toggleMaximizeWindow();
-  });
-  addSafeListener('fc-btn-close', 'click', () => {
-    window.electronAPI?.closeWindow();
-  });
-
-  const titlebar = document.getElementById('fc-titlebar');
-  if (titlebar) {
-    titlebar.addEventListener('dblclick', (e) => {
-      if (e.target.closest('.fc-win-btn')) return;
-      window.electronAPI?.toggleMaximizeWindow();
-    });
-  }
-
-  window.electronAPI?.onWindowStateChange((isMaximized) => {
-    const win = document.getElementById('fc-window');
-    const maxIcon = document.getElementById('fc-max-icon');
-    if (isMaximized) {
-      if (win) win.classList.add('is-maximized');
-      if (maxIcon) maxIcon.textContent = 'filter_none';
-    } else {
-      if (win) win.classList.remove('is-maximized');
-      if (maxIcon) maxIcon.textContent = 'crop_square';
-    }
-  });
-}
-
-setupWindowControls();
 </script>
 </div>
 </div>
