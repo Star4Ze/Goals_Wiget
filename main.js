@@ -15,6 +15,7 @@ let connectionsWindow = null;
 let futureCanvasWindow = null;
 let algoTradingWindow = null;
 let algoTradingProcess = null;
+let sellerDashboardWindow = null;
 
 const TARGET_DIR = "C:\\Users\\HomePC\\Documents\\Obsidian\\Progects\\MyLife";
 const CONNECTIONS_DIR = "C:\\Users\\HomePC\\Documents\\Obsidian\\Progects\\MyLife\\Моя картотека";
@@ -1983,6 +1984,46 @@ ${content}
 
     algoTradingWindow.on('closed', () => {
       algoTradingWindow = null;
+    });
+  });
+
+  ipcMain.handle('open-seller-dashboard', (event) => {
+    if (sellerDashboardWindow) {
+      sellerDashboardWindow.focus();
+      return;
+    }
+
+    sellerDashboardWindow = new BrowserWindow({
+      width: 1280,
+      height: 800,
+      minWidth: 900,
+      minHeight: 600,
+      frame: false,
+      transparent: false,
+      backgroundColor: '#121316',
+      resizable: true,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, 'preload.js')
+      }
+    });
+
+    sellerDashboardWindow.loadURL('http://127.0.0.1:8765/seller');
+
+    sellerDashboardWindow.on('maximize', () => {
+      if (sellerDashboardWindow && !sellerDashboardWindow.isDestroyed()) {
+        sellerDashboardWindow.webContents.send('window-state-change', true);
+      }
+    });
+    sellerDashboardWindow.on('unmaximize', () => {
+      if (sellerDashboardWindow && !sellerDashboardWindow.isDestroyed()) {
+        sellerDashboardWindow.webContents.send('window-state-change', false);
+      }
+    });
+
+    sellerDashboardWindow.on('closed', () => {
+      sellerDashboardWindow = null;
     });
   });
 

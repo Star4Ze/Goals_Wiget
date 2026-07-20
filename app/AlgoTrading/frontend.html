@@ -601,6 +601,9 @@ select:focus,input:focus{border-color:var(--accent);}
           </div>
         </div>
         
+        <div class="stitle">Панель управления</div>
+        <button class="btn btn-p btn-blk" style="margin-bottom:8px;" onclick="openSellerDashboard()"><i class="fas fa-chart-line"></i> 📊 Открыть Дашборд Селлера</button>
+        
         <div class="stitle">Конфигурация</div>
         <button class="btn btn-g btn-blk" style="margin-bottom:10px;" onclick="openBotConfigModal()">📝 Настройки (JSON)</button>
         
@@ -3600,6 +3603,14 @@ async function saveBotConfig() {
     }
   } catch (e) {
     toast('Ошибка', 'Сбой сети при сохранении конфигурации.');
+  }
+}
+
+function openSellerDashboard() {
+  if (window.electronAPI && window.electronAPI.openSellerDashboard) {
+    window.electronAPI.openSellerDashboard();
+  } else {
+    window.open(`${API}/seller`, '_blank');
   }
 }
 

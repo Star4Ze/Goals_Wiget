@@ -495,6 +495,9 @@ def background_trade_worker():
 app = FastAPI(title="Unified PriceAlert & Seller App")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+# Mount static files for Seller UI
+app.mount("/assets", StaticFiles(directory=str(BASE_DIR / "assets")), name="assets")
+
 @app.on_event("startup")
 async def startup():
     # Initialize PriceAlert DBs
@@ -524,6 +527,10 @@ async def startup():
 @app.get("/")
 async def root():
     return FileResponse(BASE_DIR / "frontend.html")
+
+@app.get("/seller")
+async def seller_dashboard():
+    return FileResponse(BASE_DIR / "seller.html")
 
 @app.get("/favicon.png")
 async def favicon():
