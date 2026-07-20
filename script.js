@@ -1412,6 +1412,13 @@ async function init() {
       window.electronAPI.openFutureCanvas();
     }
   });
+
+  // Open AlgoTrading
+  document.getElementById('addon-algotrading-btn')?.addEventListener('click', () => {
+    if (window.electronAPI && window.electronAPI.openAlgoTrading) {
+      window.electronAPI.openAlgoTrading();
+    }
+  });
   
   await loadObsidianTasks();
   await loadDailyTasks();

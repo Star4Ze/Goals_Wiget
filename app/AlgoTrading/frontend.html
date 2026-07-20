@@ -3,10 +3,88 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<title>PriceAlert</title>
+<title>AlgoTrading</title>
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
 <style>
+/* ===== WINDOW SHELL ===== */
+#fc-window {
+  width: 100vw;
+  height: 100vh;
+  background: rgba(18, 19, 22, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+#fc-window.is-maximized {
+  border-radius: 0;
+}
+
+/* ===== TITLEBAR ===== */
+#fc-titlebar {
+  -webkit-app-region: drag;
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 0 16px;
+  background: linear-gradient(to bottom, rgba(30,32,34,0.9), rgba(18,19,22,0.9));
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.fc-titlebar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.fc-titlebar-left .material-symbols-outlined {
+  color: #94a3b8;
+  font-size: 18px;
+}
+.fc-title-text {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #e2e8f0;
+  text-transform: uppercase;
+}
+.fc-titlebar-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+}
+.fc-win-btn {
+  width: 38px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.fc-win-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+}
+.fc-win-btn.fc-close:hover {
+  background: #c0392b;
+  color: #fff;
+}
+.fc-win-btn .material-symbols-outlined {
+  font-size: 16px;
+}
+
 :root{
   --bg:#0b0e17;--bg2:#111520;--bg3:#161b2a;--panel:#1a2035;
   --border:#232d45;--accent:#3b82f6;--accent2:#f59e0b;
@@ -14,8 +92,8 @@
   --radius:8px;--font:'SF Pro Display',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-html,body{height:100%;overflow:hidden;}
-body{background:var(--bg);color:var(--text);font-family:var(--font);display:flex;flex-direction:column;height:100dvh;}
+html,body{height:100%;overflow:hidden;margin:0;}
+body{background:transparent;color:var(--text);font-family:var(--font);display:flex;flex-direction:column;height:100vh;}
 
 /* HEADER */
 header{display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;min-height:50px;flex-wrap:nowrap;}
@@ -274,6 +352,32 @@ select:focus,input:focus{border-color:var(--accent);}
 </style>
 </head>
 <body>
+
+<div id="fc-window">
+
+  <!-- ===== TITLEBAR ===== -->
+  <div id="fc-titlebar">
+    <div class="fc-titlebar-left">
+      <span class="material-symbols-outlined">smart_toy</span>
+      <span class="fc-title-text">AlgoTrading</span>
+    </div>
+    <div class="fc-titlebar-right">
+      <button class="fc-win-btn" id="fc-btn-reload" title="Перезагрузить интерфейс">
+        <span class="material-symbols-outlined">refresh</span>
+      </button>
+      <button class="fc-win-btn" id="fc-btn-min" title="Свернуть">
+        <span class="material-symbols-outlined">remove</span>
+      </button>
+      <button class="fc-win-btn" id="fc-btn-max" title="Развернуть">
+        <span class="material-symbols-outlined" id="fc-max-icon">crop_square</span>
+      </button>
+      <button class="fc-win-btn fc-close" id="fc-btn-close" title="Закрыть">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="algo-content" style="flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative;">
 
 <!-- HEADER -->
 <header>
@@ -889,11 +993,14 @@ const rawUser = (location.search.match(/(?:^|[?&])user=([^&]+)/)||['',''])[1];
 const USER_NICK = rawUser ? decodeURIComponent(rawUser) : 'Admin';
 const rawToken = (location.search.match(/(?:^|[?&])token=([^&]+)/)||['',''])[1];
 
-let defaultApi = window.location.origin;
-if (window.location.pathname.includes('/app-backend/pricealert')) {
-  defaultApi = window.location.origin + '/app-backend/pricealert';
-} else if (window.location.pathname.includes('/apps/pricealert')) {
-  defaultApi = window.location.origin + '/app-backend/pricealert';
+let defaultApi = "http://127.0.0.1:8765";
+if (window.location.protocol !== 'file:') {
+  defaultApi = window.location.origin;
+  if (window.location.pathname.includes('/app-backend/pricealert')) {
+    defaultApi = window.location.origin + '/app-backend/pricealert';
+  } else if (window.location.pathname.includes('/apps/pricealert')) {
+    defaultApi = window.location.origin + '/app-backend/pricealert';
+  }
 }
 const API = rawApi ? decodeURIComponent(rawApi).replace(/\/$/, '') : defaultApi;
 
@@ -3498,6 +3605,53 @@ async function saveBotConfig() {
 
 // Запускаем опрос статуса бота каждые 6 секунд
 setInterval(loadBotStatus, 6000);
+
+// ═══════════════════════════════════════════════════════════
+// ELECTRON WINDOW CONTROLS
+// ═══════════════════════════════════════════════════════════
+function addSafeListener(id, event, cb) {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener(event, cb);
+}
+
+function setupWindowControls() {
+  addSafeListener('fc-btn-reload', 'click', () => {
+    window.electronAPI?.reloadWindow();
+  });
+  addSafeListener('fc-btn-min', 'click', () => {
+    window.electronAPI?.minimizeWindow();
+  });
+  addSafeListener('fc-btn-max', 'click', () => {
+    window.electronAPI?.toggleMaximizeWindow();
+  });
+  addSafeListener('fc-btn-close', 'click', () => {
+    window.electronAPI?.closeWindow();
+  });
+
+  const titlebar = document.getElementById('fc-titlebar');
+  if (titlebar) {
+    titlebar.addEventListener('dblclick', (e) => {
+      if (e.target.closest('.fc-win-btn')) return;
+      window.electronAPI?.toggleMaximizeWindow();
+    });
+  }
+
+  window.electronAPI?.onWindowStateChange((isMaximized) => {
+    const win = document.getElementById('fc-window');
+    const maxIcon = document.getElementById('fc-max-icon');
+    if (isMaximized) {
+      if (win) win.classList.add('is-maximized');
+      if (maxIcon) maxIcon.textContent = 'filter_none';
+    } else {
+      if (win) win.classList.remove('is-maximized');
+      if (maxIcon) maxIcon.textContent = 'crop_square';
+    }
+  });
+}
+
+setupWindowControls();
 </script>
+</div>
+</div>
 </body>
 </html>

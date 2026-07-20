@@ -13,6 +13,8 @@ let analyticsWindow = null;
 let tradingJournalWindow = null;
 let connectionsWindow = null;
 let futureCanvasWindow = null;
+let algoTradingWindow = null;
+let algoTradingProcess = null;
 
 const TARGET_DIR = "C:\\Users\\HomePC\\Documents\\Obsidian\\Progects\\MyLife";
 const CONNECTIONS_DIR = "C:\\Users\\HomePC\\Documents\\Obsidian\\Progects\\MyLife\\Моя картотека";
@@ -1944,6 +1946,46 @@ ${content}
     });
   });
 
+  ipcMain.handle('open-algo-trading', (event) => {
+    if (algoTradingWindow) {
+      algoTradingWindow.focus();
+      return;
+    }
+
+    algoTradingWindow = new BrowserWindow({
+      width: 1280,
+      height: 800,
+      minWidth: 900,
+      minHeight: 600,
+      frame: false,
+      transparent: false,
+      backgroundColor: '#121316',
+      resizable: true,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, 'preload.js')
+      }
+    });
+
+    algoTradingWindow.loadFile(path.join(__dirname, 'app', 'AlgoTrading', 'frontend.html'));
+
+    algoTradingWindow.on('maximize', () => {
+      if (algoTradingWindow && !algoTradingWindow.isDestroyed()) {
+        algoTradingWindow.webContents.send('window-state-change', true);
+      }
+    });
+    algoTradingWindow.on('unmaximize', () => {
+      if (algoTradingWindow && !algoTradingWindow.isDestroyed()) {
+        algoTradingWindow.webContents.send('window-state-change', false);
+      }
+    });
+
+    algoTradingWindow.on('closed', () => {
+      algoTradingWindow = null;
+    });
+  });
+
   ipcMain.handle('minimize-window', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win) win.minimize();
@@ -2167,9 +2209,42 @@ app.on('web-contents-created', (event, contents) => {
   });
 });
 
+function startAlgoTradingBackend() {
+  const pythonPath = 'python';
+  const scriptPath = path.join(__dirname, 'app', 'AlgoTrading', 'backend.py');
+  
+  logAction(`🚀 Запуск AlgoTrading бэкенда: ${scriptPath}`);
+  
+  const { spawn } = require('child_process');
+  
+  algoTradingProcess = spawn(pythonPath, [scriptPath], {
+    cwd: path.join(__dirname, 'app', 'AlgoTrading'),
+    detached: false,
+    windowsHide: true,
+    stdio: 'ignore'
+  });
+
+  algoTradingProcess.on('error', (err) => {
+    logAction(`⚠️ Ошибка запуска AlgoTrading бэкенда: ${err.message}`);
+  });
+
+  algoTradingProcess.on('exit', (code, signal) => {
+    logAction(`🛑 AlgoTrading бэкенд завершил работу с кодом ${code} и сигналом ${signal}`);
+    algoTradingProcess = null;
+  });
+}
+
+app.on('before-quit', () => {
+  if (algoTradingProcess) {
+    logAction('🛑 Завершение AlgoTrading бэкенда при выходе из приложения...');
+    algoTradingProcess.kill();
+  }
+});
+
 app.whenReady().then(() => {
   setupHandlers();
   startFileWatcher();
+  startAlgoTradingBackend();
   createWindow();
   
   // Запуск фоновой синхронизации Git при старте приложения через 2 секунды
