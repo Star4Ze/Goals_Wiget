@@ -1090,6 +1090,7 @@ let layoutMode = 1;
 let isLoadingOlder = false;
 let hasMoreHistory = true;
 let isHoveringPlus = false;
+let plusBtnTimeout = null;
 
 // ── Heikin Ashi mode state ────
 let haMode = false;       // true = HA-свечи включены
@@ -1161,8 +1162,14 @@ window.addEventListener('DOMContentLoaded', () => {
 
   const plusBtn = document.getElementById('chart-plus-btn');
   if (plusBtn) {
-    plusBtn.addEventListener('mouseenter', () => { isHoveringPlus = true; });
-    plusBtn.addEventListener('mouseleave', () => { isHoveringPlus = false; plusBtn.style.display = 'none'; });
+    plusBtn.addEventListener('mouseenter', () => {
+      isHoveringPlus = true;
+      if (plusBtnTimeout) clearTimeout(plusBtnTimeout);
+    });
+    plusBtn.addEventListener('mouseleave', () => {
+      isHoveringPlus = false;
+      plusBtn.style.display = 'none';
+    });
     plusBtn.addEventListener('click', onPlusBtnClick);
   }
 
@@ -1346,6 +1353,7 @@ async function setLayout(n) {
       const plusBtn = document.getElementById('chart-plus-btn');
       if (isHoveringPlus) return;
       if (plusBtn && p.point) {
+        if (plusBtnTimeout) clearTimeout(plusBtnTimeout);
         const price = slotCandleSeries.coordinateToPrice(p.point.y) || 0;
         if (price > 0) {
           plusBtn.style.display = 'flex';
@@ -1356,7 +1364,12 @@ async function setLayout(n) {
           plusBtn.style.display = 'none';
         }
       } else if (plusBtn) {
-        plusBtn.style.display = 'none';
+        if (plusBtnTimeout) clearTimeout(plusBtnTimeout);
+        plusBtnTimeout = setTimeout(() => {
+          if (!isHoveringPlus) {
+            plusBtn.style.display = 'none';
+          }
+        }, 200);
       }
       
       if (p.time) {
@@ -3667,7 +3680,10 @@ async function saveBotConfig() {
 
 function openSellerDashboard() {
   if (window.electronAPI && window.electronAPI.openSellerDashboard) {
-    window.electronAPI.openSellerDashboard();
+    window.electronAPI.openSellerDashboard().catch(err => {
+      console.error("Failed to open Seller Dashboard via IPC, using browser fallback:", err);
+      window.open(`${API}/seller`, '_blank');
+    });
   } else {
     window.open(`${API}/seller`, '_blank');
   }
