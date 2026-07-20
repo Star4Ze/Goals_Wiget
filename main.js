@@ -1986,6 +1986,11 @@ ${content}
     });
   });
 
+  ipcMain.handle('relaunch-app', () => {
+    app.relaunch();
+    app.exit(0);
+  });
+
   ipcMain.handle('minimize-window', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win) win.minimize();

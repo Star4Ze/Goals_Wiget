@@ -1347,6 +1347,15 @@ async function init() {
   }
 
   // Click & IPC Listeners
+  document.getElementById('reload-btn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (window.electronAPI && window.electronAPI.relaunchApp) {
+      window.electronAPI.relaunchApp();
+    } else {
+      window.location.reload();
+    }
+  });
+
   document.getElementById('settings-btn')?.addEventListener('click', (e) => {
     e.stopPropagation();
     openSettingsModal();

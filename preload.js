@@ -67,5 +67,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   renameCanvasBoard: (boardId, newName) => ipcRenderer.invoke('rename-canvas-board', boardId, newName),
   deleteCanvasBoard: (boardId) => ipcRenderer.invoke('delete-canvas-board', boardId),
   fetchUrl: (url) => ipcRenderer.invoke('fetch-url', url),
-  openAlgoTrading: () => ipcRenderer.invoke('open-algo-trading')
+  openAlgoTrading: () => ipcRenderer.invoke('open-algo-trading'),
+  relaunchApp: () => ipcRenderer.invoke('relaunch-app')
 });
