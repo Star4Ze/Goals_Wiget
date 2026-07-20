@@ -132,7 +132,7 @@ def get_user_config_path(nick: str) -> Path:
 def load_user_config(nick: str) -> dict:
     config_path = get_user_config_path(nick)
     if not config_path.exists():
-        template_path = ROOT_DIR / "app" / "new" / "Seller" / "config.template.json"
+        template_path = BASE_DIR / "config.template.json"
         if template_path.exists():
             shutil.copy(template_path, config_path)
             logger.info(f"Copied config template for user: {nick}")
