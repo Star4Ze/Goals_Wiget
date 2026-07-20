@@ -518,6 +518,7 @@ select:focus,input:focus{border-color:var(--accent);}
     <button class="mnbtn" id="mn-lines" onclick="mTab('lines')"><i class="fas fa-draw-polygon"></i>Линии</button>
     <button class="mnbtn" id="mn-log" onclick="mTab('log')"><i class="fas fa-history"></i>Лог</button>
     <button class="mnbtn" id="mn-ha" onclick="mTab('ha')" style="color:var(--accent2);"><i class="fas fa-chart-area"></i>HA</button>
+    <button class="mnbtn" id="mn-bot" onclick="mTab('bot')"><i class="fas fa-robot"></i>Бот</button>
   </div>
 </div>
 <div class="mob-sheet" id="mob-sheet">
@@ -527,6 +528,7 @@ select:focus,input:focus{border-color:var(--accent);}
     <div class="sh-tab" onclick="shTab('lines')">Линии</div>
     <div class="sh-tab" onclick="shTab('log')">Лог</div>
     <div class="sh-tab" onclick="shTab('ha')" style="color:var(--accent2);">HA</div>
+    <div class="sh-tab" onclick="shTab('bot')">Бот</div>
   </div>
   <div class="sh-body" id="sh-body"></div>
 </div>
@@ -694,6 +696,21 @@ select:focus,input:focus{border-color:var(--accent);}
       <div class="set-row"><span class="set-lbl" id="reg-status">Справочник инструментов</span><button class="btn btn-g btn-sm" onclick="checkRegistry()">Обновить</button></div>
     </div>
     <button class="btn btn-p btn-blk" onclick="saveSettings();closeModal('set-modal')">Сохранить</button>
+  </div>
+</div>
+
+<!-- BOT CONFIG MODAL -->
+<div class="modal" id="bot-config-modal" style="width:90%; max-width:550px;">
+  <div class="modal-hd">
+    <div class="modal-title">Настройки торгового бота (JSON)</div>
+    <button class="modal-close" onclick="closeModal('bot-config-modal')">&times;</button>
+  </div>
+  <div class="modal-body">
+    <div class="fg">
+      <div class="flbl">Конфигурационный файл бота</div>
+      <textarea id="bot-config-raw-txt" style="width:100%; height:320px; font-family:var(--font-mono); font-size:11px; background:var(--bg3); color:var(--text); border:1px solid var(--border); border-radius:var(--radius); padding:8px; outline:none; resize:vertical;"></textarea>
+    </div>
+    <button class="btn btn-p btn-blk" onclick="saveBotConfig()">Сохранить настройки</button>
   </div>
 </div>
 
@@ -2851,13 +2868,14 @@ async function loadLog(){
 // PANELS
 // ═══════════════════════════════════════════════════════════
 function ptab(t){
-  const tabs = ['alerts','lines','log','ha'];
+  const tabs = ['alerts','lines','log','bot'];
   document.querySelectorAll('.ptab').forEach((el,i)=>el.classList.toggle('on', tabs[i]===t));
   document.querySelectorAll('.pbody').forEach(el=>el.classList.remove('on'));
   document.getElementById('pt-'+t).classList.add('on');
   if(t==='log') loadLog();
   if(t==='lines') loadLines();
   if(t==='ha') loadHASignals();
+  if(t==='bot') { loadBotStatus(); loadBotLogs(); }
 }
 function togglePanel(){
   document.getElementById('right-panel').classList.toggle('collapsed');
@@ -2873,7 +2891,7 @@ function mTab(t){
   shTab(t);
 }
 function shTab(t){
-  const tabs = ['alerts','lines','log','ha'];
+  const tabs = ['alerts','lines','log','ha','bot'];
   document.querySelectorAll('.sh-tab').forEach((el,i)=>el.classList.toggle('on', tabs[i]===t));
   renderSheet(t);
 }
@@ -2893,6 +2911,11 @@ async function renderSheet(t){
       ||'<div class="empty"><i class="fas fa-chart-line"></i>Нет линий</div>';
   } else if(t==='ha') {
     body.innerHTML = document.getElementById('ha-signals-list').innerHTML;
+  } else if(t==='bot') {
+    body.innerHTML = document.getElementById('pt-bot').innerHTML;
+    // На мобилке тоже запускаем обновление логов/статуса
+    loadBotStatus();
+    loadBotLogs();
   } else {
     const data=await fetch(`${API}/api/alert_log?nick=Admin`).then(r=>r.json()).catch(()=>[]);
     body.innerHTML=data.map(l=>`<div class="logitem"><div class="log-t">${new Date(l.triggered_at*1000).toLocaleString('ru')}</div>
@@ -3364,8 +3387,117 @@ function startHACountdown() {
       const s = diff % 60;
       el.textContent = `⏱ Следующий анализ через ${m}:${String(s).padStart(2,'0')}`;
     }
-  }, 1000);
+
+// ═══════════════════════════════════════════════════════════
+// TRADING BOT CONTROL & STATUS
+// ═══════════════════════════════════════════════════════════
+let botStatusInterval = null;
+
+async function botCommand(action) {
+  try {
+    const res = await fetch(`${API}/api/control`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-User-Nick': 'Admin' },
+      body: JSON.stringify({ action })
+    }).then(r => r.json());
+    if (res.ok) {
+      toast('Успешно', `Команда ${action.toUpperCase()} отправлена боту.`);
+      loadBotStatus();
+      setTimeout(loadBotLogs, 1500);
+    } else {
+      toast('Ошибка', res.error || 'Не удалось отправить команду.');
+    }
+  } catch (e) {
+    toast('Ошибка', 'Сбой сети при отправке команды боту.');
+  }
 }
+
+async function loadBotStatus() {
+  try {
+    const status = await fetch(`${API}/api/status?user=Admin`).then(r => r.json());
+    if (status.ok) {
+      const badge = document.getElementById('bot-status-badge');
+      const details = document.getElementById('bot-status-details');
+      if (badge && details) {
+        if (status.bot_paused) {
+          badge.textContent = 'пауза';
+          badge.style.background = 'var(--border)';
+          badge.style.color = 'var(--text3)';
+        } else {
+          badge.textContent = 'активен';
+          badge.style.background = 'rgba(34,197,94,.15)';
+          badge.style.color = 'var(--green)';
+        }
+        
+        details.innerHTML = `
+          <div><b>Режим торгов:</b> ${status.trading_mode || '—'}</div>
+          <div><b>Счёт:</b> ${status.account_name || '—'} (${status.account_id || 'нет'})</div>
+          <div><b>Биржа:</b> ${status.trading_now ? '🟢 Открыта' : '🔴 Закрыта'}</div>
+          <div style="font-size:9px; color:var(--text3); margin-top:4px;"><b>Обновлено:</b> ${status.last_update ? new Date(status.last_update).toLocaleTimeString() : '—'}</div>
+        `;
+      }
+    }
+  } catch (e) {}
+}
+
+async function loadBotLogs() {
+  try {
+    const data = await fetch(`${API}/api/logs?user=Admin&limit=50`).then(r => r.json());
+    const consoleEl = document.getElementById('bot-logs-list');
+    if (consoleEl && data.ok) {
+      if (data.lines && data.lines.length) {
+        consoleEl.textContent = data.lines.join('\n');
+        consoleEl.scrollTop = consoleEl.scrollHeight;
+      } else {
+        consoleEl.textContent = 'Логи пусты.';
+      }
+    }
+  } catch (e) {}
+}
+
+async function openBotConfigModal() {
+  try {
+    const res = await fetch(`${API}/api/config/raw?user=Admin`).then(r => r.json());
+    if (res.ok) {
+      document.getElementById('bot-config-raw-txt').value = res.text;
+      openModal('bot-config-modal');
+    } else {
+      toast('Ошибка', 'Не удалось загрузить настройки бота.');
+    }
+  } catch (e) {
+    toast('Ошибка', 'Сбой сети при получении настроек бота.');
+  }
+}
+
+async function saveBotConfig() {
+  const text = document.getElementById('bot-config-raw-txt').value;
+  try {
+    JSON.parse(text);
+  } catch (e) {
+    toast('Ошибка', 'Некорректный формат JSON.');
+    return;
+  }
+  
+  try {
+    const res = await fetch(`${API}/api/config/raw?user=Admin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    }).then(r => r.json());
+    if (res.ok) {
+      toast('Успешно', 'Конфигурация бота сохранена.');
+      closeModal('bot-config-modal');
+      loadBotStatus();
+    } else {
+      toast('Ошибка', res.error || 'Не удалось сохранить конфигурацию.');
+    }
+  } catch (e) {
+    toast('Ошибка', 'Сбой сети при сохранении конфигурации.');
+  }
+}
+
+// Запускаем опрос статуса бота каждые 6 секунд
+setInterval(loadBotStatus, 6000);
 </script>
 </body>
 </html>
