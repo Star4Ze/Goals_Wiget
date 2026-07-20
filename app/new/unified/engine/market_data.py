@@ -24,9 +24,22 @@ def bond_history_multiplier(price: Optional[float], nominal: Optional[float], cu
 
 def get_last_price(client, figi: str) -> Optional[float]:
     try:
+        from logic.alerts import watched
+        if figi in watched and watched[figi] > 0:
+            return watched[figi]
+    except Exception:
+        pass
+
+    try:
         resp = client.market_data.get_last_prices(figi=[figi])
         if resp.last_prices:
-            return quotation_to_float(resp.last_prices[0].price)
+            val = quotation_to_float(resp.last_prices[0].price)
+            try:
+                from logic.alerts import watched
+                watched[figi] = val
+            except Exception:
+                pass
+            return val
     except Exception as e:
         log(f"[PRICE] market_data error for {figi}: {e}")
 
@@ -34,6 +47,7 @@ def get_last_price(client, figi: str) -> Optional[float]:
     if history:
         return history[-1]["price"]
     return None
+
 
 
 def get_currency_rate(client, currency_pair: str = "CNY_RUB") -> float:

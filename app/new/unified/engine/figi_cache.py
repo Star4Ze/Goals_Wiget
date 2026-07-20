@@ -47,6 +47,38 @@ def get_figi_info(client, figi: str):
         ):
             return cached
 
+    # Попытка найти инструмент в базе данных registry.db (PriceAlert реестр)
+    import sqlite3
+    from pathlib import Path
+    db_path = Path(__file__).resolve().parent.parent / "data" / "registry.db"
+    if db_path.exists():
+        try:
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("SELECT * FROM instruments WHERE figi=?", (figi,)).fetchone()
+            conn.close()
+            if row:
+                itype = row["type"]
+                if itype == "future":
+                    itype = "futures"
+                elif itype == "etf":
+                    itype = "fund"
+                
+                info = {
+                    "name": row["name"],
+                    "ticker": row["ticker"],
+                    "type": itype,
+                    "currency": (row["currency"] or "rub").lower(),
+                    "lot_size": row["lot"] or 1,
+                    "initial_margin": None,
+                    "initial_margin_on_buy": None,
+                    "initial_margin_on_sell": None
+                }
+                FIGI_CACHE[figi] = info
+                return info
+        except Exception:
+            pass
+
     try:
         inst = client.instruments.get_instrument_by(
             id_type=InstrumentIdType.INSTRUMENT_ID_TYPE_FIGI,
