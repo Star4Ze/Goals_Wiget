@@ -3569,6 +3569,8 @@ function startHACountdown() {
       const s = diff % 60;
       el.textContent = `⏱ Следующий анализ через ${m}:${String(s).padStart(2,'0')}`;
     }
+  }, 1000);
+}
 
 // ═══════════════════════════════════════════════════════════
 // TRADING BOT CONTROL & STATUS
