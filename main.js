@@ -90,8 +90,8 @@ async function triggerGitSync() {
   try {
     logAction("🔄 Автосинк Git: Проверка изменений...");
     
-    // 1. Проверяем наличие локальных изменений
-    const statusRes = await runGitCommand("status --porcelain");
+    // 1. Проверяем наличие локальных изменений в папке виджета
+    const statusRes = await runGitCommand("status --porcelain -- \".\"");
     let hasLocalChanges = statusRes.success && statusRes.stdout !== "";
 
     if (hasLocalChanges) {
@@ -117,19 +117,19 @@ async function triggerGitSync() {
       }
     }
 
-    const remainingStatusRes = await runGitCommand("status --porcelain");
+    const remainingStatusRes = await runGitCommand("status --porcelain -- \".\"");
     if (remainingStatusRes.success && remainingStatusRes.stdout !== "") {
-      logAction(`⚠️ Автосинк Git: pull --rebase пропущен, потому что в Obsidian остались незакоммиченные изменения вне папки виджета:\n${remainingStatusRes.stdout}`);
+      logAction(`⚠️ Автосинк Git: pull --rebase пропущен, потому что в папке виджета остались незакоммиченные изменения:\n${remainingStatusRes.stdout}`);
       return;
     }
 
-    // 4. Подтягиваем изменения с удаленного репозитория с использованием rebase
+    // 4. Подтягиваем изменения с удаленного репозитория с использованием rebase и autostash
     logAction("🔄 Автосинк Git: Получение свежих изменений (pull --rebase)...");
     
     const beforePullRes = await runGitCommand("rev-parse HEAD");
     const beforePullSha = beforePullRes.success ? beforePullRes.stdout : "";
 
-    const pullRes = await runGitCommand("pull --rebase");
+    const pullRes = await runGitCommand("pull --rebase --autostash");
     if (!pullRes.success) {
       logAction(`⚠️ Автосинк Git (pull --rebase ошибка): ${pullRes.error || pullRes.stderr}`);
       logAction("🔄 Автосинк Git: Отмена rebase...");
