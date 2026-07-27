@@ -2,7 +2,22 @@
   "id": "владиславlife",
   "name": "ВладиславLife",
   "createdAt": "2026-07-14T16:42:08.743Z",
-  "nodes": [],
+  "nodes": [
+    {
+      "id": "9b165b86-4c91-41e7-9122-f80bdb5db456",
+      "type": "goal",
+      "title": "5,000,000",
+      "description": "",
+      "date": "2029-12-31",
+      "probability": 100,
+      "sphere": "work",
+      "status": "active",
+      "importance": 10,
+      "y": 62.22222222222222,
+      "imageUrl": "",
+      "hoverFactor": 0
+    }
+  ],
   "connections": [],
   "spheres": [
     {
@@ -31,8 +46,8 @@
     }
   ],
   "viewport": {
-    "panX": 2461406400000,
+    "panX": 1881258130703.541,
     "panY": 0,
-    "scale": 2886088006.902502
+    "scale": 54284778.095414385
   }
 }
