@@ -1422,10 +1422,17 @@ async function init() {
     }
   });
 
-  // Open AlgoTrading
-  document.getElementById('addon-algotrading-btn')?.addEventListener('click', () => {
-    if (window.electronAPI && window.electronAPI.openAlgoTrading) {
-      window.electronAPI.openAlgoTrading();
+  // Open Chart Analysis
+  document.getElementById('addon-chartanalysis-btn')?.addEventListener('click', () => {
+    if (window.electronAPI && window.electronAPI.openChartAnalysis) {
+      window.electronAPI.openChartAnalysis();
+    }
+  });
+
+  // Open Grid Bot
+  document.getElementById('addon-gridbot-btn')?.addEventListener('click', () => {
+    if (window.electronAPI && window.electronAPI.openGridBot) {
+      window.electronAPI.openGridBot();
     }
   });
   

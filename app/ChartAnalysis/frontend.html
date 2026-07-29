@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<title>AlgoTrading</title>
+<title>Анализ графиков</title>
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -364,8 +364,8 @@ select:focus,input:focus{border-color:var(--accent);}
   <!-- ===== TITLEBAR ===== -->
   <div id="fc-titlebar">
     <div class="fc-titlebar-left">
-      <span class="material-symbols-outlined">smart_toy</span>
-      <span class="fc-title-text">AlgoTrading</span>
+      <span class="material-symbols-outlined">monitoring</span>
+      <span class="fc-title-text">Анализ графиков</span>
     </div>
     <div class="fc-titlebar-right">
       <button class="fc-win-btn" id="fc-btn-reload" title="Перезагрузить интерфейс">
@@ -583,7 +583,6 @@ select:focus,input:focus{border-color:var(--accent);}
       <div class="ptab on" onclick="ptab('alerts')">Алерты</div>
       <div class="ptab" onclick="ptab('lines')">Линии</div>
       <div class="ptab" onclick="ptab('log')">Лог</div>
-      <div class="ptab" onclick="ptab('bot')">Бот</div>
     </div>
     <!-- ALERTS TAB -->
     <div class="pbody on" id="pt-alerts">
@@ -638,38 +637,6 @@ select:focus,input:focus{border-color:var(--accent);}
       <div class="stitle" style="margin-top:10px;"><span>Последние события</span></div>
       <div id="ha-events-log"><div class="ha-empty" style="padding:10px;"><i class="fas fa-history" style="font-size:14px;"></i>Нет событий</div></div>
     </div>
-    <!-- BOT TAB -->
-    <div class="pbody" id="pt-bot">
-      <div class="fg">
-        <div class="stitle">Бот</div>
-        <div class="frow" style="margin-bottom:10px; gap:6px;">
-          <button class="btn btn-p btn-sm" id="bot-start-btn" onclick="botCommand('start')"><i class="fas fa-play"></i> Старт</button>
-          <button class="btn btn-d btn-sm" id="bot-stop-btn" onclick="botCommand('stop')"><i class="fas fa-stop"></i> Стоп</button>
-        </div>
-        <div class="frow" style="margin-bottom:10px; gap:6px;">
-          <button class="btn btn-g btn-sm" onclick="botCommand('cancel')">Снять ордера</button>
-          <button class="btn btn-g btn-sm" onclick="botCommand('cancel_rebalance')">Ребалансировка</button>
-        </div>
-        <div class="acard" style="margin-bottom:10px;">
-          <div class="ac-hd">
-            <span class="ac-tk">Статус</span>
-            <span class="ac-tp" id="bot-status-badge">остановлен</span>
-          </div>
-          <div class="ac-pr" id="bot-status-details" style="font-size:11px; color:var(--text2); line-height: 1.4; margin-top:5px;">
-            Загрузка...
-          </div>
-        </div>
-        
-        <div class="stitle">Панель управления</div>
-        <button class="btn btn-p btn-blk" style="margin-bottom:8px;" onclick="openSellerDashboard()"><i class="fas fa-chart-line"></i> 📊 Открыть Дашборд Селлера</button>
-        
-        <div class="stitle">Конфигурация</div>
-        <button class="btn btn-g btn-blk" style="margin-bottom:10px;" onclick="openBotConfigModal()">📝 Настройки (JSON)</button>
-        
-        <div class="stitle"><span>Логи бота</span><button class="btn btn-g btn-sm" onclick="loadBotLogs()"><i class="fas fa-sync-alt"></i></button></div>
-        <div id="bot-logs-list" style="font-family:var(--font-mono); font-size:10px; background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius); padding:8px; max-height:220px; overflow-y:auto; white-space:pre-wrap; color:var(--text2); line-height:1.3;">Ожидание...</div>
-      </div>
-    </div>
   </div>
 </div>
 
@@ -684,7 +651,6 @@ select:focus,input:focus{border-color:var(--accent);}
     <button class="mnbtn" id="mn-lines" onclick="mTab('lines')"><i class="fas fa-draw-polygon"></i>Линии</button>
     <button class="mnbtn" id="mn-log" onclick="mTab('log')"><i class="fas fa-history"></i>Лог</button>
     <button class="mnbtn" id="mn-ha" onclick="mTab('ha')" style="color:var(--accent2);"><i class="fas fa-chart-area"></i>HA</button>
-    <button class="mnbtn" id="mn-bot" onclick="mTab('bot')"><i class="fas fa-robot"></i>Бот</button>
   </div>
 </div>
 <div class="mob-sheet" id="mob-sheet">
@@ -694,7 +660,6 @@ select:focus,input:focus{border-color:var(--accent);}
     <div class="sh-tab" onclick="shTab('lines')">Линии</div>
     <div class="sh-tab" onclick="shTab('log')">Лог</div>
     <div class="sh-tab" onclick="shTab('ha')" style="color:var(--accent2);">HA</div>
-    <div class="sh-tab" onclick="shTab('bot')">Бот</div>
   </div>
   <div class="sh-body" id="sh-body"></div>
 </div>
@@ -3050,14 +3015,13 @@ async function loadLog(){
 // PANELS
 // ═══════════════════════════════════════════════════════════
 function ptab(t){
-  const tabs = ['alerts','lines','log','bot'];
+  const tabs = ['alerts','lines','log'];
   document.querySelectorAll('.ptab').forEach((el,i)=>el.classList.toggle('on', tabs[i]===t));
   document.querySelectorAll('.pbody').forEach(el=>el.classList.remove('on'));
   document.getElementById('pt-'+t).classList.add('on');
   if(t==='log') loadLog();
   if(t==='lines') loadLines();
   if(t==='ha') loadHASignals();
-  if(t==='bot') { loadBotStatus(); loadBotLogs(); }
 }
 function togglePanel(){
   document.getElementById('right-panel').classList.toggle('collapsed');
@@ -3073,7 +3037,7 @@ function mTab(t){
   shTab(t);
 }
 function shTab(t){
-  const tabs = ['alerts','lines','log','ha','bot'];
+  const tabs = ['alerts','lines','log','ha'];
   document.querySelectorAll('.sh-tab').forEach((el,i)=>el.classList.toggle('on', tabs[i]===t));
   renderSheet(t);
 }
@@ -3093,11 +3057,6 @@ async function renderSheet(t){
       ||'<div class="empty"><i class="fas fa-chart-line"></i>Нет линий</div>';
   } else if(t==='ha') {
     body.innerHTML = document.getElementById('ha-signals-list').innerHTML;
-  } else if(t==='bot') {
-    body.innerHTML = document.getElementById('pt-bot').innerHTML;
-    // На мобилке тоже запускаем обновление логов/статуса
-    loadBotStatus();
-    loadBotLogs();
   } else {
     const data=await fetch(`${API}/api/alert_log?nick=Admin`).then(r=>r.json()).catch(()=>[]);
     body.innerHTML=data.map(l=>`<div class="logitem"><div class="log-t">${new Date(l.triggered_at*1000).toLocaleString('ru')}</div>

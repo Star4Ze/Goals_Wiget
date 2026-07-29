@@ -13,9 +13,10 @@ let analyticsWindow = null;
 let tradingJournalWindow = null;
 let connectionsWindow = null;
 let futureCanvasWindow = null;
-let algoTradingWindow = null;
-let algoTradingProcess = null;
-let sellerDashboardWindow = null;
+let chartAnalysisWindow = null;
+let chartAnalysisProcess = null;
+let gridBotWindow = null;
+let gridBotProcess = null;
 
 const TARGET_DIR = "C:\\Users\\HomePC\\Documents\\Obsidian\\Progects\\MyLife";
 const CONNECTIONS_DIR = "C:\\Users\\HomePC\\Documents\\Obsidian\\Progects\\MyLife\\Моя картотека";
@@ -1947,13 +1948,13 @@ ${content}
     });
   });
 
-  ipcMain.handle('open-algo-trading', (event) => {
-    if (algoTradingWindow) {
-      algoTradingWindow.focus();
+  ipcMain.handle('open-chart-analysis', (event) => {
+    if (chartAnalysisWindow) {
+      chartAnalysisWindow.focus();
       return;
     }
 
-    algoTradingWindow = new BrowserWindow({
+    chartAnalysisWindow = new BrowserWindow({
       width: 1280,
       height: 800,
       minWidth: 900,
@@ -1969,31 +1970,31 @@ ${content}
       }
     });
 
-    algoTradingWindow.loadFile(path.join(__dirname, 'app', 'AlgoTrading', 'frontend.html'));
+    chartAnalysisWindow.loadFile(path.join(__dirname, 'app', 'ChartAnalysis', 'frontend.html'));
 
-    algoTradingWindow.on('maximize', () => {
-      if (algoTradingWindow && !algoTradingWindow.isDestroyed()) {
-        algoTradingWindow.webContents.send('window-state-change', true);
+    chartAnalysisWindow.on('maximize', () => {
+      if (chartAnalysisWindow && !chartAnalysisWindow.isDestroyed()) {
+        chartAnalysisWindow.webContents.send('window-state-change', true);
       }
     });
-    algoTradingWindow.on('unmaximize', () => {
-      if (algoTradingWindow && !algoTradingWindow.isDestroyed()) {
-        algoTradingWindow.webContents.send('window-state-change', false);
+    chartAnalysisWindow.on('unmaximize', () => {
+      if (chartAnalysisWindow && !chartAnalysisWindow.isDestroyed()) {
+        chartAnalysisWindow.webContents.send('window-state-change', false);
       }
     });
 
-    algoTradingWindow.on('closed', () => {
-      algoTradingWindow = null;
+    chartAnalysisWindow.on('closed', () => {
+      chartAnalysisWindow = null;
     });
   });
 
-  ipcMain.handle('open-seller-dashboard', (event) => {
-    if (sellerDashboardWindow) {
-      sellerDashboardWindow.focus();
+  ipcMain.handle('open-grid-bot', (event) => {
+    if (gridBotWindow) {
+      gridBotWindow.focus();
       return;
     }
 
-    sellerDashboardWindow = new BrowserWindow({
+    gridBotWindow = new BrowserWindow({
       width: 1280,
       height: 800,
       minWidth: 900,
@@ -2009,22 +2010,32 @@ ${content}
       }
     });
 
-    sellerDashboardWindow.loadURL('http://127.0.0.1:8765/seller');
+    gridBotWindow.loadURL('http://127.0.0.1:8080');
 
-    sellerDashboardWindow.on('maximize', () => {
-      if (sellerDashboardWindow && !sellerDashboardWindow.isDestroyed()) {
-        sellerDashboardWindow.webContents.send('window-state-change', true);
+    gridBotWindow.on('maximize', () => {
+      if (gridBotWindow && !gridBotWindow.isDestroyed()) {
+        gridBotWindow.webContents.send('window-state-change', true);
       }
     });
-    sellerDashboardWindow.on('unmaximize', () => {
-      if (sellerDashboardWindow && !sellerDashboardWindow.isDestroyed()) {
-        sellerDashboardWindow.webContents.send('window-state-change', false);
+    gridBotWindow.on('unmaximize', () => {
+      if (gridBotWindow && !gridBotWindow.isDestroyed()) {
+        gridBotWindow.webContents.send('window-state-change', false);
       }
     });
 
-    sellerDashboardWindow.on('closed', () => {
-      sellerDashboardWindow = null;
+    gridBotWindow.on('closed', () => {
+      gridBotWindow = null;
     });
+  });
+
+  // Keep open-seller-dashboard as redirect for legacy button calls
+  ipcMain.handle('open-seller-dashboard', (event) => {
+    if (gridBotWindow) {
+      gridBotWindow.focus();
+      return;
+    }
+    // Forward call to open-grid-bot implementation
+    ipcMain.emit('open-grid-bot', event);
   });
 
   ipcMain.handle('relaunch-app', () => {
@@ -2255,42 +2266,72 @@ app.on('web-contents-created', (event, contents) => {
   });
 });
 
-function startAlgoTradingBackend() {
+function startChartAnalysisBackend() {
   const pythonPath = 'python';
-  const scriptPath = path.join(__dirname, 'app', 'AlgoTrading', 'backend.py');
+  const scriptPath = path.join(__dirname, 'app', 'ChartAnalysis', 'backend.py');
   
-  logAction(`🚀 Запуск AlgoTrading бэкенда: ${scriptPath}`);
+  logAction(`🚀 Запуск ChartAnalysis бэкенда: ${scriptPath}`);
   
   const { spawn } = require('child_process');
   
-  algoTradingProcess = spawn(pythonPath, [scriptPath], {
-    cwd: path.join(__dirname, 'app', 'AlgoTrading'),
+  chartAnalysisProcess = spawn(pythonPath, [scriptPath], {
+    cwd: path.join(__dirname, 'app', 'ChartAnalysis'),
     detached: false,
     windowsHide: true,
     stdio: 'ignore'
   });
 
-  algoTradingProcess.on('error', (err) => {
-    logAction(`⚠️ Ошибка запуска AlgoTrading бэкенда: ${err.message}`);
+  chartAnalysisProcess.on('error', (err) => {
+    logAction(`⚠️ Ошибка запуска ChartAnalysis бэкенда: ${err.message}`);
   });
 
-  algoTradingProcess.on('exit', (code, signal) => {
-    logAction(`🛑 AlgoTrading бэкенд завершил работу с кодом ${code} и сигналом ${signal}`);
-    algoTradingProcess = null;
+  chartAnalysisProcess.on('exit', (code, signal) => {
+    logAction(`🛑 ChartAnalysis бэкенд завершил работу с кодом ${code} и сигналом ${signal}`);
+    chartAnalysisProcess = null;
+  });
+}
+
+function startGridBotBackend() {
+  const pythonPath = 'python';
+  const scriptPath = path.join(__dirname, 'app', 'Seller', 'run_local.py');
+  
+  logAction(`🚀 Запуск GridBot бэкенда: ${scriptPath}`);
+  
+  const { spawn } = require('child_process');
+  
+  gridBotProcess = spawn(pythonPath, [scriptPath], {
+    cwd: path.join(__dirname, 'app', 'Seller'),
+    detached: false,
+    windowsHide: true,
+    stdio: 'ignore'
+  });
+
+  gridBotProcess.on('error', (err) => {
+    logAction(`⚠️ Ошибка запуска GridBot бэкенда: ${err.message}`);
+  });
+
+  gridBotProcess.on('exit', (code, signal) => {
+    logAction(`🛑 GridBot бэкенд завершил работу с кодом ${code} и сигналом ${signal}`);
+    gridBotProcess = null;
   });
 }
 
 app.on('before-quit', () => {
-  if (algoTradingProcess) {
-    logAction('🛑 Завершение AlgoTrading бэкенда при выходе из приложения...');
-    algoTradingProcess.kill();
+  if (chartAnalysisProcess) {
+    logAction('🛑 Завершение ChartAnalysis бэкенда при выходе из приложения...');
+    chartAnalysisProcess.kill();
+  }
+  if (gridBotProcess) {
+    logAction('🛑 Завершение GridBot бэкенда при выходе из приложения...');
+    gridBotProcess.kill();
   }
 });
 
 app.whenReady().then(() => {
   setupHandlers();
   startFileWatcher();
-  startAlgoTradingBackend();
+  startChartAnalysisBackend();
+  startGridBotBackend();
   createWindow();
   
   // Запуск фоновой синхронизации Git при старте приложения через 2 секунды

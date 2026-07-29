@@ -517,9 +517,9 @@ async def startup():
         ha_analyzer.add_symbol(inst["figi"], inst.get("ticker", inst["figi"]), inst.get("name", ""))
     asyncio.create_task(ha_analyzer.start())
     
-    # Start bot trading cycle in background daemon thread
-    t = threading.Thread(target=background_trade_worker, daemon=True)
-    t.start()
+    # Start bot trading cycle in background daemon thread (Disabled: Grid Bot is now a separate app)
+    # t = threading.Thread(target=background_trade_worker, daemon=True)
+    # t.start()
     
     logger.info(f"Unified Trading Platform started on :{PORT}")
 

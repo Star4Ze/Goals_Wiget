@@ -67,7 +67,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   renameCanvasBoard: (boardId, newName) => ipcRenderer.invoke('rename-canvas-board', boardId, newName),
   deleteCanvasBoard: (boardId) => ipcRenderer.invoke('delete-canvas-board', boardId),
   fetchUrl: (url) => ipcRenderer.invoke('fetch-url', url),
-  openAlgoTrading: () => ipcRenderer.invoke('open-algo-trading'),
+  openChartAnalysis: () => ipcRenderer.invoke('open-chart-analysis'),
+  openGridBot: () => ipcRenderer.invoke('open-grid-bot'),
   openSellerDashboard: () => ipcRenderer.invoke('open-seller-dashboard'),
   relaunchApp: () => ipcRenderer.invoke('relaunch-app')
 });
