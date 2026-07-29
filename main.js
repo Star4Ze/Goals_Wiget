@@ -1989,6 +1989,11 @@ ${content}
   });
 
   function openGridBotWindow() {
+    if (!gridBotProcess) {
+      logAction('🚀 GridBot бэкенд не был запущен. Запускаем перед открытием окна...');
+      startGridBotBackend();
+    }
+
     if (gridBotWindow) {
       if (!gridBotWindow.isDestroyed()) {
         if (gridBotWindow.isMinimized()) gridBotWindow.restore();
@@ -2015,20 +2020,28 @@ ${content}
       }
     });
 
-    gridBotWindow.loadURL('http://127.0.0.1:8080');
+    const targetUrl = 'http://127.0.0.1:8080';
+    gridBotWindow.loadURL(targetUrl);
 
     gridBotWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
       console.log(`[GRIDBOT RENDERER] ${message} (${sourceId}:${line})`);
     });
 
+    let retryTimer = null;
+    const retryLoad = () => {
+      if (retryTimer) clearTimeout(retryTimer);
+      retryTimer = setTimeout(() => {
+        if (gridBotWindow && !gridBotWindow.isDestroyed()) {
+          console.log('[GRIDBOT RETRY] Retrying loadURL...');
+          gridBotWindow.loadURL(targetUrl);
+        }
+      }, 1000);
+    };
+
     gridBotWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
       console.error(`[GRIDBOT LOAD FAIL] ${errorCode}: ${errorDescription} (${validatedURL})`);
       logAction(`⚠️ Seller terminal load failed (${errorCode}): ${errorDescription}`);
-      setTimeout(() => {
-        if (gridBotWindow && !gridBotWindow.isDestroyed()) {
-          gridBotWindow.loadURL('http://127.0.0.1:8080');
-        }
-      }, 1500);
+      retryLoad();
     });
 
     gridBotWindow.webContents.on('render-process-gone', (event, details) => {
