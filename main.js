@@ -1988,10 +1988,15 @@ ${content}
     });
   });
 
-  ipcMain.handle('open-grid-bot', (event) => {
+  function openGridBotWindow() {
     if (gridBotWindow) {
-      gridBotWindow.focus();
-      return;
+      if (!gridBotWindow.isDestroyed()) {
+        if (gridBotWindow.isMinimized()) gridBotWindow.restore();
+        gridBotWindow.focus();
+      } else {
+        gridBotWindow = null;
+      }
+      if (gridBotWindow) return;
     }
 
     gridBotWindow = new BrowserWindow({
@@ -2012,11 +2017,31 @@ ${content}
 
     gridBotWindow.loadURL('http://127.0.0.1:8080');
 
+    gridBotWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+      console.log(`[GRIDBOT RENDERER] ${message} (${sourceId}:${line})`);
+    });
+
+    gridBotWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+      console.error(`[GRIDBOT LOAD FAIL] ${errorCode}: ${errorDescription} (${validatedURL})`);
+      logAction(`⚠️ Seller terminal load failed (${errorCode}): ${errorDescription}`);
+      setTimeout(() => {
+        if (gridBotWindow && !gridBotWindow.isDestroyed()) {
+          gridBotWindow.loadURL('http://127.0.0.1:8080');
+        }
+      }, 1500);
+    });
+
+    gridBotWindow.webContents.on('render-process-gone', (event, details) => {
+      console.error(`[GRIDBOT RENDER GONE] Reason: ${details.reason}`);
+      logAction(`⚠️ Seller terminal render process gone: ${details.reason}`);
+    });
+
     gridBotWindow.on('maximize', () => {
       if (gridBotWindow && !gridBotWindow.isDestroyed()) {
         gridBotWindow.webContents.send('window-state-change', true);
       }
     });
+
     gridBotWindow.on('unmaximize', () => {
       if (gridBotWindow && !gridBotWindow.isDestroyed()) {
         gridBotWindow.webContents.send('window-state-change', false);
@@ -2026,16 +2051,14 @@ ${content}
     gridBotWindow.on('closed', () => {
       gridBotWindow = null;
     });
+  }
+
+  ipcMain.handle('open-grid-bot', () => {
+    openGridBotWindow();
   });
 
-  // Keep open-seller-dashboard as redirect for legacy button calls
-  ipcMain.handle('open-seller-dashboard', (event) => {
-    if (gridBotWindow) {
-      gridBotWindow.focus();
-      return;
-    }
-    // Forward call to open-grid-bot implementation
-    ipcMain.emit('open-grid-bot', event);
+  ipcMain.handle('open-seller-dashboard', () => {
+    openGridBotWindow();
   });
 
   ipcMain.handle('relaunch-app', () => {
@@ -2303,8 +2326,21 @@ function startGridBotBackend() {
     cwd: path.join(__dirname, 'app', 'Seller'),
     detached: false,
     windowsHide: true,
-    stdio: 'ignore'
+    stdio: ['ignore', 'pipe', 'pipe']
   });
+
+  if (gridBotProcess.stdout) {
+    gridBotProcess.stdout.on('data', (data) => {
+      console.log(`[GridBot] ${data.toString().trim()}`);
+    });
+  }
+
+  if (gridBotProcess.stderr) {
+    gridBotProcess.stderr.on('data', (data) => {
+      const msg = data.toString().trim();
+      if (msg) console.error(`[GridBot ERR] ${msg}`);
+    });
+  }
 
   gridBotProcess.on('error', (err) => {
     logAction(`⚠️ Ошибка запуска GridBot бэкенда: ${err.message}`);
