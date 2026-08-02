@@ -1,15 +1,38 @@
+
 const STORAGE_KEY = 'widget_data';
+
+async function saveSettingItem(key, value) {
+  const strVal = typeof value === 'object' ? JSON.stringify(value) : String(value);
+  localStorage.setItem(key, strVal);
+  if (window.electronAPI && window.electronAPI.saveWidgetSettings) {
+    await window.electronAPI.saveWidgetSettings({ [key]: value });
+  }
+}
+
+async function syncSettingsFromDisk() {
+  if (window.electronAPI && window.electronAPI.getWidgetSettings) {
+    try {
+      const diskSettings = await window.electronAPI.getWidgetSettings();
+      if (diskSettings && typeof diskSettings === 'object') {
+        Object.keys(diskSettings).forEach(key => {
+          const val = typeof diskSettings[key] === 'object' ? JSON.stringify(diskSettings[key]) : String(diskSettings[key]);
+          localStorage.setItem(key, val);
+        });
+      }
+    } catch(e) {}
+  }
+}
 
 function loadSavedData() {
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved) {
     try {
       const data = JSON.parse(saved);
-      document.getElementById('personal').value = formatInput(data.personal || 800000);
-      document.getElementById('managed').value = formatInput(data.managed || 200000);
-      document.getElementById('personal-rate').value = data.personalRate || 14;
-      document.getElementById('managed-rate').value = data.managedRate || 18;
-      document.getElementById('target').value = formatInput(data.target || 5000000);
+      document.getElementById('personal').value = formatInput(data.personal ?? 800000);
+      document.getElementById('managed').value = formatInput(data.managed ?? 200000);
+      document.getElementById('personal-rate').value = data.personalRate ?? 14;
+      document.getElementById('managed-rate').value = data.managedRate ?? 18;
+      document.getElementById('target').value = formatInput(data.target ?? 5000000);
       if (data.deadline) document.getElementById('deadline').value = data.deadline;
       return data;
     } catch(e) {}
@@ -27,7 +50,7 @@ function saveAllData() {
     deadline: document.getElementById('deadline').value,
     lastUpdated: new Date().toISOString()
   };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  saveSettingItem(STORAGE_KEY, data);
 }
 
 function formatMoney(n) {
@@ -140,18 +163,32 @@ function positionDropdownBelow(modalContent, anchorRect) {
   modalContent.style.top = '0px';
   modalContent.style.bottom = 'auto';
 
+  // Temporarily reset maxHeight to accurately measure natural content height
+  modalContent.style.maxHeight = 'none';
+
   const modalRect = modalContent.getBoundingClientRect();
   const width = modalRect.width || 220;
-  const height = modalRect.height || 180;
+  const height = modalContent.scrollHeight || modalRect.height || 180;
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
   const left = anchorRect.left + (anchorRect.width - width) / 2;
-  const top = anchorRect.bottom + gap;
-  const availableHeight = Math.max(120, viewportHeight - top - margin);
+  
+  let top = anchorRect.bottom + gap;
+  const availableBelow = viewportHeight - top - margin;
+  const spaceAbove = anchorRect.top - gap - margin;
+
+  if (availableBelow < Math.min(height, 120) && spaceAbove > availableBelow) {
+    top = Math.max(margin, anchorRect.top - height - gap);
+    const availableAbove = anchorRect.top - gap - margin;
+    const calcMaxHeight = Math.min(height, Math.max(120, availableAbove));
+    modalContent.style.maxHeight = `${calcMaxHeight}px`;
+  } else {
+    const calcMaxHeight = Math.min(height, Math.max(120, availableBelow));
+    modalContent.style.maxHeight = `${calcMaxHeight}px`;
+  }
 
   modalContent.style.left = `${clamp(left, margin, viewportWidth - width - margin)}px`;
   modalContent.style.top = `${Math.max(margin, top)}px`;
-  modalContent.style.maxHeight = `${availableHeight}px`;
   modalContent.style.overflow = 'hidden';
 }
 
@@ -290,13 +327,13 @@ function autoResizeWindow() {
       if (fileBtn) {
         const btnRect = fileBtn.getBoundingClientRect();
         // Temporarily clear any maxHeight restrictions to measure natural height
-        const originalMaxHeight = fileModalContent.style.maxHeight;
         fileModalContent.style.maxHeight = 'none';
         const modalHeight = fileModalContent.scrollHeight || fileModalContent.getBoundingClientRect().height || 250;
-        fileModalContent.style.maxHeight = originalMaxHeight;
         
-        const requiredHeight = btnRect.bottom + modalHeight + 25;
-        baseHeight = Math.max(baseHeight, requiredHeight);
+        if (btnRect.bottom > 0) {
+          const requiredHeight = btnRect.bottom + modalHeight + 25;
+          baseHeight = Math.max(baseHeight, requiredHeight);
+        }
       }
     }
     
@@ -456,6 +493,32 @@ function setupSectionCollapses() {
   });
 }
 
+// Apply card visibility based on localStorage
+function applyVisibilitySettings() {
+  const showTasks = localStorage.getItem('show_tasks_card') !== 'false';
+  const showDaily = localStorage.getItem('show_daily_card') !== 'false';
+  const showCapital = localStorage.getItem('show_capital_card') !== 'false';
+
+  const tasksCard = document.getElementById('tasks-card');
+  const dailyCard = document.getElementById('daily-card');
+  const capitalCard = document.getElementById('capital-card');
+
+  if (tasksCard) tasksCard.style.display = showTasks ? '' : 'none';
+  if (dailyCard) dailyCard.style.display = showDaily ? '' : 'none';
+  if (capitalCard) capitalCard.style.display = showCapital ? '' : 'none';
+
+  // Update toggles state if modal is open
+  const tasksToggle = document.getElementById('show-tasks-toggle');
+  const dailyToggle = document.getElementById('show-daily-toggle');
+  const capitalToggle = document.getElementById('show-capital-toggle');
+  if (tasksToggle) tasksToggle.checked = showTasks;
+  if (dailyToggle) dailyToggle.checked = showDaily;
+  if (capitalToggle) capitalToggle.checked = showCapital;
+
+  autoResizeWindow();
+  setTimeout(autoResizeWindow, 310);
+}
+
 function closeTaskModal() {
   selectedTask = null;
   selectedTaskFileName = null;
@@ -469,11 +532,23 @@ async function openFileSelectorModal(event) {
   const modal = document.getElementById('file-selector-modal');
   const modalContent = modal?.querySelector('.modal-content');
   if (modal && modalContent && event) {
-    const rect = event.currentTarget.getBoundingClientRect();
+    const btn = event.currentTarget;
     modal.classList.remove('hidden');
     await renderFileList();
+    
+    modalContent.style.maxHeight = 'none';
     autoResizeWindow();
-    positionDropdownBelow(modalContent, rect);
+    
+    const reposition = () => {
+      const rect = btn.getBoundingClientRect();
+      positionDropdownBelow(modalContent, rect);
+    };
+    
+    reposition();
+    requestAnimationFrame(reposition);
+    setTimeout(reposition, 50);
+    setTimeout(reposition, 150);
+    setTimeout(reposition, 300);
   }
 }
 
@@ -481,9 +556,22 @@ function closeFileSelectorModal() {
   const modal = document.getElementById('file-selector-modal');
   if (modal) {
     modal.classList.add('hidden');
+    const modalContent = modal.querySelector('.modal-content');
+    if (modalContent) modalContent.style.maxHeight = 'none';
     autoResizeWindow();
+    setTimeout(autoResizeWindow, 310);
   }
 }
+
+window.addEventListener('resize', () => {
+  const fileModal = document.getElementById('file-selector-modal');
+  const fileModalContent = fileModal?.querySelector('.modal-content');
+  const fileBtn = document.getElementById('active-file-btn');
+  if (fileModal && !fileModal.classList.contains('hidden') && fileModalContent && fileBtn) {
+    const rect = fileBtn.getBoundingClientRect();
+    positionDropdownBelow(fileModalContent, rect);
+  }
+});
 
 function openFileActionModal(fileName, event) {
   selectedFileName = fileName;
@@ -1120,6 +1208,7 @@ function calculate() {
 
 async function init() {
   try {
+    await syncSettingsFromDisk();
     initThemeAndAccent();
   initBreakTimer();
   initSettingsListeners();
@@ -1129,6 +1218,7 @@ async function init() {
   setupCloseButton();
   setupCapitalToggle();
   setupSectionCollapses();
+  applyVisibilitySettings();
   
   const fileBtn = document.getElementById('active-file-btn');
   if (fileBtn) fileBtn.textContent = activeFileName;
@@ -1515,9 +1605,9 @@ function openSettingsModal() {
           document.documentElement.style.setProperty('--accent-dark', color.dark);
           
           // Save
-          localStorage.setItem('accent_primary', color.primary);
-          localStorage.setItem('accent_hover', color.hover);
-          localStorage.setItem('accent_dark', color.dark);
+          saveSettingItem('accent_primary', color.primary);
+          saveSettingItem('accent_hover', color.hover);
+          saveSettingItem('accent_dark', color.dark);
         };
         palette.appendChild(dot);
       });
@@ -1540,6 +1630,14 @@ function openSettingsModal() {
       mediaInput.value = savedPath ? savedPath.split(/[\\\/]/).pop() : '';
       mediaInput.title = savedPath;
     }
+
+    // Load visibility toggle states
+    const tasksToggle = document.getElementById('show-tasks-toggle');
+    const dailyToggle = document.getElementById('show-daily-toggle');
+    const capitalToggle = document.getElementById('show-capital-toggle');
+    if (tasksToggle) tasksToggle.checked = localStorage.getItem('show_tasks_card') !== 'false';
+    if (dailyToggle) dailyToggle.checked = localStorage.getItem('show_daily_card') !== 'false';
+    if (capitalToggle) capitalToggle.checked = localStorage.getItem('show_capital_card') !== 'false';
 
     const mainProviderSelect = document.getElementById('main-llm-provider');
     const mainGeminiGroup = document.getElementById('main-gemini-key-group');
@@ -1566,16 +1664,28 @@ function openSettingsModal() {
     updateBreakSettingsState();
 
     modal.classList.remove('hidden');
-    autoResizeWindow();
+    // Expand window enough to show the settings modal fully
+    if (window.electronAPI && window.electronAPI.resizeWindow) {
+      const settingsContent = modalContent;
+      // Give DOM time to render, then measure and resize
+      requestAnimationFrame(() => {
+        const h = Math.ceil(settingsContent.getBoundingClientRect().height);
+        const neededHeight = h + 80;
+        const container = document.querySelector('.container');
+        const baseHeight = container ? Math.ceil(container.getBoundingClientRect().height) + 38 : 0;
+        window.electronAPI.resizeWindow(520, Math.min(1024, Math.max(baseHeight, neededHeight)));
+      });
+    }
     updateBreakCountdownStatus();
   }
 }
 
 function closeSettingsModal() {
   const modal = document.getElementById('settings-modal');
-  if (modal) {
+  if (modal && !modal.classList.contains('hidden')) {
     modal.classList.add('hidden');
     autoResizeWindow();
+    setTimeout(autoResizeWindow, 310);
   }
 }
 
@@ -1699,7 +1809,7 @@ function initSettingsListeners() {
     document.body.classList.remove('light-theme');
     document.getElementById('theme-dark-btn')?.classList.add('active');
     document.getElementById('theme-light-btn')?.classList.remove('active');
-    localStorage.setItem('widget_theme', 'dark');
+    saveSettingItem('widget_theme', 'dark');
   });
   
   // Theme Light
@@ -1707,24 +1817,24 @@ function initSettingsListeners() {
     document.body.classList.add('light-theme');
     document.getElementById('theme-light-btn')?.classList.add('active');
     document.getElementById('theme-dark-btn')?.classList.remove('active');
-    localStorage.setItem('widget_theme', 'light');
+    saveSettingItem('widget_theme', 'light');
   });
   
   // Break Enabled change
   document.getElementById('break-enabled-toggle')?.addEventListener('change', (e) => {
-    localStorage.setItem('break_enabled', e.target.checked ? 'true' : 'false');
+    saveSettingItem('break_enabled', e.target.checked ? 'true' : 'false');
     updateBreakSettingsState();
     initBreakTimer();
   });
 
   // Break Interval change
   document.getElementById('break-interval-select')?.addEventListener('change', (e) => {
-    localStorage.setItem('break_interval', e.target.value);
+    saveSettingItem('break_interval', e.target.value);
     initBreakTimer(); // restart timer
   });
 
   document.getElementById('break-sound-select')?.addEventListener('change', (e) => {
-    localStorage.setItem('break_sound', e.target.value);
+    saveSettingItem('break_sound', e.target.value);
   });
   
   // Choose media
@@ -1732,7 +1842,7 @@ function initSettingsListeners() {
     if (window.electronAPI && window.electronAPI.selectMediaFile) {
       const filePath = await window.electronAPI.selectMediaFile();
       if (filePath) {
-        localStorage.setItem('break_media_path', filePath);
+        saveSettingItem('break_media_path', filePath);
         const mediaInput = document.getElementById('break-media-path');
         if (mediaInput) {
           mediaInput.value = filePath.split(/[\\\/]/).pop();
@@ -1785,6 +1895,32 @@ function initSettingsListeners() {
       if (e.target === settingsOverlay) closeSettingsModal();
     });
   }
+
+  // Escape key closes settings modal
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const settingsModal = document.getElementById('settings-modal');
+      if (settingsModal && !settingsModal.classList.contains('hidden')) {
+        closeSettingsModal();
+      }
+    }
+  });
+
+  // Visibility section toggles
+  document.getElementById('show-tasks-toggle')?.addEventListener('change', (e) => {
+    saveSettingItem('show_tasks_card', e.target.checked ? 'true' : 'false');
+    applyVisibilitySettings();
+  });
+
+  document.getElementById('show-daily-toggle')?.addEventListener('change', (e) => {
+    saveSettingItem('show_daily_card', e.target.checked ? 'true' : 'false');
+    applyVisibilitySettings();
+  });
+
+  document.getElementById('show-capital-toggle')?.addEventListener('change', (e) => {
+    saveSettingItem('show_capital_card', e.target.checked ? 'true' : 'false');
+    applyVisibilitySettings();
+  });
 
 }
 

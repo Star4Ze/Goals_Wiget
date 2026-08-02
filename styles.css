@@ -1151,12 +1151,23 @@ input[type="date"], input[type="number"] {
    ========================================================================== */
 
 /* Настройки модальное окно */
+#settings-modal {
+  height: 100vh !important;
+  min-height: 100vh !important;
+}
 .settings-modal-content {
   width: 330px;
   position: absolute !important;
   left: 50% !important;
   top: 50% !important;
   transform: translate(-50%, -50%) scale(1) !important;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+.settings-modal-content .modal-body {
+  overflow-y: auto;
+  flex: 1;
 }
 .modal-overlay.hidden .settings-modal-content {
   transform: translate(-50%, -50%) scale(0.95) !important;

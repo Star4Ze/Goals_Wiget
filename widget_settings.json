@@ -1,0 +1,21 @@
+{
+  "widget_data": {
+    "personal": 400000,
+    "managed": 600000,
+    "personalRate": 14,
+    "managedRate": 18,
+    "target": 5000000,
+    "deadline": "2030-01-01",
+    "lastUpdated": "2026-08-01T15:52:56.937Z"
+  },
+  "accent_primary": "#4db8ff",
+  "accent_hover": "#70c7ff",
+  "accent_dark": "#1e1e1e",
+  "widget_theme": "dark",
+  "show_tasks_card": "true",
+  "show_daily_card": "false",
+  "show_capital_card": "false",
+  "break_enabled": "true",
+  "break_interval": "0",
+  "break_sound": "chime"
+}

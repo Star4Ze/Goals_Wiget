@@ -20,6 +20,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readDailyTasks: () => ipcRenderer.invoke('read-daily-tasks'),
   moveTaskToFile: (sourceFile, lineIndex, targetFile) => ipcRenderer.invoke('move-task-to-file', sourceFile, lineIndex, targetFile),
   
+  // Widget settings persistence
+  getWidgetSettings: () => ipcRenderer.invoke('get-widget-settings'),
+  saveWidgetSettings: (settings) => ipcRenderer.invoke('save-widget-settings', settings),
+
   // Settings, Breaks & Analytics additions
   selectMediaFile: () => ipcRenderer.invoke('select-media-file'),
   showBreakWindow: (mediaPath, accent, hover, sound) => ipcRenderer.invoke('show-break-window', mediaPath, accent, hover, sound),

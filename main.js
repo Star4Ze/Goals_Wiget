@@ -1204,6 +1204,40 @@ function setupHandlers() {
     logAction(message);
   });
 
+  function getWidgetSettingsPath() {
+    return path.join(__dirname, 'widget_settings.json');
+  }
+
+  function loadWidgetSettings() {
+    try {
+      const p = getWidgetSettingsPath();
+      if (fs.existsSync(p)) {
+        return JSON.parse(fs.readFileSync(p, 'utf-8'));
+      }
+    } catch (e) {}
+    return {};
+  }
+
+  function saveWidgetSettings(newSettings) {
+    try {
+      const p = getWidgetSettingsPath();
+      const current = loadWidgetSettings();
+      const merged = { ...current, ...newSettings };
+      fs.writeFileSync(p, JSON.stringify(merged, null, 2), 'utf-8');
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  ipcMain.handle('get-widget-settings', () => {
+    return loadWidgetSettings();
+  });
+
+  ipcMain.handle('save-widget-settings', (event, settings) => {
+    return saveWidgetSettings(settings);
+  });
+
   ipcMain.handle('add-income', (event, amount, newTotal) => {
     logAction(`💰 Добавлен доход: ${amount.toLocaleString('ru-RU')} ₽ → личный капитал: ${newTotal.toLocaleString('ru-RU')} ₽`);
   });
@@ -2334,6 +2368,7 @@ function startGridBotBackend() {
     cwd: path.join(__dirname, 'app', 'Seller'),
     detached: false,
     windowsHide: true,
+    env: { ...process.env, PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' },
     stdio: ['ignore', 'pipe', 'pipe']
   });
 
