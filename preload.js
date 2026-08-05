@@ -2,7 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   readObsidianTasks: (fileName) => ipcRenderer.invoke('read-obsidian-tasks', fileName),
-  markTaskDone: (lineIndex, fileName) => ipcRenderer.invoke('mark-task-done', lineIndex, fileName),
+  markTaskDone: (lineIndex, fileName, forcedState) => ipcRenderer.invoke('mark-task-done', lineIndex, fileName, forcedState),
   addNewTask: (taskText, fileName) => ipcRenderer.invoke('add-new-task', taskText, fileName),
   logAction: (message) => ipcRenderer.invoke('log-action', message),
   addIncome: (amount, newTotal) => ipcRenderer.invoke('add-income', amount, newTotal),
@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onAppLoaded: (callback) => ipcRenderer.on('app-loaded', callback),
   resizeWindow: (width, height) => ipcRenderer.invoke('resize-window', width, height),
   deleteTask: (lineIndex, fileName) => ipcRenderer.invoke('delete-task', lineIndex, fileName),
+  restoreTask: (lineIndex, deletedLines, fileName) => ipcRenderer.invoke('restore-task', lineIndex, deletedLines, fileName),
   editTask: (lineIndex, newText, fileName) => ipcRenderer.invoke('edit-task', lineIndex, newText, fileName),
   addSubtask: (parentLineIndex, subtaskText, fileName) => ipcRenderer.invoke('add-subtask', parentLineIndex, subtaskText, fileName),
   pinTask: (lineIndex, parentLineIndex, fileName) => ipcRenderer.invoke('pin-task', lineIndex, parentLineIndex, fileName),

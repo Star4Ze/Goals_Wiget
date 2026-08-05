@@ -294,14 +294,23 @@ async function addDailyTaskInline() {
 
 async function markTaskDone(task, fileName = activeFileName) {
   if (task.source === 'obsidian' && window.electronAPI) {
-    await window.electronAPI.markTaskDone(task.lineIndex, fileName);
-    if (fileName === 'Ежедневные задачи') {
-      await loadDailyTasks();
-    } else {
-      await loadObsidianTasks();
+    const wasDoneBefore = task.done;
+    const res = await window.electronAPI.markTaskDone(task.lineIndex, fileName);
+    const reload = fileName === 'Ежедневные задачи' ? loadDailyTasks : loadObsidianTasks;
+    await reload();
+    calculate();
+
+    if (res && res.success && res.wasDone && !wasDoneBefore) {
+      const newLineIndex = res.newLineIndex ?? task.lineIndex;
+      showToast('Задача выполнена', '✅', async () => {
+        if (window.electronAPI && window.electronAPI.markTaskDone) {
+          await window.electronAPI.markTaskDone(newLineIndex, fileName, false);
+          await reload();
+          calculate();
+        }
+      });
     }
   }
-  calculate();
 }
 
 function autoResizeWindow() {
@@ -1428,10 +1437,20 @@ async function init() {
     modalDeleteBtn.addEventListener('click', async () => {
       if (selectedTask && window.electronAPI) {
         const fileName = selectedTaskFileName || activeFileName;
-        await window.electronAPI.deleteTask(selectedTask.lineIndex, fileName);
+        const taskText = selectedTask.text;
+        const res = await window.electronAPI.deleteTask(selectedTask.lineIndex, fileName);
         closeTaskModal();
-        if (fileName === 'Ежедневные задачи') await loadDailyTasks();
-        else await loadObsidianTasks();
+        const reload = fileName === 'Ежедневные задачи' ? loadDailyTasks : loadObsidianTasks;
+        await reload();
+
+        if (res && res.success && res.deletedLines) {
+          showToast('Задача удалена', '🗑️', async () => {
+            if (window.electronAPI && window.electronAPI.restoreTask) {
+              await window.electronAPI.restoreTask(res.lineIndex, res.deletedLines, fileName);
+              await reload();
+            }
+          });
+        }
       }
     });
   }
@@ -1487,7 +1506,7 @@ async function init() {
       } else if (fileName === 'Ежедневные задачи') {
         loadDailyTasks();
       }
-      showToast(`Добавлено дело: "${taskText}"`, '📝');
+      showToast(`Создана задача: "${taskText}"`, '📝');
     });
   }
   
@@ -1932,14 +1951,60 @@ function openAnalyticsWindow() {
   }
 }
 
-function showToast(message, icon = 'ℹ️') {
+function showToast(message, icon = 'ℹ️', onUndo = null) {
   const container = document.getElementById('toast-container');
   if (!container) return;
 
+  if (typeof onUndo === 'function') {
+    container.querySelectorAll('.toast-undo').forEach(t => t.remove());
+  }
+
   const toast = document.createElement('div');
-  toast.className = 'toast';
-  toast.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-text">${message}</span>`;
+  toast.className = 'toast' + (typeof onUndo === 'function' ? ' toast-undo' : '');
+
+  let secondsLeft = 3;
+  let timerId = null;
+  let intervalId = null;
+
+  let html = `<span class="toast-icon">${icon}</span><span class="toast-text">${message}</span>`;
+  if (typeof onUndo === 'function') {
+    html += `<button class="toast-undo-btn">Отменить (${secondsLeft}с)</button>`;
+  }
+  toast.innerHTML = html;
   container.appendChild(toast);
+
+  const dismiss = () => {
+    if (timerId) {
+      clearTimeout(timerId);
+      timerId = null;
+    }
+    if (intervalId) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+    toast.classList.remove('show');
+    toast.addEventListener('transitionend', () => {
+      toast.remove();
+    }, { once: true });
+  };
+
+  if (typeof onUndo === 'function') {
+    const undoBtn = toast.querySelector('.toast-undo-btn');
+    if (undoBtn) {
+      undoBtn.onclick = (e) => {
+        e.stopPropagation();
+        dismiss();
+        onUndo();
+      };
+    }
+
+    intervalId = setInterval(() => {
+      secondsLeft--;
+      if (undoBtn && secondsLeft >= 0) {
+        undoBtn.textContent = `Отменить (${secondsLeft}с)`;
+      }
+    }, 1000);
+  }
 
   // Trigger browser paint then animate
   requestAnimationFrame(() => {
@@ -1947,11 +2012,7 @@ function showToast(message, icon = 'ℹ️') {
   });
 
   // Remove after 3 seconds
-  setTimeout(() => {
-    toast.classList.remove('show');
-    // Wait for transition to finish before removing from DOM
-    toast.addEventListener('transitionend', () => {
-      toast.remove();
-    });
+  timerId = setTimeout(() => {
+    dismiss();
   }, 3000);
 }

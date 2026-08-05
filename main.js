@@ -891,15 +891,15 @@ function setupHandlers() {
     }
   });
 
-  ipcMain.handle('mark-task-done', async (event, lineIndex, fileName) => {
+  ipcMain.handle('mark-task-done', async (event, lineIndex, fileName, forcedState) => {
     const filePath = getFilePath(fileName);
     try {
-      if (!fs.existsSync(filePath)) return false;
+      if (!fs.existsSync(filePath)) return null;
       const content = fs.readFileSync(filePath, 'utf-8');
       const lines = content.split(/\r?\n/);
       if (lineIndex >= 0 && lineIndex < lines.length) {
         const line = lines[lineIndex];
-        const shouldMarkDone = fileName === DAILY_TASKS_FILE_NAME ? !isTaskDoneLine(line) : true;
+        const shouldMarkDone = forcedState !== undefined ? Boolean(forcedState) : (fileName === DAILY_TASKS_FILE_NAME ? !isTaskDoneLine(line) : true);
         
         // Track completed standard tasks
         if (fileName !== DAILY_TASKS_FILE_NAME && shouldMarkDone) {
@@ -911,12 +911,14 @@ function setupHandlers() {
         
         lines[lineIndex] = setTaskDoneState(line, shouldMarkDone);
         updateParentCompletion(lines, lineIndex);
-        if (fileName === DAILY_TASKS_FILE_NAME) {
+        let newLineIndex = lineIndex;
+        if (fileName === DAILY_TASKS_FILE_NAME && shouldMarkDone) {
           const size = getTaskBlockSize(lines, lineIndex);
           const taskBlock = lines.splice(lineIndex, size);
           while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
             lines.pop();
           }
+          newLineIndex = lines.length;
           lines.push(...taskBlock);
         }
         localWrites.set(path.basename(filePath), Date.now());
@@ -924,35 +926,56 @@ function setupHandlers() {
         saveDailyTasksHistoryIfNeeded(fileName);
         logAction(`✅ Выполнена задача на строке ${lineIndex + 1} в ${path.basename(filePath)}`);
         scheduleGitSync();
-        return true;
+        return { success: true, newLineIndex, wasDone: shouldMarkDone };
       }
-      return false;
+      return null;
     } catch (err) {
       logAction(`Ошибка выполнения задачи: ${err.message}`);
-      return false;
+      return null;
     }
   });
 
   ipcMain.handle('delete-task', async (event, lineIndex, fileName) => {
     const filePath = getFilePath(fileName);
     try {
-      if (!fs.existsSync(filePath)) return false;
+      if (!fs.existsSync(filePath)) return null;
       const content = fs.readFileSync(filePath, 'utf-8');
       const lines = content.split(/\r?\n/);
       if (lineIndex >= 0 && lineIndex < lines.length) {
         const size = getTaskBlockSize(lines, lineIndex);
-        lines.splice(lineIndex, size);
+        const deletedLines = lines.splice(lineIndex, size);
         
         localWrites.set(path.basename(filePath), Date.now());
         fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
         saveDailyTasksHistoryIfNeeded(fileName);
         logAction(`🗑️ Удалена задача (и её подзадачи, всего строк: ${size}) с индекса ${lineIndex + 1} в ${path.basename(filePath)}`);
         scheduleGitSync();
-        return true;
+        return { success: true, deletedLines, lineIndex };
       }
-      return false;
+      return null;
     } catch (err) {
       logAction(`Ошибка удаления задачи: ${err.message}`);
+      return null;
+    }
+  });
+
+  ipcMain.handle('restore-task', async (event, lineIndex, deletedLines, fileName) => {
+    const filePath = getFilePath(fileName);
+    try {
+      if (!fs.existsSync(filePath) || !Array.isArray(deletedLines) || deletedLines.length === 0) return false;
+      const content = fs.readFileSync(filePath, 'utf-8');
+      const lines = content.split(/\r?\n/);
+      const targetIndex = Math.min(Math.max(0, lineIndex), lines.length);
+      lines.splice(targetIndex, 0, ...deletedLines);
+      
+      localWrites.set(path.basename(filePath), Date.now());
+      fs.writeFileSync(filePath, lines.join('\n'), 'utf-8');
+      saveDailyTasksHistoryIfNeeded(fileName);
+      logAction(`↩️ Восстановлена задача в ${path.basename(filePath)} на строке ${targetIndex + 1}`);
+      scheduleGitSync();
+      return true;
+    } catch (err) {
+      logAction(`Ошибка восстановления задачи: ${err.message}`);
       return false;
     }
   });

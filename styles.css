@@ -1453,11 +1453,12 @@ input:checked + .slider:before {
 /* Toast Notifications */
 .toast-container {
   position: fixed;
-  bottom: 16px;
+  bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 8px;
   z-index: 10000;
   pointer-events: none;
@@ -1470,20 +1471,20 @@ input:checked + .slider:before {
   border: 1px solid var(--border-color);
   border-left: 4px solid var(--accent-color);
   color: var(--text-main);
-  padding: 10px 16px;
+  padding: 8px 14px;
   border-radius: 8px;
   font-size: 12px;
   font-weight: 500;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  white-space: nowrap;
   opacity: 0;
   transform: translateY(15px);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   pointer-events: auto;
-  min-width: 250px;
-  max-width: 400px;
+  max-width: 90vw;
 }
 
 .toast.show {
@@ -1501,4 +1502,24 @@ input:checked + .slider:before {
   word-break: break-word;
   line-height: 1.4;
 }
+
+.toast-undo-btn {
+  background: rgba(161, 134, 241, 0.18);
+  color: var(--accent-color, #a186f1);
+  border: 1px solid var(--accent-color, #a186f1);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 6px;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.toast-undo-btn:hover {
+  background: var(--accent-color, #a186f1);
+  color: #ffffff;
+}
+
 
